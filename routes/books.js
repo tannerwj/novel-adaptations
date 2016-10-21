@@ -4,7 +4,7 @@ const Promise = require('bluebird')
 const xml2js = require('xml2js')
 
 //search good reads for new book
-router.post('/books/search_new', function (req, res){
+router.post('/books/search-new', function (req, res){
   if(!req.body.query){
     return res.json({
       query: 'no query',
@@ -42,7 +42,7 @@ router.post('/books/search_new', function (req, res){
   })
 })
 
-router.post('/books/add_new', function (req, res){
+router.post('/books/add-new', function (req, res){
   if(!req.body.goodreads_id){
     return res.json({
       query: 'no goodreads id',
