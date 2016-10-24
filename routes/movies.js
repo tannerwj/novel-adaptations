@@ -2,7 +2,7 @@ const router = require('express').Router()
 const request = require('request-promise')
 const Promise = require('bluebird')
 const omdb = require('omdb')
-const mongodb = require('mongodb')
+const Movie = require('../config/movie.js')
 
 // search omdb for new movie
 // http://www.omdbapi.com/?t={Movie+Title}&y={Year}&plot={full-or-short}&r={json-or-xml}
@@ -56,42 +56,12 @@ router.post('/movies/add-new', function(req, res) {
             })
         }
 
-        insertMovie(movie)
-        res.json(movie)
+        var new_movie = Movie(movie)
+        new_movie.save(function (err){
+          if(err) console.log('new movie save error', err)
+          res.sendStatus(200)
+        })
     })
 })
-
-function insertMovie(to_insert) {
-    // we need to work with "MongoClient" interface in order to connect to a mongodb server.
-    var MongoClient = mongodb.MongoClient
-
-    // connection URL. This is where your mongodb server is running.
-    var url = 'mongodb://localhost:27017/noveladaptations'
-
-    // use connect method to connect to the Server
-    MongoClient.connect(url, function(err, db) {
-        if (err) {
-            console.log('Unable to connect to the mongoDB server. Error:', err)
-        } else {
-            // HURRAY!! We are connected. :)
-            console.log('Connection established to', url)
-
-			// get the documents collection
-			var collection = db.collection('movies')
-
-			// insert the movie
-			collection.insert([to_insert], function (err, result) {
-				if (err) {
-					console.log(err)
-				} else {
-					console.log('Inserted %d documents into the "movies" collection. The documents inserted with "_id" are:', result.length, result)
-				}
-
-	            // close connection
-	            db.close()
-        	})
-		}
-    })
-}
 
 module.exports = router

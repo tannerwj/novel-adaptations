@@ -2,6 +2,7 @@ const router = require('express').Router()
 const request = require('request-promise')
 const Promise = require('bluebird')
 const xml2js = require('xml2js')
+const Book = require('../config/book.js')
 
 //search good reads for new book
 router.post('/books/search-new', function (req, res){
@@ -59,7 +60,7 @@ router.post('/books/add-new', function (req, res){
   }).then(parseXml).then(function (data){
     var book =  data.GoodreadsResponse.book[0]
     //save book in db
-    var toSave = {
+    var new_book = Book({
       goodreads_id: book.id[0],
       title: book.title[0],
       original_title: book.work[0].original_title[0],
@@ -77,12 +78,16 @@ router.post('/books/add-new', function (req, res){
           role: author.role[0]
         }
       })
-    }
+    })
+
     //more options to save if wanted:
     //reviews widget, similar books, author images/ratings/links
     //marketplace_id, kindle_asin, original title
-    return res.json(toSave)
-    res.sendStatus(200)
+    new_book.save(function (err){
+      if(err) console.log('new book save error', err)
+      res.sendStatus(200)
+    })
+
   }).catch(function (err){
     res.sendStatus(500)
     console.log('error', err)

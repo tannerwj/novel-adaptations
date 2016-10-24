@@ -6,6 +6,8 @@ const cookieParser = require('cookie-parser')
 
 const app = express()
 const port = process.env.PORT || 80
+
+const db = require('./config/db.js')
 const books = require('./routes/books')
 const movies = require('./routes/movies')
 
