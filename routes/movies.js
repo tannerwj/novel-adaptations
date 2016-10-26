@@ -63,17 +63,18 @@ router.post('/movies/add-new', function(req, res) {
             rated: movie.rated,
             released: movie.released,
             runtime: movie.runtime,
-            genre: movie.genres,//[0]
+            genre: movie.genres,
             director: movie.director,
-            writer: movie.writers,//[0]
-            actors: movie.actors,//[0]
+            writer: movie.writers,
+            actors: movie.actors,
             plot: movie.plot,
-            country: movie.countries,//[0]
+            country: movie.countries,
             poster: movie.poster,
             imdbRating: movie.imdb.rating,
             imdbVotes: movie.imdb.votes,
             type: movie.type
         })
+        
         new_movie.save(function (err){
           if(err) console.log('new movie save error', err)
           res.sendStatus(200)
