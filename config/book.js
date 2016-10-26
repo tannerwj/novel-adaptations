@@ -7,15 +7,20 @@ const BookSchema = new Schema({
   original_title: String,
   isbn: { type: String, unique: true },
   isbn13: { type: String, unique: true },
-  image_url: { type: String, unique: true },
-  small_image_url: { type: String, unique: true },
+  image_url: String,
+  small_image_url: String,
 	description: String,
 	publication_date: String,
 	average_rating: String,
   authors: [{
-    author_id: { type: Number, unique: true },
     name:  String,
     role: String
+  }],
+  adaptations: [{
+    adaptation_id: mongoose.Schema.Types.ObjectId,
+    title: String,
+    priority: Number,
+    image_url: String
   }]
 })
 
