@@ -56,7 +56,24 @@ router.post('/movies/add-new', function(req, res) {
             })
         }
 
-        var new_movie = Movie(movie)
+        var new_movie = Movie({
+            imdbID: movie.imdb.id,
+            title: movie.title,
+            year: movie.year,
+            rated: movie.rated,
+            released: movie.released,
+            runtime: movie.runtime,
+            genre: movie.genres,//[0]
+            director: movie.director,
+            writer: movie.writers,//[0]
+            actors: movie.actors,//[0]
+            plot: movie.plot,
+            country: movie.countries,//[0]
+            poster: movie.poster,
+            imdbRating: movie.imdb.rating,
+            imdbVotes: movie.imdb.votes,
+            type: movie.type
+        })
         new_movie.save(function (err){
           if(err) console.log('new movie save error', err)
           res.sendStatus(200)
