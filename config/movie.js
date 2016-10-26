@@ -17,7 +17,11 @@ const MovieSchema = new Schema({
 	poster: String,
 	imdbRating: Number,
 	imdbVotes: Number,
-	type: String
+	type: String,
+	adaptation_id: mongoose.Schema.Types.ObjectId,
+    title: String,
+    priority: Number,
+    image_url: String
 })
 
 module.exports = mongoose.model('Movie', MovieSchema)
