@@ -1,21 +1,38 @@
 <!doctype html>
-<html>
-<body>
-<pre>
-ideas:
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
 
-top book adaptations
-worst book adaptations
-review/rate adaptations
-parts missing from book/added to movie
-book/movie suggestions
-social share books/movies/adaptations
-recommend adaptations that haven't been made yet
+    <title>Novel Adaptations</title>
 
-my fav books/movies
-my fav adaptations
+    <meta name='description' content='Compare books with their movies, vote for new movies to be made'>
+    <meta content='index, follow' name='robots'>
 
-data from goodreads/omdb
-</pre>
-</body>
+    <link href="data:image/x-icon;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAvqaFAIhbIACffEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMiIiIiIAAAIiIiIiIiAAAiIiIiIiIAACIiIiIiIgAAIiIiIiIiAAAiIiIiIiIAACIiIiIiIgAAIiIiIiIiAAAiIiIiIiIAACIhICIiIgAAIiAAIiIiAAAiIAAiIiIAACIgACIiIgAAIgAAAAAAAAAiIiIiIiAAAAIiIiIiIADgBwAAwAMAAMADAADAAwAAwAMAAMADAADAAwAAwAMAAMADAADBAwAAxwMAAMcDAADHAwAAz/8AAMAHAADgBwAA" rel="icon" type="image/x-icon" >
+    <link rel="import" href="/elements/elements.html">
+  </head>
+  <body>
+    <na-app id="app"></na-app>
+
+    <script>
+    var webComponentsSupported = (
+      'registerElement' in document
+      && 'import' in document.createElement('link')
+      && 'content' in document.createElement('template'))
+    if (!webComponentsSupported){
+      console.log('polymer not supported, loading polyfill')
+      var script = document.createElement('script')
+      script.async = true
+      script.src = '/bower_components/webcomponentsjs/webcomponents-lite.min.js'
+      script.onload = onload
+      document.head.appendChild(script)
+    } else{
+      console.log('polymer supported')
+      if (!window.HTMLImports){
+        document.dispatchEvent(new CustomEvent('WebComponentsReady', {bubbles: true}))
+      }
+    }
+    </script>
+  </body>
 </html>
