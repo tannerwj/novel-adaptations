@@ -1,0 +1,56 @@
+<script src="/bower_components/page/page.js"></script>
+<script>
+  window.addEventListener('WebComponentsReady', function(){
+    var app = document.querySelector('#app')
+
+    app.baseUrl = '/'
+    if (window.location.port === ''){  // if production
+      page.base(app.baseUrl.replace(/\/$/, ''))
+    }
+
+    // Middleware
+    function scrollToTop(ctx, next){
+      app.$.headerPanelMain.scrollToTop(true)
+      next()
+    }
+
+    function closeDrawer(ctx, next){
+      app.$.paperDrawerPanel.closeDrawer()
+      next()
+    }
+
+    page('*', scrollToTop, closeDrawer, function(ctx, next){
+      next()
+    })
+
+    page('/', function(ctx){
+      app.route = 'home'
+    })
+
+    page('/adaptations', function(){
+      app.route = 'adaptations'
+    })
+
+    page('/books', function(){
+      app.route = 'books'
+    })
+
+    page('/movies', function (){
+      app.route = 'movies'
+    })
+
+    page('/make-it-a-movie', function (){
+      app.route = 'make_it_a_movie'
+    })
+
+    page('*', function(ctx){
+      app.$.toast.text = 'Can\'t find: ' + ctx.path  + '. Redirected you to Home Page'
+      app.$.toast.show()
+      page.redirect(app.baseUrl)
+    })
+
+    page({
+      hashbang: true
+    })
+  })
+</script>
