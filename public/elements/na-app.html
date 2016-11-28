@@ -1,0 +1,140 @@
+<dom-module id="na-app">
+  <template>
+    <style>
+      :host {
+        --primary-background-color: #ffffff;
+        --primary-base-color: #000000;
+        --primary-text-color: var(--paper-grey-900);
+        --primary-secondary-color: #737373;  /* for secondary text and icons */
+        --primary-disabled-color: #9b9b9b;  /* disabled/hint text */
+        --primary-divider-color: #dbdbdb;
+
+          @apply(--paper-font-title);
+      }
+      body {
+        @apply(--layout-fullbleed);
+        @apply(--layout-vertical);
+      }
+      section[tabindex="-1"]:focus { outline: none; }
+
+      .app-menu iron-icon {
+        margin-right: 33px;
+        opacity: 0.54;
+      }
+
+      #menuHeader {
+        background-color: white;
+      }
+
+      #leftNav a {
+        @apply(--layout-horizontal);
+        @apply(--layout-center);
+        @apply(--paper-font-title);
+
+        text-decoration: none;
+        color: black;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 24px;
+        min-height: 48px;
+        padding: 0 16px;
+      }
+
+      paper-menu {
+        --paper-menu-selected-item: {
+          color: white !important;
+          background: var(--google-blue-300);
+        }
+      }
+
+      #toast .toast-hide-button {
+        color: var(--slab-orange);
+        margin-left: 10px;
+      }
+
+      footer paper-button {
+        background: var(--google-blue-500);
+        color: white;
+      }
+      footer .footerButtons{
+        text-align: center;
+        margin-top: 50px;
+      }
+    </style>
+
+    <paper-drawer-panel id="paperDrawerPanel">
+      <paper-scroll-header-panel id="leftNav" drawer>
+        <paper-toolbar id="menuHeader">
+        </paper-toolbar>
+
+        <paper-menu class="app-menu" attr-for-selected="data-route" selected="[[route]]" role="menu">
+          <a data-route="home" href="/" tabindex="-1">
+            <iron-icon icon="home"></iron-icon>
+            <span>home</span>
+          </a>
+          <a data-route="adaptations" href="/adaptations" tabindex="-1">
+            <iron-icon icon="image:movie-creation"></iron-icon>
+            <span>adaptations</span>
+          </a>
+          <a data-route="books" href="/books" tabindex="-1">
+            <iron-icon icon="icons:book"></iron-icon>
+            <span>books</span>
+          </a>
+          <a data-route="movies" href="/movies" tabindex="-1">
+            <iron-icon icon="maps:local-movies"></iron-icon>
+            <span>movies</span>
+          </a>
+          <a data-route="make_it_a_movie" href="/make-it-a-movie" tabindex="-1">
+            <iron-icon icon="icons:add-box"></iron-icon>
+            <span>make it a movie</span>
+          </a>
+        </paper-menu>
+
+        <footer>
+          <div class="footerButtons">
+            <paper-button on-click="goToLogin" raised>Login</paper-button>
+          </div>
+        </footer>
+      </paper-scroll-header-panel>
+
+      <paper-scroll-header-panel id="headerPanelMain" main>
+        <paper-toolbar>
+          <paper-icon-button icon="menu" paper-drawer-toggle></paper-icon-button>
+          <div class="page-title">
+            Novel Adaptations
+          </div>
+        </paper-toolbar>
+
+        <iron-pages attr-for-selected="data-route" selected="[[route]]">
+          <section data-route="home" tabindex="-1">
+            <na-home></na-home>
+          </section>
+          <section data-route="adaptations" tabindex="-1">
+            <na-adaptations></na-adaptations>
+          </section>
+          <section data-route="books" tabindex="-1">
+            <na-books></na-books>
+          </section>
+          <section data-route="movies" tabindex="-1">
+            <na-movies></na-movies>
+          </section>
+          <section data-route="make_it_a_movie" tabindex="-1">
+            <na-make-movie></na-make-movie>
+          </section>
+        </iron-pages>
+      </paper-scroll-header-panel>
+    </paper-drawer-panel>
+
+    <paper-toast id="toast" class="fit-bottom" duration="4000">
+      <span class="toast-hide-button" role="button" onclick="app.$.toast.hide()">Ok</span>
+    </paper-toast>
+
+  </template>
+  <script>
+    Polymer({
+      is: 'na-app'
+    })
+  </script>
+</dom-module>
