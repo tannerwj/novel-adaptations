@@ -2,7 +2,20 @@
   <template>
     <style>
     </style>
-    books
+    <iron-ajax
+    auto
+    url="http://localhost/books/all"
+    handle-as="json"
+    last-response="{{ajaxResponse}}"></iron-ajax>
+
+    <template is="dom-repeat" items="[[ajaxResponse]]">
+      <div class="horizontal-section">
+        <h2><a href="/book/[[item.goodreads_id]]" target="_blank">[[item.title]]</a></h2>
+        <iron-image src="[[item.image_url]]" width="300" height="444" sizing="cover" fade></iron-image>
+        <p>[[item.description]]</p>
+      </div>
+    </template>
+
   </template>
   <script>
     Polymer({

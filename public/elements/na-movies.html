@@ -2,7 +2,21 @@
   <template>
     <style>
     </style>
-    movies
+
+    <iron-ajax
+    auto
+    url="http://localhost/movies/all"
+    handle-as="json"
+    last-response="{{ajaxResponse}}"></iron-ajax>
+
+    <template is="dom-repeat" items="[[ajaxResponse]]">
+      <div class="horizontal-section">
+        <h2><a href="/book/[[item.imdbID]]" target="_blank">[[item.title]]</a></h2>
+        <iron-image src="[[item.poster]]" width="300" height="444" sizing="cover" fade></iron-image>
+        <p>[[item.plot]]</p>
+      </div>
+    </template>
+
   </template>
   <script>
     Polymer({

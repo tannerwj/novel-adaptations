@@ -4,6 +4,12 @@ const Promise = require('bluebird')
 const omdb = require('omdb')
 const Movie = require('../config/movie.js')
 
+router.get('/movies/all', function (req, res){
+  Movie.find({}, function(err, movies) {
+    res.send(movies)
+  })
+})
+
 // search omdb for new movie
 // http://www.omdbapi.com/?t={Movie+Title}&y={Year}&plot={full-or-short}&r={json-or-xml}
 router.post('/movies/search-new', function(req, res) {

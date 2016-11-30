@@ -4,6 +4,13 @@ const Promise = require('bluebird')
 const xml2js = require('xml2js')
 const Book = require('../config/book.js')
 
+// retrieve books from the database
+router.get('/books/all', function (req, res){
+  Book.find({}, function(err, books) {
+    res.send(books)
+  })
+})
+
 //search good reads for new book
 router.post('/books/search-new', function (req, res){
   if(!req.body.query){
