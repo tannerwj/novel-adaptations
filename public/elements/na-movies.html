@@ -50,10 +50,10 @@
       <div style="float: right">Don't see the movie you're looking for? <paper-button on-click="goToLogin" raised>Add Movie</paper-button></div><br><br>
       <paper-toolbar>
         <span class="title"><iron-icon icon="maps:local-movies"></iron-icon>Movies</span>
-
+        <paper-input label="Search" value="{{searchString::input}}">
       </paper-toolbar>
 
-      <template is="dom-repeat" items="[[ajaxResponse]]">
+      <template is="dom-repeat" items="[[ajaxResponse]]" filter="{{computeFilter(searchString)}}">
         <paper-material elevation="1">
           <iron-image src="[[item.poster]]" width="130" height="200" sizing="cover" fade></iron-image>
           <h2><a href="/movie/[[item.imdbID]]" target="_blank">[[item.title]]</a></h2><br>
@@ -85,7 +85,22 @@
   </template>
   <script>
     Polymer({
-      is: 'na-movies'
+      is: 'na-movies',
+      computeFilter: function(string) {
+        if (!string) {
+          // set filter to null to disable filtering
+          return null
+        } else {
+          // return a filter function for the current search string
+          string = string.toLowerCase()
+          return function(ajaxResponse) {
+            var title = ajaxResponse.title.toLowerCase()
+            var director = ajaxResponse.director.toLowerCase()
+            return (title.indexOf(string) != -1 ||
+                director.indexOf(string) != -1)
+          }
+        }
+      }
     })
   </script>
 </dom-module>

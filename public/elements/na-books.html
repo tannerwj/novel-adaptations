@@ -48,15 +48,15 @@
       <div style="float: right">Don't see the book you're looking for? <paper-button on-click="goToLogin" raised>Add Book</paper-button></div><br><br>
       <paper-toolbar>
         <span class="title"><iron-icon icon="icons:book"></iron-icon>Book</span>
-
+        <paper-input label="Search" value="{{searchString::input}}">
       </paper-toolbar>
 
-      <template is="dom-repeat" items="[[ajaxResponse]]">
+      <template is="dom-repeat" items="[[ajaxResponse]]" filter="{{computeFilter(searchString)}}">
         <paper-material elevation="1">
           <iron-image src="[[item.image_url]]" width="130" height="200" sizing="cover" fade></iron-image>
           <h2><a href="/book/[[item.goodreads_id]]" target="_blank">[[item.title]]</a></h2>
           <p><strong>Author: </strong>[[item.author]]</p>
-          <p><strong>GoodReads Rating: </strong>[[item.rating]]</p>
+          <p><strong>GoodReads Rating: </strong>[[item.average_rating]]</p>
           <p><strong>Description: </strong>[[item.description]]</p>
         </paper-material>
       </template>
@@ -65,7 +65,22 @@
   </template>
   <script>
     Polymer({
-      is: 'na-books'
+      is: 'na-books',
+      computeFilter: function(string) {
+        if (!string) {
+          // set filter to null to disable filtering
+          return null
+        } else {
+          // return a filter function for the current search string
+          string = string.toLowerCase()
+          return function(ajaxResponse) {
+            var title = ajaxResponse.title.toLowerCase()
+            //var author = ajaxResponse.author.toLowerCase()
+            return (title.indexOf(string) != -1)// ||
+                //author.indexOf(string) != -1)
+          }
+        }
+      }
     })
   </script>
 </dom-module>
