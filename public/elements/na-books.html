@@ -1,10 +1,15 @@
 <dom-module id="na-books">
   <template>
     <style>
+      :host {
+        --paper-input-container-color: #ffffff;
+        --paper-input-container-input-color: #ffffff;
+      }
+      
       paper-material {
         padding: 20px;
         float: left;
-        max-width: calc(100% - 40px);
+        width: calc(100% - 40px);
         overflow: hidden;
       }
 
@@ -12,7 +17,7 @@
         padding: 0px !important;
         margin: 20px;
         float: left;
-        max-width: calc(100% - 40px);
+        width: calc(100% - 40px);
       }
 
       iron-image {
@@ -37,6 +42,7 @@
         font-size: 18px;
       }
     </style>
+
     <iron-ajax
       auto
       url="http://localhost/books/all"

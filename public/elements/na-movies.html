@@ -1,10 +1,15 @@
 <dom-module id="na-movies">
   <template>
     <style>
+      :host {
+        --paper-input-container-color: #ffffff;
+        --paper-input-container-input-color: #ffffff;
+      }
+      
       paper-material {
         padding: 20px;
         float: left;
-        max-width: calc(100% - 40px);
+        width: calc(100% - 40px);
         overflow: hidden;
       }
 
@@ -12,7 +17,7 @@
         padding: 0px !important;
         margin: 20px;
         float: left;
-        max-width: calc(100% - 40px);
+        width: calc(100% - 40px);
       }
 
       iron-image {
