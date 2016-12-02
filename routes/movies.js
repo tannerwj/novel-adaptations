@@ -10,6 +10,13 @@ router.get('/movies/all', function (req, res){
   })
 })
 
+router.get('/movies/search', function (req, res){
+  console.log(req.headers.title)
+  Movie.find({'title':{$regex : ".*" + req.headers.title + ".*"}}, function(err, movies) {
+    res.send(movies)
+  })
+})
+
 // search omdb for new movie
 // http://www.omdbapi.com/?t={Movie+Title}&y={Year}&plot={full-or-short}&r={json-or-xml}
 router.post('/movies/search-new', function(req, res) {

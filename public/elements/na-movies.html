@@ -1,21 +1,86 @@
 <dom-module id="na-movies">
   <template>
     <style>
+      paper-material {
+        padding: 20px;
+        float: left;
+        max-width: calc(100% - 40px);
+        overflow: hidden;
+      }
+
+      .outer {
+        padding: 0px !important;
+        margin: 20px;
+        float: left;
+        max-width: calc(100% - 40px);
+      }
+
+      iron-image {
+        float: left;
+        margin-right: 20px;
+      }
+
+      p {
+        font-size: 18px;
+        margin: 0px;
+      }
+
+      iron-icon {
+        margin-right: 33px;
+        opacity: 0.54;
+      }
+
+      paper-button {
+        background: var(--google-blue-500);
+        color: white;
+        padding: 10px;
+        font-size: 18px;
+      }
     </style>
 
     <iron-ajax
-    auto
-    url="http://localhost/movies/all"
-    handle-as="json"
-    last-response="{{ajaxResponse}}"></iron-ajax>
+      auto
+      method='GET'
+      url="http://localhost/movies/all"
+      handle-as="json"
+      last-response="{{ajaxResponse}}">
+    </iron-ajax>
+
+    <div class="outer">
+      <div style="float: right">Don't see the movie you're looking for? <paper-button on-click="goToLogin" raised>Add Movie</paper-button></div><br><br>
+      <paper-toolbar>
+        <span class="title"><iron-icon icon="maps:local-movies"></iron-icon>Movies</span>
+
+      </paper-toolbar>
+
+      <template is="dom-repeat" items="[[ajaxResponse]]">
+        <paper-material elevation="1">
+          <iron-image src="[[item.poster]]" width="130" height="200" sizing="cover" fade></iron-image>
+          <h2><a href="/movie/[[item.imdbID]]" target="_blank">[[item.title]]</a></h2><br>
+          <p><strong>IMDb Rating: </strong>[[item.imdbRating]]</p>
+          <p><strong>Director: </strong>[[item.director]]</p>
+          <p><strong>Plot: </strong>[[item.plot]]</p>
+        </paper-material>
+      </template>
+    </div>
+
+    <!-- This is used to get a specific movie, figure out how to put form contents in place of "Harry Potter"
+    <iron-ajax
+      auto
+      method='GET'
+      url="http://localhost/movies/search"
+      headers='{"title":"Harry Potter"}'
+      handle-as="json"
+      last-response="{{ajaxResponse}}">
+    </iron-ajax>
 
     <template is="dom-repeat" items="[[ajaxResponse]]">
       <div class="horizontal-section">
-        <h2><a href="/book/[[item.imdbID]]" target="_blank">[[item.title]]</a></h2>
+        <h2><a href="/movie/[[item.imdb]]" target="_blank">[[item.title]]</a></h2>
         <iron-image src="[[item.poster]]" width="300" height="444" sizing="cover" fade></iron-image>
         <p>[[item.plot]]</p>
       </div>
-    </template>
+    </template> -->
 
   </template>
   <script>

@@ -1,20 +1,66 @@
 <dom-module id="na-books">
   <template>
     <style>
+      paper-material {
+        padding: 20px;
+        float: left;
+        max-width: calc(100% - 40px);
+        overflow: hidden;
+      }
+
+      .outer {
+        padding: 0px !important;
+        margin: 20px;
+        float: left;
+        max-width: calc(100% - 40px);
+      }
+
+      iron-image {
+        float: left;
+        margin-right: 20px;
+      }
+
+      p {
+        font-size: 18px;
+        margin: 0px;
+      }
+
+      iron-icon {
+        margin-right: 33px;
+        opacity: 0.54;
+      }
+
+      paper-button {
+        background: var(--google-blue-500);
+        color: white;
+        padding: 10px;
+        font-size: 18px;
+      }
     </style>
     <iron-ajax
-    auto
-    url="http://localhost/books/all"
-    handle-as="json"
-    last-response="{{ajaxResponse}}"></iron-ajax>
+      auto
+      url="http://localhost/books/all"
+      handle-as="json"
+      last-response="{{ajaxResponse}}">
+    </iron-ajax>
+    
+    <div class="outer">
+      <div style="float: right">Don't see the book you're looking for? <paper-button on-click="goToLogin" raised>Add Book</paper-button></div><br><br>
+      <paper-toolbar>
+        <span class="title"><iron-icon icon="icons:book"></iron-icon>Book</span>
 
-    <template is="dom-repeat" items="[[ajaxResponse]]">
-      <div class="horizontal-section">
-        <h2><a href="/book/[[item.goodreads_id]]" target="_blank">[[item.title]]</a></h2>
-        <iron-image src="[[item.image_url]]" width="300" height="444" sizing="cover" fade></iron-image>
-        <p>[[item.description]]</p>
-      </div>
-    </template>
+      </paper-toolbar>
+
+      <template is="dom-repeat" items="[[ajaxResponse]]">
+        <paper-material elevation="1">
+          <iron-image src="[[item.image_url]]" width="130" height="200" sizing="cover" fade></iron-image>
+          <h2><a href="/book/[[item.goodreads_id]]" target="_blank">[[item.title]]</a></h2>
+          <p><strong>Author: </strong>[[item.author]]</p>
+          <p><strong>GoodReads Rating: </strong>[[item.rating]]</p>
+          <p><strong>Description: </strong>[[item.description]]</p>
+        </paper-material>
+      </template>
+    </div>
 
   </template>
   <script>
