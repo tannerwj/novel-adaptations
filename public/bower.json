@@ -38,6 +38,7 @@
     "paper-scroll-header-panel": "PolymerElements/paper-scroll-header-panel#^1.0.16",
     "paper-input": "PolymerElements/paper-input#^1.1.22",
     "page": "visionmedia/page.js#^1.7.1",
-    "paper-styles": "PolymerElements/paper-styles#^1.1.5"
+    "paper-styles": "PolymerElements/paper-styles#^1.1.5",
+    "mercury-paginator": "^1.1.2"
   }
 }

@@ -59,6 +59,8 @@ router.post('/movies/add-new', function(req, res) {
     omdb.get({ imdb: imdb_id }, true, function(err, movie) {
         if (err) {
             console.error(err)
+            //when omdb is slow it reponds with socket hang up error
+            //need to show error, not give 500
             return res.sendStatus(500)
         }
 
@@ -87,7 +89,7 @@ router.post('/movies/add-new', function(req, res) {
             imdbVotes: movie.imdb.votes,
             type: movie.type
         })
-        
+
         new_movie.save(function (err){
           if(err) console.log('new movie save error', err)
           res.sendStatus(200)

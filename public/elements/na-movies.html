@@ -5,69 +5,120 @@
         --paper-input-container-color: #ffffff;
         --paper-input-container-input-color: #ffffff;
       }
-      
-      paper-material {
-        padding: 20px;
-        float: left;
-        width: calc(100% - 40px);
-        overflow: hidden;
-      }
-
       .outer {
-        padding: 0px !important;
-        margin: 20px;
+        margin: 0 20px;
         float: left;
         width: calc(100% - 40px);
       }
-
       iron-image {
         float: left;
         margin-right: 20px;
       }
-
-      p {
-        font-size: 18px;
-        margin: 0px;
-      }
-
-      iron-icon {
-        margin-right: 33px;
-        opacity: 0.54;
-      }
-
       paper-button {
         background: var(--google-blue-500);
         color: white;
         padding: 10px;
         font-size: 18px;
       }
+      .dontSee {
+        float: right;
+        margin: 10px 20px;
+      }
+      .lineTitle {
+        font-weight: 600;
+      }
+      .movie {
+        margin: 10px;
+        display: flex;
+      }
+      .movie > div {
+      	width: 50%;
+      	padding: 10px;
+      }
+      .description {
+        display: block;
+        text-overflow: ellipsis;
+        word-wrap: break-word;
+        overflow: hidden;
+        max-height: 8.4em;
+        line-height: 1.8em;
+      }
+      .title-bar {
+        background: var(--google-blue-500);
+        height: 60px;
+        display: flex;
+        font-size: 20pt;
+        color: white;
+        align-items: center;
+        padding: 0 15px;
+      }
+      .title-bar .title {
+				width: 50%;
+			}
+			.left-title-bar {
+				width: 30%;
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				height: 100%;
+			}
+			.title-bar paper-input, .title-bar paper-dropdown-menu{
+				margin-bottom: 10px;
+			}
+      paper-item {
+        cursor: pointer;
+      }
     </style>
 
     <iron-ajax
       auto
-      method='GET'
-      url="http://localhost/movies/all"
+      url="/movies/all"
       handle-as="json"
-      last-response="{{ajaxResponse}}">
+      last-response="{{ajaxResponse}}"
+      on-response="populatePagination">
     </iron-ajax>
 
-    <div class="outer">
-      <div style="float: right">Don't see the movie you're looking for? <paper-button on-click="goToLogin" raised>Add Movie</paper-button></div><br><br>
-      <paper-toolbar>
+    <div class="dontSee">
+      Don't see the movie you're looking for?
+      <paper-button on-click="goToAddMovie" raised>Add Movie</paper-button>
+    </div>
+    <paper-material elevation="4" class="outer">
+      <div class="title-bar">
         <span class="title"><iron-icon icon="maps:local-movies"></iron-icon>Movies</span>
-        <paper-input label="Search" value="{{searchString::input}}">
-      </paper-toolbar>
+        <div class="left-title-bar">
+          <paper-input label="Search" value="{{searchString::input}}">
+        </div>
+        <paper-dropdown-menu id="sortDropdown" label="Sort by...">
+          <paper-listbox class="dropdown-content" on-iron-select="selectDropdownItem">
+            <paper-item value="sortByName">Name A-Z</paper-item>
+            <paper-item value="sortByNameBackwards">Name Z-A</paper-item>
+            <paper-item value="sortByRating">Rating High-Low</paper-item>
+            <paper-item value="sortByRatingBackwards">Rating Low-High</paper-item>
+          </paper-listbox>
+        </paper-dropdown-menu>
+      </div>
 
-      <template is="dom-repeat" items="[[ajaxResponse]]" filter="{{computeFilter(searchString)}}">
-        <paper-material elevation="1">
-          <iron-image src="[[item.poster]]" width="130" height="200" sizing="cover" fade></iron-image>
-          <h2><a href="/movie/[[item.imdbID]]" target="_blank">[[item.title]]</a></h2><br>
-          <p><strong>IMDb Rating: </strong>[[item.imdbRating]]</p>
-          <p><strong>Director: </strong>[[item.director]]</p>
-          <p><strong>Plot: </strong>[[item.plot]]</p>
+      <template is="dom-repeat" items="[[ajaxResponse]]" sort="{{sortBy}}" filter="{{computeFilter(searchString)}}">
+        <paper-material elevation="1" class="movie">
+          <div class="leftSide">
+            <iron-image style="width:100px; height:150px; background-color: lightgray;" sizing="contain" preload src="[[item.poster]]"></iron-image>
+            <h2><a href="/movie/[[item.imdbID]]">[[item.title]]</a></h2>
+            <p><span class="lineTitle">IMDb Rating: </span>[[item.imdbRating]]</p>
+            <p><span class="lineTitle">Director: </span>[[item.director]]</p>
+          </div>
+          <div class="description">
+            [[stripHtml(item.plot)]]
+          </div>
         </paper-material>
       </template>
-    </div>
+      <mercury-paginator
+        id="paginator"
+        perpage="5"
+        show-first
+        show-last
+        items="{{ajaxResponse}}">
+      </mercury-paginator>
+    </paper-material>
 
     <!-- This is used to get a specific movie, figure out how to put form contents in place of "Harry Potter"
     <iron-ajax
@@ -91,20 +142,49 @@
   <script>
     Polymer({
       is: 'na-movies',
-      computeFilter: function(string) {
-        if (!string) {
-          // set filter to null to disable filtering
-          return null
-        } else {
-          // return a filter function for the current search string
+      populatePagination: function (){
+        this.$.paginator.data = this.ajaxResponse
+      },
+      computeFilter: function (string){
+        if(!string) return null
+        return function (movie){
+          if(!movie) return null
           string = string.toLowerCase()
-          return function(ajaxResponse) {
-            var title = ajaxResponse.title.toLowerCase()
-            var director = ajaxResponse.director.toLowerCase()
-            return (title.indexOf(string) != -1 ||
-                director.indexOf(string) != -1)
-          }
+          var title = movie.title ? movie.title.toLowerCase() : ''
+          var director = movie.director ? movie.director.toLowerCase() : ''
+          return ~title.indexOf(string) || ~director.indexOf(string)
         }
+      },
+      stripHtml: function (text){
+        if(!text) return ''
+        return text.replace(/<(?:.|\n)*?>/gm, '')
+      },
+      selectDropdownItem: function (e, item){
+        this.sortBy = item.item.attributes.value.value
+        this.$.paginator.firstPage()
+    	},
+      sortByName: function (a, b){
+        if (a.title == b.title) return 0
+        return a.title < b.title ? -1 : 1
+      },
+      sortByNameBackwards: function (a, b){
+        if (a.title == b.title) return 0
+        return a.title < b.title ? 1 : -1
+      },
+      sortByRating: function (a, b){
+    		var aRating = Number(a.imdbRating)
+    		var bRating = Number(b.imdbRating)
+        if (aRating == bRating) return this.sortByName(a, b)
+        return aRating < bRating ? 1 : -1
+      },
+      sortByRatingBackwards: function (a, b){
+    		var aRating = Number(a.imdbRating)
+    		var bRating = Number(b.imdbRating)
+        if (aRating == bRating) return this.sortByName(a, b)
+        return aRating < bRating ? -1 : 1
+      },
+      goToAddMovie: function (){
+        page.show('/movies/add')
       }
     })
   </script>

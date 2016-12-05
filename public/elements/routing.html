@@ -35,8 +35,16 @@
       app.route = 'books'
     })
 
+    page('/books/add', function(){
+      app.route = 'addbooks'
+    })
+
     page('/movies', function (){
       app.route = 'movies'
+    })
+
+    page('/movies/add', function(){
+      app.route = 'addmovies'
     })
 
     page('/make-it-a-movie', function (){
