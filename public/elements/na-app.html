@@ -8,8 +8,7 @@
         --primary-secondary-color: #737373;  /* for secondary text and icons */
         --primary-disabled-color: #9b9b9b;  /* disabled/hint text */
         --primary-divider-color: #dbdbdb;
-
-          @apply(--paper-font-title);
+          font-family: 'Roboto', 'Noto', sans-serif;
       }
       body {
         @apply(--layout-fullbleed);
@@ -64,12 +63,13 @@
         text-align: center;
         margin-top: 50px;
       }
+      .page-title {
+        @apply(--paper-font-title);
+      }
     </style>
 
     <paper-drawer-panel id="paperDrawerPanel">
       <paper-scroll-header-panel id="leftNav" drawer>
-        <paper-toolbar id="menuHeader">
-        </paper-toolbar>
 
         <paper-menu class="app-menu" attr-for-selected="data-route" selected="[[route]]" role="menu">
           <a data-route="home" href="/" tabindex="-1">
@@ -124,6 +124,12 @@
           </section>
           <section data-route="make_it_a_movie" tabindex="-1">
             <na-make-movie></na-make-movie>
+          </section>
+          <section data-route="addbooks" tabindex="-1">
+            <na-add-book></na-add-book>
+          </section>
+          <section data-route="addmovies" tabindex="-1">
+            <na-add-movie></na-add-movie>
           </section>
         </iron-pages>
       </paper-scroll-header-panel>

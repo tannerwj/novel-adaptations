@@ -11,9 +11,9 @@ const db = require('./config/db.js')
 const books = require('./routes/books')
 const movies = require('./routes/movies')
 
-
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: false }))
+app.use(express.static(__dirname + '/public'))
 
 app.all('/books/*', books)
 app.all('/movies/*', movies)
