@@ -21,6 +21,7 @@
         color: white;
         padding: 10px;
         font-size: 18px;
+        float: right;
       }
       .lineTitle {
         font-weight: 600;
@@ -47,6 +48,7 @@
 	<paper-material elevation="4" class="outer">
       <template is="dom-repeat" items="[[book]]">
         <div class="leftSide">
+          <paper-button on-click="goToAddMovie" raised>Make it a Movie!</paper-button>
           <a href="/book/[[item.goodreads_id]]"><iron-image style="width:300px; height:444px; background-color: lightgray;" sizing="contain" preload src="[[item.image_url]]"></iron-image></a>
           <h2><a href="/book/[[item.goodreads_id]]">[[item.title]]</a></h2>
           <p><span class="lineTitle">Author(s): </span>[[displayAuthors(item.authors)]]</p>

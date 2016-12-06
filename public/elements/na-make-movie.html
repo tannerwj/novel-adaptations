@@ -1,12 +1,189 @@
 <dom-module id="na-make-movie">
   <template>
     <style>
+      :host {
+        --paper-input-container-color: #ffffff;
+        --paper-input-container-input-color: #ffffff;
+      }
+      .outer {
+        margin: 0 20px;
+        float: left;
+        width: calc(100% - 40px);
+      }
+      iron-image {
+        float: left;
+        margin-right: 20px;
+      }
+      iron-icon {
+        top: -2px;
+      }
+      paper-button {
+        background: var(--google-blue-500);
+        color: white;
+        padding: 10px;
+        font-size: 18px;
+      }
+      .dontSee {
+        float: right;
+        margin: 10px 20px;
+      }
+      .lineTitle {
+        font-weight: 600;
+      }
+      .book {
+        margin: 10px;
+        display: flex;
+      }
+      .book > div {
+        width: 50%;
+        padding: 10px;
+      }
+      .description {
+        display: block;
+        text-overflow: ellipsis;
+        word-wrap: break-word;
+        overflow: hidden;
+        max-height: 8.4em;
+        line-height: 1.8em;
+      }
+      .title-bar {
+        background: var(--google-blue-500);
+        height: 60px;
+        display: flex;
+        font-size: 20pt;
+        color: white;
+        align-items: center;
+        padding: 0 15px;
+      }
+      .title-bar .title {
+        width: 50%;
+      }
+      .left-title-bar {
+        width: 30%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 100%;
+      }
+      .title-bar paper-input, .title-bar paper-dropdown-menu{
+        margin-bottom: 10px;
+      }
+      paper-item {
+        cursor: pointer;
+      }
+      a {
+        color: #4285f4;
+        text-decoration: none;
+        cursor: pointer;
+      }
     </style>
-    Make it a Movie!
+
+    <iron-ajax
+      auto
+      url="/books/all"
+      handle-as="json"
+      last-response="{{ajaxResponse}}"
+      on-response="populatePagination">
+    </iron-ajax>
+
+    <div class="dontSee">
+      Don't see the book you're looking for?
+      <paper-button on-click="goToAddBook" raised>Add Book</paper-button>
+    </div>
+    <paper-material elevation="4" class="outer">
+      <div class="title-bar">
+        <div class="title"><iron-icon icon="icons:book"></iron-icon>Books</div>
+        <div class="left-title-bar">
+          <paper-input label="Search" value="{{searchString::input}}">
+        </div>
+        <paper-dropdown-menu id="sortDropdown" label="Sort by...">
+          <paper-listbox class="dropdown-content" on-iron-select="selectDropdownItem">
+            <paper-item value="sortByName">Name A-Z</paper-item>
+            <paper-item value="sortByNameBackwards">Name Z-A</paper-item>
+            <paper-item value="sortByRating">Rating High-Low</paper-item>
+            <paper-item value="sortByRatingBackwards">Rating Low-High</paper-item>
+          </paper-listbox>
+        </paper-dropdown-menu>
+      </div>
+
+      <template is="dom-repeat" items="[[ajaxResponse]]" sort="{{sortBy}}" filter="{{computeFilter(searchString)}}">
+        <paper-material elevation="1" class="book">
+          <div class="leftSide">
+            <a href="/book/[[item.goodreads_id]]"><iron-image style="width:100px; height:150px; background-color: lightgray;" sizing="contain" preload src="[[item.image_url]]"></iron-image></a>
+            <h2><a href="/book/[[item.goodreads_id]]">[[item.title]]</a></h2>
+            <p>
+              <span class="lineTitle">Author: </span>
+              [[displayAuthors(item.authors)]]
+            </p>
+            <p>
+              <span class="lineTitle">GoodReads Rating: </span>
+              [[item.average_rating]]
+            </p>
+          </div>
+          <div class="description">
+            [[stripHtml(item.description)]]
+          </div>
+        </paper-material>
+      </template>
+      <mercury-paginator
+        id="paginator"
+        perpage="5"
+        show-first
+        show-last
+        items="{{ajaxResponse}}">
+      </mercury-paginator>
+    </paper-material>
+
   </template>
   <script>
     Polymer({
-      is: 'na-make-movie'
+      is: 'na-make-movie',
+      populatePagination: function (){
+        this.$.paginator.data = this.ajaxResponse
+      },
+      computeFilter: function (string){
+        if(!string) return null
+        return function (book){
+          if (!book) return null
+          string = string.toLowerCase()
+          return book.title && ~book.title.toLowerCase().indexOf(string)
+        }
+      },
+      displayAuthors: function (authors){
+        return authors.map(function (author){ return author.name + (author.role ? ': ' + author.role : '') }).join(', ')
+      },
+      //should do the html stripping on the backend on save
+      stripHtml: function (text){
+        if(!text) return ''
+        return text.replace(/<(?:.|\n)*?>/gm, '')
+      },
+      selectDropdownItem: function (e, item){
+        this.sortBy = item.item.attributes.value.value
+        this.$.paginator.firstPage()
+      },
+      sortByName: function (a, b){
+        if (a.title == b.title) return 0
+        return a.title < b.title ? -1 : 1
+      },
+      sortByNameBackwards: function (a, b){
+        if (a.title == b.title) return 0
+        return a.title < b.title ? 1 : -1
+      },
+      sortByRating: function (a, b){
+        var aRating = Number(a.average_rating)
+        var bRating = Number(b.average_rating)
+        if (aRating == bRating) return this.sortByName(a, b)
+        return aRating < bRating ? 1 : -1
+      },
+      sortByRatingBackwards: function (a, b){
+        var aRating = Number(a.average_rating)
+        var bRating = Number(b.average_rating)
+        if (aRating == bRating) return this.sortByName(a, b)
+        return aRating < bRating ? -1 : 1
+      },
+      goToAddBook: function (){
+        page.show('/books/add')
+      }
     })
   </script>
 </dom-module>
