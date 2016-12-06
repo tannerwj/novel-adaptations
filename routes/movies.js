@@ -10,9 +10,9 @@ router.get('/movies/all', function (req, res){
   })
 })
 
-router.get('/movies/search', function (req, res){
-  console.log(req.headers.title)
-  Movie.find({'title':{$regex : ".*" + req.headers.title + ".*"}}, function(err, movies) {
+// get movie by id
+router.post('/movies/by-id', function (req, res){
+    Movie.find({'imdbID':req.body.movie_id}, function(err, movies) {
     res.send(movies)
   })
 })

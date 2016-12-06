@@ -14,6 +14,9 @@
         float: left;
         margin-right: 20px;
       }
+      iron-icon {
+        top: -2px;
+      }
       paper-button {
         background: var(--google-blue-500);
         color: white;
@@ -68,6 +71,11 @@
       paper-item {
         cursor: pointer;
       }
+      a {
+        color: #4285f4;
+        text-decoration: none;
+        cursor: pointer;
+      }
     </style>
 
     <iron-ajax
@@ -101,7 +109,7 @@
       <template is="dom-repeat" items="[[ajaxResponse]]" sort="{{sortBy}}" filter="{{computeFilter(searchString)}}">
         <paper-material elevation="1" class="movie">
           <div class="leftSide">
-            <iron-image style="width:100px; height:150px; background-color: lightgray;" sizing="contain" preload src="[[item.poster]]"></iron-image>
+            <a href="/movie/[[item.imdbID]]"><iron-image style="width:100px; height:150px; background-color: lightgray;" sizing="contain" preload src="[[item.poster]]"></iron-image></a>
             <h2><a href="/movie/[[item.imdbID]]">[[item.title]]</a></h2>
             <p><span class="lineTitle">IMDb Rating: </span>[[item.imdbRating]]</p>
             <p><span class="lineTitle">Director: </span>[[item.director]]</p>
@@ -120,30 +128,13 @@
       </mercury-paginator>
     </paper-material>
 
-    <!-- This is used to get a specific movie, figure out how to put form contents in place of "Harry Potter"
-    <iron-ajax
-      auto
-      method='GET'
-      url="http://localhost/movies/search"
-      headers='{"title":"Harry Potter"}'
-      handle-as="json"
-      last-response="{{ajaxResponse}}">
-    </iron-ajax>
-
-    <template is="dom-repeat" items="[[ajaxResponse]]">
-      <div class="horizontal-section">
-        <h2><a href="/movie/[[item.imdb]]" target="_blank">[[item.title]]</a></h2>
-        <iron-image src="[[item.poster]]" width="300" height="444" sizing="cover" fade></iron-image>
-        <p>[[item.plot]]</p>
-      </div>
-    </template> -->
-
   </template>
   <script>
     Polymer({
       is: 'na-movies',
       populatePagination: function (){
         this.$.paginator.data = this.ajaxResponse
+        console.log('data', this.$.paginator.data)
       },
       computeFilter: function (string){
         if(!string) return null

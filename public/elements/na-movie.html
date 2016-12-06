@@ -1,0 +1,82 @@
+<dom-module id="na-movie">
+  <template>
+    <style>
+      :host {
+        --paper-input-container-color: #ffffff;
+        --paper-input-container-input-color: #ffffff;
+      }
+      .outer {
+        margin: 20px;
+        float: left;
+        width: calc(100% - 80px);
+        padding: 20px;
+        padding-top: 0px;
+      }
+      iron-image {
+        float: left;
+        margin-right: 20px;
+      }
+      paper-button {
+        background: var(--google-blue-500);
+        color: white;
+        padding: 10px;
+        font-size: 18px;
+      }
+      .lineTitle {
+        font-weight: 600;
+      }
+      paper-item {
+        cursor: pointer;
+      }
+      a {
+        color: #4285f4;
+        text-decoration: none;
+        cursor: pointer;
+      }
+    </style>
+
+    <iron-ajax
+      id="get_movie"
+      method="POST"
+      url="/movies/by-id"
+      handle-as="json"
+      last-response="{{movie}}"
+      content-type="application/json">
+    </iron-ajax>
+
+	<paper-material elevation="4" class="outer">
+      <template is="dom-repeat" items="[[movie]]">
+        <div class="leftSide">
+          <iron-image style="width:300px; height:444px; background-color: lightgray;" sizing="contain" preload src="[[item.poster]]"></iron-image>
+          <h2><a href="/movie/[[item.imdbID]]">[[item.title]]</a></h2>
+          <p><span class="lineTitle">Rated: </span>[[item.rated]]</p>
+          <p><span class="lineTitle">Year: </span>[[item.year]]</p>
+          <p><span class="lineTitle">IMDb Rating: </span>[[item.imdbRating]]</p>
+          <p><span class="lineTitle">Runtime: </span>[[item.runtime]] minutes</p>
+          <p><span class="lineTitle">Director(s): </span>[[commaSpace(item.director)]]</p>
+          <p><span class="lineTitle">Writer(s): </span>[[commaSpace(item.writer)]]</p>
+          <p><span class="lineTitle">Actor(s): </span>[[commaSpace(item.actors)]]</p>
+          <p><span class="lineTitle">Plot: </span>[[stripHtml(item.plot)]]</p>
+        </div>
+      </template>
+    </paper-material>
+
+  </template>
+  <script>
+    Polymer({
+      is: 'na-movie',
+      receive_movie: function(movie_id){
+      	this.$.get_movie.body={"movie_id":movie_id}
+      	this.$.get_movie.generateRequest()
+      },
+      stripHtml: function (text){
+        if(!text) return ''
+        return text.replace(/<(?:.|\n)*?>/gm, '')
+      },
+      commaSpace: function(text){
+      	if(!text) return ''
+      	return text.replace(/,/g, ', ')
+      }
+    })
+  </script>
+</dom-module>

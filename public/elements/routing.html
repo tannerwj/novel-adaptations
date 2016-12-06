@@ -2,6 +2,8 @@
 <script>
   window.addEventListener('WebComponentsReady', function(){
     var app = document.querySelector('#app')
+    var book_page = app.$.na_book
+    var movie_page = app.$.na_movie
 
     app.baseUrl = '/'
     if (window.location.port === ''){  // if production
@@ -35,12 +37,22 @@
       app.route = 'books'
     })
 
+    page('/book/:book_id', function(ctx){
+      book_page.receive_book(ctx.params.book_id)
+      app.route = 'book'
+    })
+
     page('/books/add', function(){
       app.route = 'addbooks'
     })
 
     page('/movies', function (){
       app.route = 'movies'
+    })
+
+    page('/movie/:movie_id', function(ctx){
+      movie_page.receive_movie(ctx.params.movie_id)
+      app.route = 'movie'
     })
 
     page('/movies/add', function(){

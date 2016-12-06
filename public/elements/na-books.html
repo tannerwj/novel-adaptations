@@ -14,6 +14,9 @@
         float: left;
         margin-right: 20px;
       }
+      iron-icon {
+        top: -2px;
+      }
       paper-button {
         background: var(--google-blue-500);
         color: white;
@@ -68,6 +71,11 @@
       paper-item {
         cursor: pointer;
       }
+      a {
+        color: #4285f4;
+        text-decoration: none;
+        cursor: pointer;
+      }
     </style>
 
     <iron-ajax
@@ -101,7 +109,7 @@
       <template is="dom-repeat" items="[[ajaxResponse]]" sort="{{sortBy}}" filter="{{computeFilter(searchString)}}">
         <paper-material elevation="1" class="book">
           <div class="leftSide">
-            <iron-image style="width:100px; height:150px; background-color: lightgray;" sizing="contain" preload src="[[item.image_url]]"></iron-image>
+            <a href="/book/[[item.goodreads_id]]"><iron-image style="width:100px; height:150px; background-color: lightgray;" sizing="contain" preload src="[[item.image_url]]"></iron-image></a>
             <h2><a href="/book/[[item.goodreads_id]]">[[item.title]]</a></h2>
             <p>
               <span class="lineTitle">Author: </span>

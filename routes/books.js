@@ -11,6 +11,13 @@ router.get('/books/all', function (req, res){
   })
 })
 
+// get book by id
+router.post('/books/by-id', function (req, res){
+    Book.find({'goodreads_id':req.body.book_id}, function(err, books) {
+    res.send(books)
+  })
+})
+
 //search good reads for new book
 router.post('/books/search-new', function (req, res){
   if(!req.body.query){
