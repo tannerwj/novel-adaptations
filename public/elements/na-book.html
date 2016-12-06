@@ -1,0 +1,81 @@
+<dom-module id="na-book">
+  <template>
+    <style>
+      :host {
+        --paper-input-container-color: #ffffff;
+        --paper-input-container-input-color: #ffffff;
+      }
+      .outer {
+        margin: 20px;
+        float: left;
+        width: calc(100% - 80px);
+        padding: 20px;
+        padding-top: 0px;
+      }
+      iron-image {
+        float: left;
+        margin-right: 20px;
+      }
+      paper-button {
+        background: var(--google-blue-500);
+        color: white;
+        padding: 10px;
+        font-size: 18px;
+      }
+      .lineTitle {
+        font-weight: 600;
+      }
+      paper-item {
+        cursor: pointer;
+      }
+      a {
+        color: #4285f4;
+        text-decoration: none;
+        cursor: pointer;
+      }
+    </style>
+
+    <iron-ajax
+      id="get_book"
+      method="POST"
+      url="/books/by-id"
+      handle-as="json"
+      last-response="{{book}}"
+      content-type="application/json">
+    </iron-ajax>
+
+	<paper-material elevation="4" class="outer">
+      <template is="dom-repeat" items="[[book]]">
+        <div class="leftSide">
+          <a href="/book/[[item.goodreads_id]]"><iron-image style="width:300px; height:444px; background-color: lightgray;" sizing="contain" preload src="[[item.image_url]]"></iron-image></a>
+          <h2><a href="/book/[[item.goodreads_id]]">[[item.title]]</a></h2>
+          <p><span class="lineTitle">Author(s): </span>[[displayAuthors(item.authors)]]</p>
+          <p><span class="lineTitle">Year: </span>[[item.publication_date]]</p>
+          <p><span class="lineTitle">GoodReads Rating: </span>[[item.average_rating]]</p>
+          <p><span class="lineTitle">Description: </span>[[stripHtml(item.description)]]</p>
+        </div>
+      </template>
+    </paper-material>
+
+  </template>
+  <script>
+    Polymer({
+      is: 'na-book',
+      receive_book: function(book_id){
+      	this.$.get_book.body={"book_id":book_id}
+      	this.$.get_book.generateRequest()
+      },
+      stripHtml: function (text){
+        if(!text) return ''
+        return text.replace(/<(?:.|\n)*?>/gm, '')
+      },
+      commaSpace: function(text){
+      	if(!text) return ''
+      	return text.replace(/,/g, ', ')
+      },
+      displayAuthors: function (authors){
+        return authors.map(function (author){ return author.name + (author.role ? ': ' + author.role : '') }).join(', ')
+      }
+    })
+  </script>
+</dom-module>
