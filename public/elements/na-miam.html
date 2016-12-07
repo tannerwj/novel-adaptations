@@ -35,6 +35,51 @@
         padding: 20px;
         min-height: 440px;
       }
+      .socialIcons *{
+        margin: 0 20px;
+      }
+      .miamParts {
+        margin: 0 20px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .miamParts .miamPart {
+        width: 50%;
+      }
+      .miamParts .miamPart .partsEntry, .review{
+        display: flex;
+        margin: 10px 0;
+      }
+      .miamParts .miamPart .partsEntry .partsEntryVoting, .review .reviewVoting{
+        display: flex;
+        flex-direction: column;
+        cursor: pointer;
+      }
+      .miamParts .miamPart .partsEntry .partsEntryContent{
+        max-width: 50%;
+      }
+      .miamReview {
+        margin: 0 20px 100px 20px;
+      }
+      .newReview {
+        display: flex;
+      }
+      textarea {
+        width: 100%;
+        height: 100px;
+      }
+      .postReivew {
+        background: var(--google-blue-500);
+        color: white;
+        font-size: 18px;
+      }
+      .miamVoting {
+        float: right;
+        text-align: center;
+      }
+      .miamVoting iron-icon {
+        cursor: pointer;
+      }
     </style>
 
     <iron-ajax
@@ -52,12 +97,134 @@
         <span class="title"><iron-icon icon="image:movie-creation"></iron-icon>[[miam.title]]</span>
       </div>
       <div class="miam">
+        <div class="miamVoting">
+          <p>Should this be made/remade into a movie?</p>
+          <iron-icon icon="icons:thumb-up"></iron-icon>
+          <iron-icon icon="icons:thumb-down"></iron-icon>
+        </div>
         <iron-image style="width:300px; height:444px; background-color: lightgray;" sizing="contain" preload src="[[miam.image_url]]"></iron-image>
         <p><span class="lineTitle">Author(s): </span>[[displayAuthors(miam.authors)]]</p>
         <p><span class="lineTitle">Year Published: </span>[[miam.publication_date]]</p>
         <p><span class="lineTitle">GoodReads Rating: </span>[[miam.average_rating]]</p>
         <p><span class="lineTitle">Description: </span>[[stripHtml(miam.description)]]</p>
+        <div class="socialIcons">
+          <social-media-icons icon="facebook" size="50"></social-media-icons>
+          <social-media-icons icon="twitter" size="50"></social-media-icons>
+          <social-media-icons icon="instagram" size="50"></social-media-icons>
+        </div>
       </div>
+      <div class="miamParts">
+        <div class="miamPart">
+          <h3>Essential parts for a successful movie</h3>
+          <div class="partsEntry">
+            <div class="partsEntryVoting">
+              <iron-icon icon="icons:arrow-drop-up"></iron-icon>
+              <iron-icon icon="icons:arrow-drop-down"></iron-icon>
+            </div>
+            <div class="partsEntryContent">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed quis tortor erat.
+              Nunc varius dui non feugiat porttitor. Cras vel leo mi. Aenean maximus erat
+              venenatis urna imperdiet pretium. Ut pretium sapien a dui rutrum molestie.
+            </div>
+          </div>
+          <div class="partsEntry">
+            <div class="partsEntryVoting">
+              <iron-icon icon="icons:arrow-drop-up"></iron-icon>
+              <iron-icon icon="icons:arrow-drop-down"></iron-icon>
+            </div>
+            <div class="partsEntryContent">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed quis tortor erat.
+              Nunc varius dui non feugiat porttitor. Cras vel leo mi. Aenean maximus erat
+              venenatis urna imperdiet pretium. Ut pretium sapien a dui rutrum molestie.
+            </div>
+          </div>
+          <div class="partsEntry">
+            <div class="partsEntryVoting">
+              <iron-icon icon="icons:arrow-drop-up"></iron-icon>
+              <iron-icon icon="icons:arrow-drop-down"></iron-icon>
+            </div>
+            <div class="partsEntryContent">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed quis tortor erat.
+              Nunc varius dui non feugiat porttitor. Cras vel leo mi. Aenean maximus erat
+              venenatis urna imperdiet pretium. Ut pretium sapien a dui rutrum molestie.
+            </div>
+          </div>
+        </div>
+        <div class="miamPart">
+          <h3>Nonessential parts for a successful movie</h3>
+          <div class="partsEntry">
+            <div class="partsEntryVoting">
+              <iron-icon icon="icons:arrow-drop-up"></iron-icon>
+              <iron-icon icon="icons:arrow-drop-down"></iron-icon>
+            </div>
+            <div class="partsEntryContent">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed quis tortor erat.
+              Nunc varius dui non feugiat porttitor. Cras vel leo mi. Aenean maximus erat
+              venenatis urna imperdiet pretium. Ut pretium sapien a dui rutrum molestie.
+            </div>
+          </div>
+          <div class="partsEntry">
+            <div class="partsEntryVoting">
+              <iron-icon icon="icons:arrow-drop-up"></iron-icon>
+              <iron-icon icon="icons:arrow-drop-down"></iron-icon>
+            </div>
+            <div class="partsEntryContent">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed quis tortor erat.
+              Nunc varius dui non feugiat porttitor. Cras vel leo mi. Aenean maximus erat
+              venenatis urna imperdiet pretium. Ut pretium sapien a dui rutrum molestie.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="miamReview">
+        <h2>Novel Reviews about the movie idea: [[miam.title]]</h2>
+        <div class="reviews">
+          <div class="review">
+            <div class="reviewVoting">
+              <iron-icon icon="icons:arrow-drop-up"></iron-icon>
+              <iron-icon icon="icons:arrow-drop-down"></iron-icon>
+            </div>
+            <div class="reviewContent">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce finibus maximus est,
+              non laoreet erat. Vivamus risus orci, placerat sit amet dolor ac, aliquet ornare nisi.
+              Proin ultricies pharetra erat a aliquet. Aliquam vitae ipsum vestibulum tortor eleifend
+              ullamcorper eget id risus. Sed in commodo nibh. Suspendisse euismod facilisis
+              sollicitudin. Fusce placerat ex a elit faucibus imperdiet. Nunc dictum sagittis
+              volutpat. Morbi fringilla quam laoreet tortor sollicitudin, vel tristique augue congue.
+              Phasellus malesuada lacinia orci, vitae dictum neque eleifend in. Etiam efficitur
+              risus sapien, id ornare turpis semper sit amet. Morbi magna tortor, porta non tortor
+              sit amet, efficitur porttitor elit. Maecenas vulputate risus ligula, non porttitor
+              lorem malesuada eget. Etiam in nisi enim. Suspendisse vitae sem et lectus finibus tincidunt sit amet vitae augue.
+            </div>
+          </div>
+          <div class="review">
+            <div class="reviewVoting">
+              <iron-icon icon="icons:arrow-drop-up"></iron-icon>
+              <iron-icon icon="icons:arrow-drop-down"></iron-icon>
+            </div>
+            <div class="reviewContent">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce finibus maximus est,
+              non laoreet erat. Vivamus risus orci, placerat sit amet dolor ac, aliquet ornare nisi.
+              Proin ultricies pharetra erat a aliquet. Aliquam vitae ipsum vestibulum tortor eleifend
+              ullamcorper eget id risus. Sed in commodo nibh. Suspendisse euismod facilisis
+              sollicitudin. Fusce placerat ex a elit faucibus imperdiet. Nunc dictum sagittis
+              volutpat. Morbi fringilla quam laoreet tortor sollicitudin, vel tristique augue congue.
+              Phasellus malesuada lacinia orci, vitae dictum neque eleifend in. Etiam efficitur
+              risus sapien, id ornare turpis semper sit amet. Morbi magna tortor, porta non tortor
+              sit amet, efficitur porttitor elit. Maecenas vulputate risus ligula, non porttitor
+              lorem malesuada eget. Etiam in nisi enim. Suspendisse vitae sem et lectus finibus tincidunt sit amet vitae augue.
+            </div>
+          </div>
+        </div>
+        <div class="addReivew">
+          <h4>Add your own review</h4>
+          <div class="newReview">
+            <textarea></textarea>
+            <paper-button class="postReivew">Post</paper-button>
+          </div>
+        </div>
+      </div>
+    </paper-material>
     </paper-material>
 
   </template>
