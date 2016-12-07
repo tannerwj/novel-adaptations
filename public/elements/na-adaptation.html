@@ -1,0 +1,270 @@
+<dom-module id="na-adaptation">
+  <template>
+    <style>
+      :host {
+        --paper-input-container-color: #ffffff;
+        --paper-input-container-input-color: #ffffff;
+      }
+      .outer {
+        margin: 20px;
+        float: left;
+        width: calc(100% - 80px);
+      }
+      paper-button {
+        font-size: 18px;
+      }
+      .lineTitle {
+        font-weight: 600;
+      }
+      .title-bar {
+        background: var(--google-blue-500);
+        height: 60px;
+        display: flex;
+        font-size: 20pt;
+        color: white;
+        align-items: center;
+      }
+      .title-bar .title {
+				width: 50%;
+			}
+      .adaptation {
+        padding: 20px;
+        min-height: 440px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .middle, .leftSide, .rightSide {
+        text-align: center;
+      }
+      .middle {
+        font-size: 20pt;
+      }
+      .middle .socialIcons {
+        display: flex;
+        justify-content: center;
+      }
+      .middle .socialIcons *{
+        margin: 0 20px;
+      }
+      .leftSide paper-button, .rightSide paper-button {
+        width: 80%;
+        text-align: center;
+        margin: 10px 0;
+        background: var(--google-blue-500);
+        color: white;
+      }
+      .adaptParts {
+        margin: 0 20px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .adaptParts .adaptPart {
+        width: 50%;
+      }
+      .adaptParts .adaptPart .partsEntry, .review{
+        display: flex;
+        margin: 10px 0;
+      }
+      .adaptParts .adaptPart .partsEntry .partsEntryVoting, .review .reviewVoting{
+        display: flex;
+        flex-direction: column;
+        cursor: pointer;
+      }
+      .adaptParts .adaptPart .partsEntry .partsEntryContent{
+        max-width: 50%;
+      }
+      .adaptReview {
+        margin: 0 20px 100px 20px;
+      }
+      .newReview {
+        display: flex;
+      }
+      textarea {
+        width: 500px;
+        height: 100px;
+      }
+      .postReivew {
+        background: var(--google-blue-500);
+        color: white;
+        font-size: 18px;
+      }
+    </style>
+
+    <iron-ajax
+      id="get_adaptation"
+      method="POST"
+      url="/adaptations/by-id"
+      handle-as="json"
+      last-response="{{item}}"
+      content-type="application/json">
+    </iron-ajax>
+
+    <paper-material elevation="4" class="outer">
+      <div class="title-bar">
+        <paper-button on-click="goBack">Back</paper-button>
+        <span class="title"><iron-icon icon="image:movie-creation"></iron-icon>[[item.title]]</span>
+      </div>
+      <div class="adaptation">
+        <div class="leftSide">
+          <iron-image style="width:300px; height:444px; background-color: lightgray;" sizing="contain" preload src="[[item.book_image_url]]"></iron-image>
+          <div>
+            <paper-button on-click="goToBook" raised>Go To Book</paper-button>
+            <div class="lineTitle">Book Rating</div>
+            <div>[[item.book_rating]]/5</div>
+          </div>
+        </div>
+        <div class="middle">
+          <p><span class="lineTitle">Director: </span>[[item.director]]</p>
+          <p><span class="lineTitle">Year Released: </span>[[item.year_released]]</p>
+          <p><span class="lineTitle">Writer(s): </span>[[item.writers]]</p>
+          <p><span class="lineTitle">Actors: </span>[[item.actors]]</p>
+          <p class="lineTitle">Novel Rating</p>
+          <div>[[item.rating]]</div>
+          <div class="socialIcons">
+            <social-media-icons icon="facebook" size="50"></social-media-icons>
+            <social-media-icons icon="twitter" size="50"></social-media-icons>
+            <social-media-icons icon="instagram" size="50"></social-media-icons>
+          </div>
+        </div>
+        <div class="rightSide">
+          <iron-image style="width:300px; height:444px; background-color: lightgray;" sizing="contain" preload src="[[item.movie_image_url]]"></iron-image>
+          <div>
+            <paper-button on-click="goToMovie" raised>Go To Movie</paper-button>
+            <div class="lineTitle">Movie Rating</div>
+            <div>[[item.movie_rating]]/10</div>
+          </div>
+        </div>
+      </div>
+      <div class="adaptParts">
+        <div class="adaptPart">
+          <h3>Parts in Movie, but not in Book</h3>
+          <div class="partsEntry">
+            <div class="partsEntryVoting">
+              <iron-icon icon="icons:arrow-drop-up"></iron-icon>
+              <iron-icon icon="icons:arrow-drop-down"></iron-icon>
+            </div>
+            <div class="partsEntryContent">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed quis tortor erat.
+              Nunc varius dui non feugiat porttitor. Cras vel leo mi. Aenean maximus erat
+              venenatis urna imperdiet pretium. Ut pretium sapien a dui rutrum molestie.
+            </div>
+          </div>
+          <div class="partsEntry">
+            <div class="partsEntryVoting">
+              <iron-icon icon="icons:arrow-drop-up"></iron-icon>
+              <iron-icon icon="icons:arrow-drop-down"></iron-icon>
+            </div>
+            <div class="partsEntryContent">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed quis tortor erat.
+              Nunc varius dui non feugiat porttitor. Cras vel leo mi. Aenean maximus erat
+              venenatis urna imperdiet pretium. Ut pretium sapien a dui rutrum molestie.
+            </div>
+          </div>
+          <div class="partsEntry">
+            <div class="partsEntryVoting">
+              <iron-icon icon="icons:arrow-drop-up"></iron-icon>
+              <iron-icon icon="icons:arrow-drop-down"></iron-icon>
+            </div>
+            <div class="partsEntryContent">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed quis tortor erat.
+              Nunc varius dui non feugiat porttitor. Cras vel leo mi. Aenean maximus erat
+              venenatis urna imperdiet pretium. Ut pretium sapien a dui rutrum molestie.
+            </div>
+          </div>
+        </div>
+        <div class="adaptPart">
+          <h3>Parts in Book, but not in Movie</h3>
+          <div class="partsEntry">
+            <div class="partsEntryVoting">
+              <iron-icon icon="icons:arrow-drop-up"></iron-icon>
+              <iron-icon icon="icons:arrow-drop-down"></iron-icon>
+            </div>
+            <div class="partsEntryContent">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed quis tortor erat.
+              Nunc varius dui non feugiat porttitor. Cras vel leo mi. Aenean maximus erat
+              venenatis urna imperdiet pretium. Ut pretium sapien a dui rutrum molestie.
+            </div>
+          </div>
+          <div class="partsEntry">
+            <div class="partsEntryVoting">
+              <iron-icon icon="icons:arrow-drop-up"></iron-icon>
+              <iron-icon icon="icons:arrow-drop-down"></iron-icon>
+            </div>
+            <div class="partsEntryContent">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed quis tortor erat.
+              Nunc varius dui non feugiat porttitor. Cras vel leo mi. Aenean maximus erat
+              venenatis urna imperdiet pretium. Ut pretium sapien a dui rutrum molestie.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="adaptReview">
+        <h2>Novel Reviews of this Adaptation of [[item.title]]</h2>
+        <div class="addReivew">
+          <h4>Add your own review</h4>
+          <div class="newReview">
+            <textarea></textarea>
+            <paper-button class="postReivew">Post</paper-button>
+          </div>
+        </div>
+        <div class="reviews">
+          <div class="review">
+            <div class="reviewVoting">
+              <iron-icon icon="icons:arrow-drop-up"></iron-icon>
+              <iron-icon icon="icons:arrow-drop-down"></iron-icon>
+            </div>
+            <div class="reviewContent">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce finibus maximus est,
+              non laoreet erat. Vivamus risus orci, placerat sit amet dolor ac, aliquet ornare nisi.
+              Proin ultricies pharetra erat a aliquet. Aliquam vitae ipsum vestibulum tortor eleifend
+              ullamcorper eget id risus. Sed in commodo nibh. Suspendisse euismod facilisis
+              sollicitudin. Fusce placerat ex a elit faucibus imperdiet. Nunc dictum sagittis
+              volutpat. Morbi fringilla quam laoreet tortor sollicitudin, vel tristique augue congue.
+              Phasellus malesuada lacinia orci, vitae dictum neque eleifend in. Etiam efficitur
+              risus sapien, id ornare turpis semper sit amet. Morbi magna tortor, porta non tortor
+              sit amet, efficitur porttitor elit. Maecenas vulputate risus ligula, non porttitor
+              lorem malesuada eget. Etiam in nisi enim. Suspendisse vitae sem et lectus finibus tincidunt sit amet vitae augue.
+            </div>
+          </div>
+          <div class="review">
+            <div class="reviewVoting">
+              <iron-icon icon="icons:arrow-drop-up"></iron-icon>
+              <iron-icon icon="icons:arrow-drop-down"></iron-icon>
+            </div>
+            <div class="reviewContent">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce finibus maximus est,
+              non laoreet erat. Vivamus risus orci, placerat sit amet dolor ac, aliquet ornare nisi.
+              Proin ultricies pharetra erat a aliquet. Aliquam vitae ipsum vestibulum tortor eleifend
+              ullamcorper eget id risus. Sed in commodo nibh. Suspendisse euismod facilisis
+              sollicitudin. Fusce placerat ex a elit faucibus imperdiet. Nunc dictum sagittis
+              volutpat. Morbi fringilla quam laoreet tortor sollicitudin, vel tristique augue congue.
+              Phasellus malesuada lacinia orci, vitae dictum neque eleifend in. Etiam efficitur
+              risus sapien, id ornare turpis semper sit amet. Morbi magna tortor, porta non tortor
+              sit amet, efficitur porttitor elit. Maecenas vulputate risus ligula, non porttitor
+              lorem malesuada eget. Etiam in nisi enim. Suspendisse vitae sem et lectus finibus tincidunt sit amet vitae augue.
+            </div>
+          </div>
+        </div>
+      </div>
+    </paper-material>
+
+  </template>
+  <script>
+    Polymer({
+      is: 'na-adaptation',
+      receive_adaptation: function (adaptation_id){
+      	this.$.get_adaptation.body= { adapt_id: adaptation_id }
+      	this.$.get_adaptation.generateRequest()
+      },
+      goBack: function (){
+        page.show('/adaptations')
+      },
+      goToBook: function (e){
+        page.show('/book/' + this.item.goodreads_id)
+      },
+      goToMovie: function (){
+        page.show('/movie/' + this.item.imdb_id)
+      }
+    })
+  </script>
+</dom-module>
