@@ -30,21 +30,13 @@
       .lineTitle {
         font-weight: 600;
       }
-      .book {
+      .miam {
         margin: 10px;
         display: flex;
       }
-      .book > div {
+      .miam > div {
         width: 50%;
         padding: 10px;
-      }
-      .description {
-        display: block;
-        text-overflow: ellipsis;
-        word-wrap: break-word;
-        overflow: hidden;
-        max-height: 8.4em;
-        line-height: 1.8em;
       }
       .title-bar {
         background: var(--google-blue-500);
@@ -80,7 +72,7 @@
 
     <iron-ajax
       auto
-      url="/books/all"
+      url="/miam/all"
       handle-as="json"
       last-response="{{ajaxResponse}}"
       on-response="populatePagination">
@@ -88,11 +80,11 @@
 
     <div class="dontSee">
       Don't see the book you're looking for?
-      <paper-button on-click="goToAddBook" raised>Add Book</paper-button>
+      <paper-button on-click="goToBook" raised>Browse Books</paper-button>
     </div>
     <paper-material elevation="4" class="outer">
       <div class="title-bar">
-        <div class="title"><iron-icon icon="icons:book"></iron-icon>Books</div>
+        <div class="title"><iron-icon icon="image:movie-creation"></iron-icon>Make these into movies!</div>
         <div class="left-title-bar">
           <paper-input label="Search" value="{{searchString::input}}">
         </div>
@@ -107,22 +99,14 @@
       </div>
 
       <template is="dom-repeat" items="[[ajaxResponse]]" sort="{{sortBy}}" filter="{{computeFilter(searchString)}}">
-        <paper-material elevation="1" class="book">
+        <paper-material elevation="1" class="miam">
           <div class="leftSide">
-            <a href="/book/[[item.goodreads_id]]"><iron-image style="width:100px; height:150px; background-color: lightgray;" sizing="contain" preload src="[[item.image_url]]"></iron-image></a>
-            <h2><a href="/book/[[item.goodreads_id]]">[[item.title]]</a></h2>
-            <p>
-              <span class="lineTitle">Author: </span>
-              [[displayAuthors(item.authors)]]
-            </p>
-            <p>
-              <span class="lineTitle">GoodReads Rating: </span>
-              [[item.average_rating]]
-            </p>
+            <a href="/miam/[[item.goodreads_id]]"><iron-image style="width:100px; height:150px; background-color: lightgray;" sizing="contain" preload src="[[item.image_url]]"></iron-image></a>
+            <h2><a href="/miam/[[item.goodreads_id]]">[[item.title]]</a></h2>
+            <p><span class="lineTitle">Author: </span>[[item.authors]]</p>
+            <p><span class="lineTitle">GoodReads Rating: </span>[[item.average_rating]]</p>
           </div>
-          <div class="description">
-            [[stripHtml(item.description)]]
-          </div>
+          
         </paper-material>
       </template>
       <mercury-paginator
@@ -143,14 +127,11 @@
       },
       computeFilter: function (string){
         if(!string) return null
-        return function (book){
-          if (!book) return null
+        return function (miam){
+          if (!miam) return null
           string = string.toLowerCase()
-          return book.title && ~book.title.toLowerCase().indexOf(string)
+          return miam.title && ~miam.title.toLowerCase().indexOf(string)
         }
-      },
-      displayAuthors: function (authors){
-        return authors.map(function (author){ return author.name + (author.role ? ': ' + author.role : '') }).join(', ')
       },
       //should do the html stripping on the backend on save
       stripHtml: function (text){
@@ -181,8 +162,8 @@
         if (aRating == bRating) return this.sortByName(a, b)
         return aRating < bRating ? -1 : 1
       },
-      goToAddBook: function (){
-        page.show('/books/add')
+      goToBook: function (){
+        page.show('/books')
       }
     })
   </script>

@@ -45,10 +45,19 @@
       content-type="application/json">
     </iron-ajax>
 
+    <iron-ajax
+       id="addMiam"
+       method="POST"
+       url="/miam/add-new"
+       handle-as="json"
+       content-type="application/json"
+       on-response="miamSaved">
+     </iron-ajax>
+
 	<paper-material elevation="4" class="outer">
       <template is="dom-repeat" items="[[book]]">
         <div class="leftSide">
-          <paper-button on-click="goToAddMovie" raised>Make it a Movie!</paper-button>
+          <paper-button on-click="addMiam" raised>Make it a Movie!</paper-button>
           <a href="/book/[[item.goodreads_id]]"><iron-image style="width:300px; height:444px; background-color: lightgray;" sizing="contain" preload src="[[item.image_url]]"></iron-image></a>
           <h2><a href="/book/[[item.goodreads_id]]">[[item.title]]</a></h2>
           <p><span class="lineTitle">Author(s): </span>[[displayAuthors(item.authors)]]</p>
@@ -77,7 +86,26 @@
       },
       displayAuthors: function (authors){
         return authors.map(function (author){ return author.name + (author.role ? ': ' + author.role : '') }).join(', ')
-      }
+      },
+      addMiam: function(e){
+      	this.$.addMiam.body = {
+      		goodreads_id: e.model.book.goodreads_id,
+      		title: e.model.book.title,
+      		image_url: e.model.book.image_url,
+      		description: e.model.book.description,
+      		publication_date: e.model.book.publication_date,
+      		average_rating: e.model.book.average_rating,
+      		authors: displayAuthors(e.model.book.authors)
+      	}
+      	this.$.addMiam.generateRequest()
+      	page.show('/make-it-a-movie')
+      },
+       bookSaved: function (){
+         app.$.toast.text = `You've added a new book!`
+ 	     app.$.toast.show()
+         page.show('/book/' + this.newbook)
+         this.newbook = null
+       }
     })
   </script>
 </dom-module>
