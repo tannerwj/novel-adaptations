@@ -134,7 +134,6 @@
       is: 'na-movies',
       populatePagination: function (){
         this.$.paginator.data = this.ajaxResponse
-        console.log('data', this.$.paginator.data)
       },
       computeFilter: function (string){
         if(!string) return null
