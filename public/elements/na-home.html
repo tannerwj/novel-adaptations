@@ -1,8 +1,53 @@
 <dom-module id="na-home">
   <template>
     <style>
+      .outer {
+        margin: 20px;
+        float: left;
+        width: calc(100% - 80px);
+      }
+      .topContent {
+        display: flex;
+        flex-direction: column;
+        text-align: center;
+        margin-bottom: 50px;
+      }
+      .topContent h1 {
+        color: var(--google-blue-500);
+        font-size: 60pt;
+      }
+      .topContent iron-icon {
+        --iron-icon-height: 200px;
+        --iron-icon-width: 200px;
+      }
+      .content {
+        margin: 0 auto;
+        margin-bottom: 100px;
+        width: 800px;
+        font-size: 20px;
+        line-height: 40px;
+      }
+      a {
+        color: var(--google-blue-500);
+        text-decoration: none;
+      }
     </style>
-    Home
+    <paper-material elevation="4" class="outer">
+      <div class="topContent">
+        <h1>Novel Adaptations</h1>
+        <div class="topIcons">
+          <iron-icon icon="icons:book"></iron-icon>
+          <iron-icon icon="icons:arrow-forward"></iron-icon>
+          <iron-icon icon="image:movie-creation"></iron-icon>
+        </div>
+      </div>
+      <div class="content">
+        At Novel Adaptations, you can review your favorite <a href="/movies">movies</a> that have been made from your favorite <a href="/books">books</a>.
+        You can recommend books that have never before been made into movies to be made, as well as books that need a new movie because it's been a while
+        or the other movie wasn't the best. Add new books, movies, and new movie adaptations when they come out! Review, rate, and share adaptations with your
+        friends. Maybe your friends think that the movie was better than the book for some reason.
+      </div>
+    </paper-material>
   </template>
   <script>
     Polymer({

@@ -14,9 +14,6 @@
         top: -2px;
       }
       paper-button {
-        background: var(--google-blue-500);
-        color: white;
-        padding: 10px;
         font-size: 18px;
       }
       .book {
@@ -54,10 +51,10 @@
         --paper-input-container-input-color: white;
         width: 50%;
 			}
-			.title-bar paper-button {
+      .title-bar .searchButton {
         color: var(--google-blue-500);
         background-color: white;
-			}
+      }
       .addBook {
         position: absolute;
         bottom: 10px;
@@ -85,11 +82,12 @@
 
     <paper-material elevation="4" class="outer">
       <div class="title-bar">
+        <paper-button on-click="goBack">Back</paper-button>
         <div class="title"><iron-icon icon="icons:book"></iron-icon>Search for new Books</div>
         <div class="left-title-bar">
-          <paper-input label="Search" value="{{searchString::input}}">
+          <paper-input id="search" label="Search" value="{{searchString::input}}">
         </div>
-        <paper-button on-click="search" raised>Search</paper-button>
+        <paper-button class="searchButton" on-click="search" raised>Search</paper-button>
       </div>
       <template is="dom-repeat" items="{{books.result}}" as="book">
         <paper-material elevation="1" class="book">
@@ -150,6 +148,13 @@
 	      app.$.toast.show()
         page.show('/book/' + this.newbook)
         this.newbook = null
+      },
+      clearData: function (){
+        this.$.search.value = ''
+        this.books = null
+      },
+      goBack: function (){
+        page.show('/books')
       }
     })
   </script>
