@@ -8,7 +8,10 @@ const MiamSchema = new Schema({
   description: String,
   publication_date: String,
   average_rating: String,
-  authors: String,
+  authors: [{
+    name:  String,
+    role: String
+  }],
   essential_movie_parts: [{
     description: String,
     total_votes: Number,

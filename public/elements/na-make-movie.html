@@ -103,10 +103,10 @@
           <div class="leftSide">
             <a href="/miam/[[item.goodreads_id]]"><iron-image style="width:100px; height:150px; background-color: lightgray;" sizing="contain" preload src="[[item.image_url]]"></iron-image></a>
             <h2><a href="/miam/[[item.goodreads_id]]">[[item.title]]</a></h2>
-            <p><span class="lineTitle">Author: </span>[[item.authors]]</p>
+            <p><span class="lineTitle">Author: </span>[[displayAuthors(item.authors)]]</p>
             <p><span class="lineTitle">GoodReads Rating: </span>[[item.average_rating]]</p>
           </div>
-          
+
         </paper-material>
       </template>
       <mercury-paginator
@@ -141,6 +141,9 @@
       selectDropdownItem: function (e, item){
         this.sortBy = item.item.attributes.value.value
         this.$.paginator.firstPage()
+      },
+      displayAuthors: function (authors){
+        return authors.map(function (author){ return author.name + (author.role ? ': ' + author.role : '') }).join(', ')
       },
       sortByName: function (a, b){
         if (a.title == b.title) return 0

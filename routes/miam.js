@@ -12,7 +12,7 @@ router.get('/miam/all', function (req, res){
 
 // get single make it a movie entry by id
 router.post('/miam/by-id', function (req, res){
-    Book.find({'goodreads_id':req.body.book_id}, function(err, miam) {
+    Miam.find({'goodreads_id':req.body.book_id}, function(err, miam) {
     res.send(miam)
   })
 })
@@ -24,8 +24,6 @@ router.post('/miam/add-new', function(req, res) {
             result: []
         })
     }
-
-    var imdb_id = req.body.imdb_id
 
     var new_miam = Miam({
         goodreads_id: req.body.goodreads_id,
