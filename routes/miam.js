@@ -5,16 +5,16 @@ const Miam = require('../config/miam.js')
 
 // retrieve all make it a movie entries from the database
 router.get('/miam/all', function (req, res){
-  Miam.find({}, function(err, miam) {
-    res.send(miam)
-  })
+    Miam.find({}, function(err, miam) {
+        res.send(miam)
+    })
 })
 
 // get single make it a movie entry by id
 router.post('/miam/by-id', function (req, res){
     Miam.find({'goodreads_id':req.body.book_id}, function(err, miam) {
-    res.send(miam)
-  })
+        res.send(miam[0])
+    })
 })
 
 router.post('/miam/add-new', function(req, res) {
