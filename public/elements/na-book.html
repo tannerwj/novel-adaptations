@@ -61,7 +61,7 @@
         <span class="title"><iron-icon icon="icons:book"></iron-icon>[[book.title]]</span>
       </div>
       <div class="book">
-        <paper-button hidden$="{{book.exists}}" on-click="addMiam" raised>Make it a Movie!</paper-button>
+        <paper-button on-click="addMiam" raised>Make it a Movie!</paper-button>
         <iron-image style="width:300px; height:444px; background-color: lightgray;" sizing="contain" preload src="[[book.image_url]]"></iron-image>
         <p><span class="lineTitle">Author(s): </span>[[displayAuthors(book.authors)]]</p>
         <p><span class="lineTitle">Year Published: </span>[[book.publication_date]]</p>

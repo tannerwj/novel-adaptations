@@ -1,0 +1,87 @@
+<dom-module id="na-miam">
+  <template>
+    <style>
+      :host {
+        --paper-input-container-color: #ffffff;
+        --paper-input-container-input-color: #ffffff;
+      }
+      .outer {
+        margin: 20px;
+        float: left;
+        width: calc(100% - 80px);
+      }
+      iron-image {
+        float: left;
+        margin-right: 20px;
+      }
+      paper-button {
+        font-size: 18px;
+      }
+      .lineTitle {
+        font-weight: 600;
+      }
+      .title-bar {
+        background: var(--google-blue-500);
+        height: 60px;
+        display: flex;
+        font-size: 20pt;
+        color: white;
+        align-items: center;
+      }
+      .title-bar .title {
+				width: 50%;
+			}
+      .miam {
+        padding: 20px;
+        min-height: 440px;
+      }
+    </style>
+
+    <iron-ajax
+      id="get_miam"
+      method="POST"
+      url="/miam/by-id"
+      handle-as="json"
+      last-response="{{miam}}"
+      content-type="application/json">
+    </iron-ajax>
+
+    <paper-material elevation="4" class="outer">
+      <div class="title-bar">
+        <paper-button on-click="goBack">Back</paper-button>
+        <span class="title"><iron-icon icon="image:movie-creation"></iron-icon>[[miam.title]]</span>
+      </div>
+      <div class="miam">
+        <iron-image style="width:300px; height:444px; background-color: lightgray;" sizing="contain" preload src="[[miam.image_url]]"></iron-image>
+        <p><span class="lineTitle">Author(s): </span>[[displayAuthors(miam.authors)]]</p>
+        <p><span class="lineTitle">Year Published: </span>[[miam.publication_date]]</p>
+        <p><span class="lineTitle">GoodReads Rating: </span>[[miam.average_rating]]</p>
+        <p><span class="lineTitle">Description: </span>[[stripHtml(miam.description)]]</p>
+      </div>
+    </paper-material>
+
+  </template>
+  <script>
+    Polymer({
+      is: 'na-miam',
+      receive_miam: function(book_id){
+      	this.$.get_miam.body = { "book_id": book_id }
+      	this.$.get_miam.generateRequest()
+      },
+      stripHtml: function (text){
+        if(!text) return ''
+        return text.replace(/<(?:.|\n)*?>/gm, '')
+      },
+      commaSpace: function(text){
+      	if(!text) return ''
+      	return text.replace(/,/g, ', ')
+      },
+      displayAuthors: function (authors){
+        return authors.map(function (author){ return author.name + (author.role ? ': ' + author.role : '') }).join(', ')
+      },
+      goBack: function (){
+        history.back()
+      }
+    })
+  </script>
+</dom-module>

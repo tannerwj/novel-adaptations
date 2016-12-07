@@ -4,6 +4,7 @@
     var app = document.querySelector('#app')
     var book_page = app.$.na_book
     var movie_page = app.$.na_movie
+    var miam_page = app.$.na_miam
     var adaptation_page = app.$.na_adaptation
     var addbooks_page = app.$.na_addbooks
     var addmovies_page = app.$.na_addmovies
@@ -71,6 +72,11 @@
 
     page('/make-it-a-movie', function (){
       app.route = 'make_it_a_movie'
+    })
+
+    page('/miam/:book_id', function (ctx){
+      miam_page.receive_miam(ctx.params.book_id)
+      app.route = 'miam'
     })
 
     page('*', function(ctx){
