@@ -1,6 +1,7 @@
 const router = require('express').Router()
 const request = require('request-promise')
 const Promise = require('bluebird')
+const async = require('async-q')
 const omdb = require('omdb')
 const Movie = require('../config/movie.js')
 
@@ -13,8 +14,8 @@ router.get('/movies/all', function (req, res){
 // get movie by id
 router.post('/movies/by-id', function (req, res){
     Movie.find({'imdbID':req.body.movie_id}, function(err, movies) {
-    res.send(movies)
-  })
+        res.send(movies[0])
+    })
 })
 
 // search omdb for new movie
@@ -35,12 +36,18 @@ router.post('/movies/search-new', function(req, res) {
             return res.sendStatus(500)
         }
 
-        var response = {
-            query: query,
-            result: movies
-        }
-
-        res.json(response)
+        
+        async.map(movies, function (movie){
+            return Movie.findOne({ 'imdbID' : movie.imdb }).exec().then(function (m){
+                if(m) movie.exists = true
+            })
+        }).then(function (){
+            var response = {
+                query: query,
+                result: movies
+            }
+            res.json(response)
+        })
     })
 })
 

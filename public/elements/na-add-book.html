@@ -1,12 +1,156 @@
 <dom-module id="na-add-book">
   <template>
     <style>
+      .outer {
+        margin: 20px;
+        float: left;
+        width: calc(100% - 40px);
+      }
+      iron-image {
+        float: left;
+        margin-right: 20px;
+      }
+      iron-icon {
+        top: -2px;
+      }
+      paper-button {
+        background: var(--google-blue-500);
+        color: white;
+        padding: 10px;
+        font-size: 18px;
+      }
+      .book {
+        width: 45%;
+        float: left;
+        margin: 10px;
+        height: 170px;
+        position: relative;
+      }
+      .book > div {
+      	padding: 10px;
+      }
+      .title-bar {
+        background: var(--google-blue-500);
+        height: 100px;
+        display: flex;
+        font-size: 20pt;
+        color: white;
+        align-items: center;
+        padding: 0 15px;
+      }
+      .title-bar .title {
+				width: 30%;
+			}
+			.left-title-bar {
+				width: 30%;
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				height: 100%;
+			}
+			.title-bar paper-input {
+				margin-bottom: 10px;
+        --paper-input-container-color: white;
+        --paper-input-container-input-color: white;
+        width: 50%;
+			}
+			.title-bar paper-button {
+        color: var(--google-blue-500);
+        background-color: white;
+			}
+      .addBook {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+      }
     </style>
-    add book
+
+    <iron-ajax
+      id="searchBooks"
+      method="POST"
+      url="/books/search-new"
+      handle-as="json"
+      last-response="{{books}}"
+      content-type="application/json">
+    </iron-ajax>
+
+    <iron-ajax
+      id="addBook"
+      method="POST"
+      url="/books/add-new"
+      handle-as="json"
+      content-type="application/json"
+      on-response="bookSaved">
+    </iron-ajax>
+
+    <paper-material elevation="4" class="outer">
+      <div class="title-bar">
+        <div class="title"><iron-icon icon="icons:book"></iron-icon>Search for new Books</div>
+        <div class="left-title-bar">
+          <paper-input label="Search" value="{{searchString::input}}">
+        </div>
+        <paper-button on-click="search" raised>Search</paper-button>
+      </div>
+      <template is="dom-repeat" items="{{books.result}}" as="book">
+        <paper-material elevation="1" class="book">
+          <div class="leftSide">
+            <template is="dom-if" if="{{book.exists}}">
+              <a href="/book/[[book.goodreads_id}}">
+                <iron-image style="width:100px; height:150px; background-color: lightgray;" sizing="contain" preload src="{{book.small_img}}"></iron-image>
+              </a>
+            </template>
+            <template is="dom-if" if="{{!book.exists}}">
+              <iron-image style="width:100px; height:150px; background-color: lightgray;" sizing="contain" preload src="{{book.small_img}}"></iron-image>
+            </template>
+              <h2>
+                <template is="dom-if" if="{{book.exists}}">
+                  <a href="/book/{{book.goodreads_id}}">
+                    [[book.title]]
+                  </a>
+                </template>
+                <template is="dom-if" if="{{!book.exists}}">
+                  [[book.title]]
+                </template>
+              </h2>
+            <p>
+              <span class="lineTitle">Author: </span>
+              {{book.author}}
+            </p>
+            <p>
+              <span class="lineTitle">GoodReads Rating: </span>
+              {{book.rating}}
+            </p>
+          </div>
+          <paper-button hidden$="{{book.exists}}" on-click="addBook" class="addBook" raised>Add Book</paper-button>
+        </paper-material>
+      </template>
+    </paper-material>
   </template>
   <script>
     Polymer({
-      is: 'na-add-book'
+      is: 'na-add-book',
+      ready: function (){
+        this.newbook = null
+      },
+      search: function (){
+        if(!this.searchString) return
+      	this.$.searchBooks.body = { query: this.searchString }
+      	this.$.searchBooks.generateRequest()
+      },
+      addBook: function (e){
+        if(this.newbook) return
+        var id = e.model.book.goodreads_id
+        if(!id) return
+        this.newbook = id
+      	this.$.addBook.body = { goodreads_id: id }
+      	this.$.addBook.generateRequest()
+      },
+      bookSaved: function (){
+        app.$.toast.text = `You've added a new book!`
+	      app.$.toast.show()
+        page.show('/book/' + this.newbook)
+        this.newbook = null
+      }
     })
   </script>
 </dom-module>
