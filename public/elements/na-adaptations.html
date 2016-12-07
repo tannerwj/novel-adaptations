@@ -1,15 +1,188 @@
 <dom-module id="na-adaptations">
   <template>
     <style>
+      :host {
+        --paper-input-container-color: #ffffff;
+        --paper-input-container-input-color: #ffffff;
+      }
+      .outer {
+        margin: 20px;
+        float: left;
+        width: calc(100% - 40px);
+      }
+      iron-icon {
+        top: -2px;
+      }
+      paper-button {
+        background: var(--google-blue-500);
+        color: white;
+        padding: 10px;
+        font-size: 18px;
+      }
+      .dontSee {
+        float: right;
+        margin: 10px 20px;
+      }
+      .lineTitle {
+        font-weight: 600;
+      }
+      .description {
+        display: block;
+        text-overflow: ellipsis;
+        word-wrap: break-word;
+        overflow: hidden;
+        max-height: 8.4em;
+        line-height: 1.8em;
+      }
+      .title-bar {
+        background: var(--google-blue-500);
+        height: 60px;
+        display: flex;
+        font-size: 20pt;
+        color: white;
+        align-items: center;
+        padding: 0 15px;
+      }
+      .title-bar .title {
+				width: 50%;
+			}
+			.left-title-bar {
+				width: 30%;
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				height: 100%;
+			}
+			.title-bar paper-input, .title-bar paper-dropdown-menu{
+				margin-bottom: 10px;
+			}
+      paper-item {
+        cursor: pointer;
+      }
+      a {
+        color: #4285f4;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .adaptation {
+        width: 45%;
+        margin: 10px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .middle, .leftSide, .rightSide {
+        text-align: center;
+      }
+      .leftSide, .rightSide {
+        margin: 10px;
+      }
     </style>
-    Adaptations
 
-    
+    <iron-ajax
+      auto
+      url="/adaptations/all"
+      handle-as="json"
+      last-response="{{ajaxResponse}}"
+      on-response="populatePagination">
+    </iron-ajax>
+
+    <paper-material elevation="4" class="outer">
+      <div class="title-bar">
+        <span class="title"><iron-icon icon="image:movie-creation"></iron-icon>Adaptations</span>
+        <div class="left-title-bar">
+          <paper-input label="Search" value="{{searchString::input}}">
+        </div>
+        <paper-dropdown-menu id="sortDropdown" label="Sort by...">
+          <paper-listbox class="dropdown-content" on-iron-select="selectDropdownItem">
+            <paper-item value="sortByName">Name A-Z</paper-item>
+            <paper-item value="sortByNameBackwards">Name Z-A</paper-item>
+            <paper-item value="sortByRating">Rating High-Low</paper-item>
+            <paper-item value="sortByRatingBackwards">Rating Low-High</paper-item>
+          </paper-listbox>
+        </paper-dropdown-menu>
+      </div>
+
+      <template is="dom-repeat" items="[[ajaxResponse]]" sort="{{sortBy}}" filter="{{computeFilter(searchString)}}">
+        <paper-material elevation="1" class="adaptation">
+          <div class="leftSide">
+            <a href="/adaptation/[[item.adaptID]]">
+              <iron-image style="width:100px; height:150px; background-color: lightgray;" sizing="contain" preload src="[[item.book_image_url]]"></iron-image>
+            </a>
+            <div>
+              <div class="lineTitle">Book Rating</div>
+              <div>[[item.book_rating]]</div>
+            </div>
+          </div>
+          <div class="middle">
+            <a href="/adaptation/[[item.adaptID]]"><h2>[[item.title]]</h2></a>
+            <paper-button on-click="goToAdaptation" raised>Go To Adaptation</paper-button>
+            <div class="lineTitle">Novel Rating</div>
+            <div>[[item.rating]]</div>
+          </div>
+          <div class="rightSide">
+            <iron-image style="width:100px; height:150px; background-color: lightgray;" sizing="contain" preload src="[[item.movie_image_url]]"></iron-image>
+            <div>
+              <div class="lineTitle">Movie Rating</div>
+              <div>[[item.movie_rating]]</div>
+            </div>
+          </div>
+        </paper-material>
+      </template>
+      <mercury-paginator
+        id="paginator"
+        perpage="5"
+        show-first
+        show-last
+        items="{{ajaxResponse}}">
+      </mercury-paginator>
+    </paper-material>
 
   </template>
   <script>
     Polymer({
-      is: 'na-adaptations'
+      is: 'na-adaptations',
+      populatePagination: function (){
+        this.$.paginator.data = this.ajaxResponse
+      },
+      computeFilter: function (string){
+        if(!string) return null
+        return function (adaptation){
+          if (!adaptation) return null
+          string = string.toLowerCase()
+          return book.title && ~book.title.toLowerCase().indexOf(string)
+        }
+      },
+      stripHtml: function (text){
+        if(!text) return ''
+        return text.replace(/<(?:.|\n)*?>/gm, '')
+      },
+      selectDropdownItem: function (e, item){
+        this.sortBy = item.item.attributes.value.value
+        this.$.paginator.firstPage()
+    	},
+      sortByName: function (a, b){
+        if (a.title == b.title) return 0
+        return a.title < b.title ? -1 : 1
+      },
+      sortByNameBackwards: function (a, b){
+        if (a.title == b.title) return 0
+        return a.title < b.title ? 1 : -1
+      },
+      sortByRating: function (a, b){
+    		var aRating = Number(a.imdbRating)
+    		var bRating = Number(b.imdbRating)
+        if (aRating == bRating) return this.sortByName(a, b)
+        return aRating < bRating ? 1 : -1
+      },
+      sortByRatingBackwards: function (a, b){
+    		var aRating = Number(a.imdbRating)
+    		var bRating = Number(b.imdbRating)
+        if (aRating == bRating) return this.sortByName(a, b)
+        return aRating < bRating ? -1 : 1
+      },
+      goToAdaptation: function (){
+        page.show('/adaptation/5847ae94321a3e2844e4311c')
+      }
     })
   </script>
 </dom-module>

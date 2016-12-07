@@ -14,9 +14,6 @@
         top: -2px;
       }
       paper-button {
-        background: var(--google-blue-500);
-        color: white;
-        padding: 10px;
         font-size: 18px;
       }
       .movie {
@@ -54,7 +51,7 @@
         --paper-input-container-input-color: white;
         width: 50%;
       }
-      .title-bar paper-button {
+      .title-bar .searchButton {
         color: var(--google-blue-500);
         background-color: white;
       }
@@ -85,11 +82,12 @@
 
     <paper-material elevation="4" class="outer">
       <div class="title-bar">
+        <paper-button on-click="goBack">Back</paper-button>
         <div class="title"><iron-icon icon="maps:local-movies"></iron-icon>Search for new Movies</div>
         <div class="left-title-bar">
-          <paper-input label="Search" value="{{searchString::input}}">
+          <paper-input id="search" label="Search" value="{{searchString::input}}">
         </div>
-        <paper-button on-click="search" raised>Search</paper-button>
+        <paper-button class="searchButton" on-click="search" raised>Search</paper-button>
       </div>
       <template is="dom-repeat" items="{{movies.result}}" as="movie">
         <paper-material elevation="1" class="movie">
@@ -146,6 +144,13 @@
 	      app.$.toast.show()
         page.show('/movie/' + this.newmovie)
         this.newmovie = null
+      },
+      clearData: function (){
+        this.$.search.value = ''
+        this.movies = null
+      },
+      goBack: function (){
+        page.show('/movies')
       }
     })
   </script>

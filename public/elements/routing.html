@@ -4,6 +4,9 @@
     var app = document.querySelector('#app')
     var book_page = app.$.na_book
     var movie_page = app.$.na_movie
+    var adaptation_page = app.$.na_adaptation
+    var addbooks_page = app.$.na_addbooks
+    var addmovies_page = app.$.na_addmovies
 
     app.baseUrl = '/'
     if (window.location.port === ''){  // if production
@@ -33,6 +36,11 @@
       app.route = 'adaptations'
     })
 
+    page('/adaptation/:adaptation_id', function(ctx){
+      adaptation_page.receive_adaptation(ctx.params.adaptation_id)
+      app.route = 'adaptation'
+    })
+
     page('/books', function(){
       app.route = 'books'
     })
@@ -43,6 +51,7 @@
     })
 
     page('/books/add', function(){
+      addbooks_page.clearData()
       app.route = 'addbooks'
     })
 
@@ -56,6 +65,7 @@
     })
 
     page('/movies/add', function(){
+      addmovies_page.clearData()
       app.route = 'addmovies'
     })
 
