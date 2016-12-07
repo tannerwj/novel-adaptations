@@ -1,12 +1,152 @@
 <dom-module id="na-add-movie">
   <template>
     <style>
+      .outer {
+        margin: 20px;
+        float: left;
+        width: calc(100% - 40px);
+      }
+      iron-image {
+        float: left;
+        margin-right: 20px;
+      }
+      iron-icon {
+        top: -2px;
+      }
+      paper-button {
+        background: var(--google-blue-500);
+        color: white;
+        padding: 10px;
+        font-size: 18px;
+      }
+      .movie {
+        width: 45%;
+        float: left;
+        margin: 10px;
+        height: 170px;
+        position: relative;
+      }
+      .movie > div {
+        padding: 10px;
+      }
+      .title-bar {
+        background: var(--google-blue-500);
+        height: 100px;
+        display: flex;
+        font-size: 20pt;
+        color: white;
+        align-items: center;
+        padding: 0 15px;
+      }
+      .title-bar .title {
+        width: 30%;
+      }
+      .left-title-bar {
+        width: 30%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 100%;
+      }
+      .title-bar paper-input {
+        margin-bottom: 10px;
+        --paper-input-container-color: white;
+        --paper-input-container-input-color: white;
+        width: 50%;
+      }
+      .title-bar paper-button {
+        color: var(--google-blue-500);
+        background-color: white;
+      }
+      .addMovie {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+      }
     </style>
-    add movie
+
+    <iron-ajax
+      id="searchMovies"
+      method="POST"
+      url="/movies/search-new"
+      handle-as="json"
+      last-response="{{movies}}"
+      content-type="application/json">
+    </iron-ajax>
+
+    <iron-ajax
+      id="addMovie"
+      method="POST"
+      url="/movies/add-new"
+      handle-as="json"
+      content-type="application/json"
+      on-response="movieSaved">
+    </iron-ajax>
+
+    <paper-material elevation="4" class="outer">
+      <div class="title-bar">
+        <div class="title"><iron-icon icon="maps:local-movies"></iron-icon>Search for new Movies</div>
+        <div class="left-title-bar">
+          <paper-input label="Search" value="{{searchString::input}}">
+        </div>
+        <paper-button on-click="search" raised>Search</paper-button>
+      </div>
+      <template is="dom-repeat" items="{{movies.result}}" as="movie">
+        <paper-material elevation="1" class="movie">
+          <div class="leftSide">
+            <template is="dom-if" if="{{movie.exists}}">
+              <a href="/movie/[[movie.imdb}}">
+                <iron-image style="width:100px; height:150px; background-color: lightgray;" sizing="contain" preload src="{{movie.poster}}"></iron-image>
+              </a>
+            </template>
+            <template is="dom-if" if="{{!movie.exists}}">
+              <iron-image style="width:100px; height:150px; background-color: lightgray;" sizing="contain" preload src="{{movie.poster}}"></iron-image>
+            </template>
+              <h2>
+                <template is="dom-if" if="{{movie.exists}}">
+                  <a href="/movie/{{movie.imdb}}">
+                    [[movie.title]]
+                  </a>
+                </template>
+                <template is="dom-if" if="{{!movie.exists}}">
+                  [[movie.title]]
+                </template>
+              </h2>
+            <p>
+              <span class="lineTitle">Year: </span>
+              [[movie.year]]
+            </p>
+          </div>
+          <paper-button hidden$="{{movie.exists}}" on-click="addMovie" class="addMovie" raised>Add Movie</paper-button>
+        </paper-material>
+      </template>
+    </paper-material>
   </template>
   <script>
     Polymer({
-      is: 'na-add-movie'
+      is: 'na-add-movie',
+      ready: function (){
+        this.newmovie = null
+      },
+      search: function (){
+        if(!this.searchString) return
+      	this.$.searchMovies.body = { query: this.searchString }
+      	this.$.searchMovies.generateRequest()
+      },
+      addMovie: function (e){
+        if(this.newmovie) return
+        var id = e.model.movie.imdb
+        if(!id) return
+        this.newmovie = id
+      	this.$.addMovie.body = { imdb_id: id }
+      	this.$.addMovie.generateRequest()
+      },
+      movieSaved: function (){
+        app.$.toast.text = `You've added a new movie!`
+	      app.$.toast.show()
+        page.show('/movie/' + this.newmovie)
+        this.newmovie = null
+      }
     })
   </script>
 </dom-module>
