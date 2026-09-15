@@ -1197,7 +1197,7 @@ export function LoginPage({ error }: { error?: string }) {
         <h1>Log in</h1>
         <p>Enter your email and we'll send you a magic sign-in link. No passwords, ever.</p>
         {error && <div class="auth-error">{error}</div>}
-        <form action="/auth/login" method="post">
+        <form action="/auth/magic-link" method="post">
           <label for="email">Email address</label>
           <input type="email" id="email" name="email" required autocomplete="email" placeholder="you@example.com" />
           <button class="btn btn-primary" type="submit">Send magic link</button>
