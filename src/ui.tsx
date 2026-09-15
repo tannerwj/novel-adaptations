@@ -10,6 +10,8 @@
  * selectors, the admin news queue). See USER_SCRIPT and QUEUE_SCRIPT.
  */
 import type { Child } from 'hono/jsx';
+import type { Context } from 'hono';
+import { getCookie } from 'hono/cookie';
 import type { AdaptationSummary, Book, NewsItem, NewsStatus, SourceRow } from './db';
 // Round 3 (SEO): per-page meta/OG/Twitter tags; no-op when origin is absent.
 import { seoHead } from './seo';
@@ -60,6 +62,39 @@ export type AuthUser = { email: string; isAdmin?: boolean } | null;
  * without handing the new page access to window.opener.
  */
 export const extLink = { target: '_blank', rel: 'noopener noreferrer' } as const;
+
+// ---------------------------------------------------------------------------
+// Theme — server-resolved, cookie-driven (Track A).
+//
+// The `theme` cookie ('light' | 'dark', default 'light') picks the palette.
+// Layout renders <html data-theme={theme}> on the server, so the attribute
+// is present in the SSR head and there is no flash of the wrong theme.
+// Toggle via POST /api/theme (registered in src/index.tsx).
+// ---------------------------------------------------------------------------
+
+/** Theme names the CSS understands (`:root` = light, `[data-theme="dark"]`). */
+export type ThemeName = 'light' | 'dark';
+
+/** Cookie name carrying the user's theme choice (1-year Max-Age). */
+export const THEME_COOKIE = 'theme';
+
+/** Read the theme for this request. Anything but 'dark' → 'light'. */
+export function themeOf(c: Context): ThemeName {
+  return getCookie(c, THEME_COOKIE) === 'dark' ? 'dark' : 'light';
+}
+
+/** Two-letter avatar initials from an email address, e.g. tannerwj@x → "TW". */
+function initialsFor(email: string): string {
+  const local = (email.split('@')[0] ?? '').trim();
+  const parts = local.split(/[^a-zA-Z0-9]+/).filter(Boolean);
+  const source = parts.length > 0 ? parts : [local || 'N'];
+  return source
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
 
 // ---------------------------------------------------------------------------
 // Small helpers (labels)
@@ -124,94 +159,223 @@ const PIPELINE: string[] = [
 // ---------------------------------------------------------------------------
 
 const GLOBAL_CSS = `
+/* ------------------------------------------------------------------
+ * Novel Adaptations theme — Linear/Stripe-quality restraint.
+ *
+ * Light theme is the default and lives in :root. Dark theme overrides sit
+ * under [data-theme="dark"], which the server sets on <html> before any
+ * paint (see Layout in this file), so there is no flash of the wrong
+ * theme. The color-scheme property follows the theme so native form controls and
+ * scrollbars match.
+ *
+ * THEME CONTRACT (for Track B and friends): every color on this page must
+ * come from one of the --* tokens below. Legacy --gold/--gold-soft/--red/
+ * --green/--blue are aliases of the new palette — prefer the new names in
+ * new code.
+ * ------------------------------------------------------------------ */
 :root {
-  color-scheme: dark;
-  --bg: #0a0b0f;
-  --bg-soft: #0e1016;
-  --surface: #12141b;
-  --surface-2: #171a23;
-  --border: #262b38;
-  --text: #f2f3f6;
-  --muted: #aab2c4;   /* bumped for ≥4.5:1 body-text contrast on --bg */
-  --faint: #818898;   /* bumped; still reads as secondary on dark surfaces */
-  --gold: #e3a83e;
-  --gold-soft: #f0c368;
-  --red: #e05252;
-  --green: #4caf6d;
-  --blue: #4f9cf0;
-  --link: #8fc7ff;
+  color-scheme: light;
+
+  /* --- surfaces --- */
+  --bg: #faf9f6;
+  --bg-soft: #f1eee6;
+  --surface: #ffffff;
+  --surface-2: #f4f1ea;
+  --header-bg: rgba(250, 249, 246, .88);
+
+  /* --- lines --- */
+  --border: #e5dfd0;
+  --border-strong: #cdc3ab;
+
+  /* --- text (all pass >= 4.5:1 on --bg) --- */
+  --text: #1e1c17;
+  --muted: #5f594c;
+  --faint: #6f695b;
+
+  /* --- brand: gold/amber family --- */
+  --accent: #c78f2e;        /* button fills, marks */
+  --accent-soft: #eec25e;   /* hover on accent fills */
+  --accent-ink: #14100a;    /* text on top of accent fills */
+  --accent-deep: #8a5f14;   /* small text in accent color (>= 4.5:1 on --bg) */
+  --accent-tint: #faf3dd;   /* pale gold wash for highlighted rows */
+
+  /* --- functional --- */
+  --link: #1a5fb4;
+  --success: #2f7d44;
+  --danger: #b3352f;
+  --info: #2b6cb0;
+
+  /* --- elevation --- */
+  --shadow: 0 1px 2px rgba(30, 28, 23, .06), 0 12px 32px rgba(30, 28, 23, .08);
+  --shadow-lg: 0 2px 4px rgba(30, 28, 23, .06), 0 24px 60px rgba(30, 28, 23, .14);
+
+  --radius: 12px;
+
+  /* legacy aliases — kept for older module CSS, prefer the names above */
+  --gold: var(--accent);
+  --gold-soft: var(--accent-soft);
+  --red: var(--danger);
+  --green: var(--success);
+  --blue: var(--info);
+
   /* Fraunces for literary-cinematic display, Inter for clean body text.
      System stacks remain as zero-cost fallbacks. */
   --serif: 'Fraunces', Georgia, 'Times New Roman', serif;
   --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --radius: 12px;
 }
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0b0c10;
+  --bg-soft: #0e1016;
+  --surface: #12141b;
+  --surface-2: #171a23;
+  --header-bg: rgba(11, 12, 16, .82);
+
+  --border: #262b38;
+  --border-strong: #3a4152;
+
+  --text: #f1f2f5;
+  --muted: #a9b1c2;   /* >= 4.5:1 on --bg */
+  --faint: #8b93a6;   /* >= 4.5:1 on --bg, reads as secondary */
+
+  --accent: #e3a83e;
+  --accent-soft: #f0c368;
+  --accent-ink: #14100a;
+  --accent-deep: #e3a83e;
+  --accent-tint: rgba(227, 168, 62, .1);
+
+  --link: #8fc7ff;
+  --success: #4caf6d;
+  --danger: #e05252;
+  --info: #4f9cf0;
+
+  --shadow: 0 24px 60px rgba(0, 0, 0, .45);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, .6);
+}
+
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
   font-family: var(--sans);
   background: var(--bg);
   background-image:
-    radial-gradient(1200px 500px at 50% -10%, rgba(227,168,62,.07), transparent 60%),
-    radial-gradient(900px 400px at 90% 0%, rgba(79,156,240,.05), transparent 60%);
+    radial-gradient(1200px 500px at 50% -10%, rgba(199, 143, 46, .06), transparent 60%),
+    radial-gradient(900px 400px at 90% 0%, rgba(43, 108, 176, .05), transparent 60%);
   color: var(--text);
   line-height: 1.65;
   font-optical-sizing: auto; /* lets Fraunces tune itself at display sizes */
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
 }
+[data-theme="dark"] body {
+  background-image:
+    radial-gradient(1200px 500px at 50% -10%, rgba(227, 168, 62, .07), transparent 60%),
+    radial-gradient(900px 400px at 90% 0%, rgba(79, 156, 240, .05), transparent 60%);
+}
 a { color: var(--link); text-decoration: none; }
 a:hover { text-decoration: underline; }
-::selection { background: rgba(227,168,62,.35); }
+::selection { background: rgba(199, 143, 46, .3); }
+[data-theme="dark"] ::selection { background: rgba(227, 168, 62, .35); }
+
+/* Visible keyboard focus everywhere — no-JS friendly, theme aware. */
+:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 
 /* ---- header / nav ---- */
 .site-header {
   position: sticky; top: 0; z-index: 50;
   backdrop-filter: blur(14px);
-  background: rgba(10,11,15,.82);
+  -webkit-backdrop-filter: blur(14px);
+  background: var(--header-bg);
   border-bottom: 1px solid var(--border);
 }
 .site-header-inner {
-  max-width: 1180px; margin: 0 auto; padding: .8rem 1.25rem;
-  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+  max-width: 1180px; margin: 0 auto; padding: .6rem 1.25rem;
+  display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;
 }
 .brand {
-  font-family: var(--serif); font-size: 1.45rem; font-weight: 700;
-  letter-spacing: .005em; color: #fff; white-space: nowrap;
+  font-family: var(--serif); font-size: 1.2rem; font-weight: 700;
+  letter-spacing: -.01em; color: var(--text); white-space: nowrap;
 }
 .brand:hover { text-decoration: none; }
-.brand .brand-arrow { color: var(--gold); }
-.brand .brand-tag { display:block; font-family: var(--sans); font-size:.68rem; font-weight:600; letter-spacing:.28em; text-transform:uppercase; color: var(--muted); }
-.main-nav { display: flex; gap: .25rem; flex-wrap: wrap; align-items: center; }
+.brand .brand-arrow { color: var(--accent-deep); }
+.main-nav { display: flex; gap: .1rem; flex-wrap: wrap; align-items: center; }
 .main-nav a.nav-link {
-  color: var(--muted); font-size: .92rem; font-weight: 600;
-  padding: .45rem .85rem; border-radius: 999px;
+  color: var(--muted); font-size: .87rem; font-weight: 600;
+  padding: .42rem .8rem; border-radius: 999px;
 }
-.main-nav a.nav-link:hover { color: #fff; text-decoration: none; background: var(--surface-2); }
-.main-nav a.nav-link.active { color: #fff; background: var(--surface-2); }
-/* Round 3: header search (Track 3) — inline, collapses gracefully on mobile. */
+.main-nav a.nav-link:hover { color: var(--text); text-decoration: none; background: var(--surface-2); }
+.main-nav a.nav-link.active { color: var(--text); background: var(--surface-2); }
+/* Header search — compact inline form. */
 .header-search { display: flex; gap: .4rem; align-items: center; }
 .header-search input[type="search"] {
-  width: 11rem; padding: .45rem .8rem; font-size: .88rem;
-  color: var(--text); background: var(--surface-2);
+  width: 10.5rem; padding: .42rem .85rem; font-size: .85rem;
+  font-family: var(--sans); color: var(--text); background: var(--surface-2);
   border: 1px solid var(--border); border-radius: 999px;
 }
-.header-search input[type="search"]::placeholder { color: var(--muted); }
-@media (max-width: 720px) { .header-search input[type="search"] { width: 8rem; } }
-.header-user { margin-left: auto; display: flex; align-items: center; gap: .75rem; }
-.header-user .email { color: var(--muted); font-size: .85rem; max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.admin-badge { display: inline-block; padding: .15rem .5rem; font-size: .7rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #0a0b0f; background: var(--gold); border-radius: 999px; text-decoration: none; }
-.logout-form { display: inline; }
+.header-search input[type="search"]::placeholder { color: var(--faint); }
+.header-search input[type="search"]:focus { border-color: var(--accent); outline: none; }
+@media (max-width: 720px) { .header-search input[type="search"] { width: 7.5rem; } }
+/* Right-hand cluster: theme toggle + user area. */
+.header-actions { margin-left: auto; display: flex; align-items: center; gap: .6rem; }
+.theme-form { display: inline-flex; margin: 0; }
+.theme-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2.1rem; height: 2.1rem; padding: 0; cursor: pointer;
+  color: var(--muted); background: transparent;
+  border: 1px solid var(--border); border-radius: 999px;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.theme-toggle:hover { color: var(--text); border-color: var(--border-strong); background: var(--surface-2); }
+.theme-toggle svg { width: 1.05rem; height: 1.05rem; }
+.header-user { display: flex; align-items: center; }
+/* Avatar + account dropdown (vanilla JS toggle, no framework). */
+.user-menu { position: relative; }
+.avatar-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2.1rem; height: 2.1rem; padding: 0; cursor: pointer;
+  font: inherit; font-size: .8rem; font-weight: 700; letter-spacing: .03em;
+  color: var(--accent-ink); background: var(--accent);
+  border: 1px solid transparent; border-radius: 999px;
+  transition: transform .15s, background .15s;
+}
+.avatar-btn:hover { background: var(--accent-soft); }
+.avatar-btn:active { transform: scale(.96); }
+.user-menu .menu {
+  position: absolute; right: 0; top: calc(100% + .5rem);
+  min-width: 13rem; padding: .4rem; margin: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-lg);
+  z-index: 60;
+}
+.menu-item {
+  display: block; width: 100%; text-align: left;
+  font: inherit; font-size: .9rem; font-weight: 500; color: var(--text);
+  padding: .55rem .8rem; border: 0; border-radius: 8px;
+  background: transparent; cursor: pointer; text-decoration: none;
+}
+a.menu-item:hover, button.menu-item:hover { background: var(--surface-2); text-decoration: none; color: var(--text); }
+.menu-divider { border: 0; border-top: 1px solid var(--border); margin: .4rem .2rem; }
+.menu-label {
+  font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--faint); margin: .45rem .8rem .2rem;
+}
+.menu-logout { margin: 0; }
 .btn {
   font: inherit; font-size: .88rem; font-weight: 600; cursor: pointer;
   padding: .5rem 1rem; border-radius: 999px;
   border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
   transition: border-color .15s, transform .15s;
 }
-.btn:hover { border-color: var(--gold); }
+.btn:hover { border-color: var(--accent); }
 .btn:active { transform: scale(.97); }
-.btn-primary { background: var(--gold); border-color: var(--gold); color: #14100a; }
-.btn-primary:hover { background: var(--gold-soft); border-color: var(--gold-soft); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover { background: var(--accent-soft); border-color: var(--accent-soft); }
 .btn-sm { font-size: .8rem; padding: .35rem .8rem; }
 
 /* ---- page shell ---- */
@@ -219,7 +383,7 @@ a:hover { text-decoration: underline; }
 .page-narrow { max-width: 760px; }
 .kicker {
   text-transform: uppercase; letter-spacing: .22em; font-size: .72rem; font-weight: 700;
-  color: var(--gold); margin: 0 0 .5rem;
+  color: var(--accent-deep); margin: 0 0 .5rem;
 }
 .display-title {
   font-family: var(--serif); font-weight: 700; line-height: 1.06;
@@ -233,9 +397,8 @@ a:hover { text-decoration: underline; }
 .section-title .count { font-family: var(--sans); font-size: .85rem; color: var(--faint); font-weight: 600; }
 .meta { color: var(--muted); font-size: .9rem; }
 .back-link { display: inline-block; margin-bottom: 1.25rem; color: var(--muted); font-size: .9rem; }
-.back-link:hover { color: #fff; }
+.back-link:hover { color: var(--text); }
 .empty { color: var(--faint); padding: 3rem 1rem; text-align: center; font-size: 1.02rem; }
-
 /* ---- poster cards ---- */
 .poster-grid {
   display: grid; gap: 1.75rem 1.5rem;
@@ -252,9 +415,10 @@ a:hover { text-decoration: underline; }
 }
 .poster-card:hover .poster {
   transform: translateY(-6px);
-  border-color: rgba(227,168,62,.55);
-  box-shadow: 0 18px 44px rgba(0,0,0,.55), 0 0 0 1px rgba(227,168,62,.25);
+  border-color: rgba(199, 143, 46, .55);
+  box-shadow: var(--shadow-lg);
 }
+[data-theme="dark"] .poster-card:hover .poster { border-color: rgba(227, 168, 62, .55); }
 .poster img {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block;
 }
@@ -264,21 +428,21 @@ a:hover { text-decoration: underline; }
 }
 .poster .art-fallback .art-title {
   font-family: var(--serif); font-weight: 700; font-size: 1.25rem; line-height: 1.15; color: #fff;
-  text-shadow: 0 2px 12px rgba(0,0,0,.6);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, .6);
 }
 .poster .art-fallback .art-sub {
-  font-size: .78rem; color: rgba(255,255,255,.75); text-transform: uppercase; letter-spacing: .14em;
+  font-size: .78rem; color: rgba(255, 255, 255, .75); text-transform: uppercase; letter-spacing: .14em;
 }
 .poster .art-fallback::after {
   content: ''; position: absolute; inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,.55), transparent 55%);
+  background: linear-gradient(to top, rgba(0, 0, 0, .55), transparent 55%);
   pointer-events: none;
 }
 .poster .art-fallback > * { position: relative; z-index: 1; }
 .poster-card .card-body { padding: .8rem .15rem 0; }
 .poster-card .card-title { font-size: 1.02rem; font-weight: 700; margin: 0 0 .2rem; line-height: 1.3; }
 .poster-card .card-title a { color: var(--text); }
-.poster-card .card-title a:hover { color: var(--gold-soft); text-decoration: none; }
+.poster-card .card-title a:hover { color: var(--accent-deep); text-decoration: none; }
 .poster-card .card-meta { color: var(--muted); font-size: .85rem; margin: 0 0 .45rem; }
 .poster-card .card-meta a { color: var(--muted); }
 .poster-card .card-badges { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
@@ -289,12 +453,18 @@ a:hover { text-decoration: underline; }
   padding: .22rem .65rem; border-radius: 999px; border: 1px solid;
   text-transform: uppercase; letter-spacing: .06em; white-space: nowrap;
 }
-.tier-trusted { background: rgba(76,175,109,.14); color: #5fd08a; border-color: rgba(76,175,109,.45); }
-.tier-reputable { background: rgba(79,156,240,.14); color: #7db8f7; border-color: rgba(79,156,240,.45); }
-.tier-rumor { background: rgba(224,82,82,.14); color: #ff8f8f; border-color: rgba(224,82,82,.5); }
-.flag-review { background: rgba(227,168,62,.14); color: var(--gold-soft); border-color: rgba(227,168,62,.45); }
-.flag-lowconf { background: rgba(154,163,181,.12); color: var(--muted); border-color: rgba(154,163,181,.35); }
-.kind-pill { background: rgba(255,255,255,.06); color: var(--muted); border-color: var(--border); }
+.tier-trusted { background: rgba(47, 125, 68, .12); color: #2f7d44; border-color: rgba(47, 125, 68, .4); }
+.tier-reputable { background: rgba(43, 108, 176, .12); color: #2b6cb0; border-color: rgba(43, 108, 176, .4); }
+.tier-rumor { background: rgba(179, 53, 47, .1); color: #b3352f; border-color: rgba(179, 53, 47, .4); }
+.flag-review { background: rgba(199, 143, 46, .14); color: var(--accent-deep); border-color: rgba(199, 143, 46, .45); }
+.flag-lowconf { background: rgba(111, 105, 91, .1); color: var(--muted); border-color: rgba(111, 105, 91, .35); }
+.kind-pill { background: var(--surface-2); color: var(--muted); border-color: var(--border); }
+[data-theme="dark"] .tier-trusted { background: rgba(76, 175, 109, .14); color: #5fd08a; border-color: rgba(76, 175, 109, .45); }
+[data-theme="dark"] .tier-reputable { background: rgba(79, 156, 240, .14); color: #7db8f7; border-color: rgba(79, 156, 240, .45); }
+[data-theme="dark"] .tier-rumor { background: rgba(224, 82, 82, .14); color: #ff8f8f; border-color: rgba(224, 82, 82, .5); }
+[data-theme="dark"] .flag-review { background: rgba(227, 168, 62, .14); color: var(--accent-soft); border-color: rgba(227, 168, 62, .45); }
+[data-theme="dark"] .flag-lowconf { background: rgba(154, 163, 181, .12); color: var(--muted); border-color: rgba(154, 163, 181, .35); }
+[data-theme="dark"] .kind-pill { background: rgba(255, 255, 255, .06); color: var(--muted); border-color: var(--border); }
 
 /* ---- hero (detail pages) ---- */
 .hero {
@@ -302,7 +472,7 @@ a:hover { text-decoration: underline; }
   margin-bottom: 2.5rem;
 }
 @media (min-width: 820px) { .hero { grid-template-columns: 300px 1fr; gap: 3rem; } }
-.hero .poster { aspect-ratio: 2 / 3; max-width: 300px; box-shadow: 0 24px 60px rgba(0,0,0,.6); }
+.hero .poster { aspect-ratio: 2 / 3; max-width: 300px; box-shadow: var(--shadow-lg); }
 .hero h1 { font-family: var(--serif); font-size: clamp(2.3rem, 5.5vw, 3.6rem); line-height: 1.04; margin: 0 0 .5rem; letter-spacing: -.015em; }
 .hero .byline { color: var(--muted); font-size: 1.05rem; margin: 0 0 1.25rem; }
 .hero .byline a { color: var(--text); }
@@ -345,23 +515,24 @@ dl.facts dd { margin: 0; }
   width: 2px; background: var(--border);
 }
 .timeline li:last-child::before { display: none; }
-.timeline li.done::before { background: rgba(76,175,109,.5); }
+.timeline li.done::before { background: var(--success); opacity: .55; }
 .timeline .dot {
   position: absolute; left: 0; top: .2rem; width: 1.6rem; height: 1.6rem; border-radius: 50%;
   border: 2px solid var(--border); background: var(--surface-2);
   display: flex; align-items: center; justify-content: center;
   font-size: .7rem; color: var(--faint);
 }
-.timeline li.done .dot { border-color: var(--green); background: rgba(76,175,109,.18); color: var(--green); }
+.timeline li.done .dot { border-color: var(--success); background: var(--success); color: #fff; }
+[data-theme="dark"] .timeline li.done .dot { background: rgba(76, 175, 109, .18); color: var(--success); }
 .timeline li.current .dot {
-  border-color: var(--gold); background: rgba(227,168,62,.22); color: var(--gold);
-  box-shadow: 0 0 0 5px rgba(227,168,62,.12);
+  border-color: var(--accent); background: var(--accent-tint); color: var(--accent-deep);
+  box-shadow: 0 0 0 5px rgba(199, 143, 46, .12);
   animation: pulse 2.2s ease-in-out infinite;
 }
-@keyframes pulse { 50% { box-shadow: 0 0 0 9px rgba(227,168,62,.05); } }
+@keyframes pulse { 50% { box-shadow: 0 0 0 9px rgba(199, 143, 46, .05); } }
 .timeline .step-label { font-weight: 700; font-size: .95rem; text-transform: capitalize; }
 .timeline li.upcoming .step-label { color: var(--faint); font-weight: 600; }
-.timeline li.current .step-label { color: var(--gold-soft); }
+.timeline li.current .step-label { color: var(--accent-deep); }
 .timeline .step-meta { color: var(--faint); font-size: .82rem; margin-top: .15rem; }
 .timeline .step-meta a { color: var(--link); font-size: .82rem; }
 @media (min-width: 720px) {
@@ -381,23 +552,26 @@ dl.facts dd { margin: 0; }
   padding: .9rem 1.1rem;
   transition: border-color .2s;
 }
-.leaderboard li.rank-row:hover { border-color: rgba(227,168,62,.4); }
+.leaderboard li.rank-row:hover { border-color: var(--border-strong); }
 .rank-num {
   font-family: var(--serif); font-size: 1.9rem; font-weight: 700; color: var(--faint); text-align: center;
 }
-li.rank-row:nth-child(1) .rank-num { color: var(--gold); }
-li.rank-row:nth-child(2) .rank-num { color: #c9cedb; }
-li.rank-row:nth-child(3) .rank-num { color: #c98a4b; }
+li.rank-row:nth-child(1) .rank-num { color: var(--accent-deep); }
+li.rank-row:nth-child(2) .rank-num { color: var(--faint); }
+li.rank-row:nth-child(3) .rank-num { color: #a0672c; }
+[data-theme="dark"] li.rank-row:nth-child(1) .rank-num { color: var(--accent); }
+[data-theme="dark"] li.rank-row:nth-child(2) .rank-num { color: #c9cedb; }
+[data-theme="dark"] li.rank-row:nth-child(3) .rank-num { color: #c98a4b; }
 .rank-thumb { width: 64px; aspect-ratio: 2 / 3; border-radius: 8px; overflow: hidden; position: relative; background: var(--surface-2); border: 1px solid var(--border); }
 .rank-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.rank-thumb .mini-art { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 700; font-size: 1.3rem; color: rgba(255,255,255,.9); }
+.rank-thumb .mini-art { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 700; font-size: 1.3rem; color: rgba(255, 255, 255, .9); }
 .rank-info .rank-title { font-weight: 700; font-size: 1.05rem; margin: 0; }
 .rank-info .rank-title a { color: var(--text); }
 .rank-info .rank-authors { color: var(--muted); font-size: .88rem; margin: .1rem 0 0; }
 .rank-votes { text-align: right; display: flex; flex-direction: column; gap: .45rem; align-items: flex-end; }
 .rank-votes .votes { font-family: var(--serif); font-size: 1.4rem; font-weight: 700; }
 .rank-votes .votes-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .12em; color: var(--faint); }
-.vote-btn.voted { border-color: var(--gold); background: rgba(227,168,62,.16); color: var(--gold-soft); }
+.vote-btn.voted { border-color: var(--accent); background: var(--accent-tint); color: var(--accent-deep); }
 
 /* ---- shelves ---- */
 .shelf-group { margin-bottom: 2.5rem; }
@@ -414,7 +588,7 @@ li.rank-row:nth-child(3) .rank-num { color: #c98a4b; }
 .auth-card {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 2.5rem; max-width: 26rem; margin: 3rem auto;
-  box-shadow: 0 24px 60px rgba(0,0,0,.45);
+  box-shadow: var(--shadow);
 }
 .auth-card h1 { font-family: var(--serif); font-size: 1.8rem; margin: 0 0 .5rem; }
 .auth-card p { color: var(--muted); font-size: .95rem; }
@@ -425,19 +599,20 @@ li.rank-row:nth-child(3) .rank-num { color: #c98a4b; }
   border: 1px solid var(--border); background: var(--bg-soft); color: var(--text);
 }
 .auth-error {
-  background: rgba(224,82,82,.12); border: 1px solid rgba(224,82,82,.5); color: #ff9d9d;
+  background: rgba(179, 53, 47, .08); border: 1px solid rgba(179, 53, 47, .5); color: var(--danger);
   border-radius: 10px; padding: .8rem 1rem; font-size: .9rem;
 }
+[data-theme="dark"] .auth-error { background: rgba(224, 82, 82, .12); color: #ff9d9d; }
 .dev-link-box {
   background: var(--bg-soft); border: 1px dashed var(--border); border-radius: 10px;
   padding: 1rem; font-size: .85rem; word-break: break-all; margin-top: 1rem;
 }
 
-/* ---- feedback (Track D) ---- */
+/* ---- feedback ---- */
 .feedback-card {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 2.5rem; max-width: 36rem; margin: 3rem auto;
-  box-shadow: 0 24px 60px rgba(0,0,0,.45);
+  box-shadow: var(--shadow);
 }
 .feedback-card h1 { font-family: var(--serif); font-size: 1.8rem; margin: 0 0 .5rem; }
 .feedback-card p { color: var(--muted); font-size: .95rem; }
@@ -458,19 +633,19 @@ li.rank-row:nth-child(3) .rank-num { color: #c98a4b; }
   padding: .5rem 1.1rem; border: 1px solid var(--border); border-radius: 999px;
   color: var(--muted); font-size: .88rem; font-weight: 600;
 }
-.tabs a:hover { color: #fff; text-decoration: none; border-color: var(--gold); }
-.tabs a.active { border-color: var(--gold); color: #fff; background: rgba(227,168,62,.1); }
+.tabs a:hover { color: var(--text); text-decoration: none; border-color: var(--accent); }
+.tabs a.active { border-color: var(--accent); color: var(--text); background: var(--accent-tint); }
 .queue-item {
   border: 1px solid var(--border); border-radius: var(--radius); padding: 1.4rem;
   background: var(--surface); margin-bottom: 1.1rem;
   transition: border-color .2s;
 }
-.queue-item:hover { border-color: #3a4152; }
+.queue-item:hover { border-color: var(--border-strong); }
 .queue-item h3 { margin: 0 0 .5rem; font-size: 1.12rem; line-height: 1.35; }
 .queue-item h3 a { color: var(--text); }
-.queue-item h3 a:hover { color: var(--gold-soft); }
+.queue-item h3 a:hover { color: var(--accent-deep); }
 .queue-item .meta { color: var(--muted); font-size: .85rem; margin: .35rem 0; }
-.queue-item .summary { font-size: .94rem; color: #c9cdd6; margin: .6rem 0; }
+.queue-item .summary { font-size: .94rem; color: var(--text); opacity: .82; margin: .6rem 0; }
 .queue-item .badges { display: flex; flex-wrap: wrap; gap: .4rem; margin: .4rem 0; }
 .actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; align-items: center; }
 .actions input[type="text"], .actions input[type="url"], .actions input[type="number"] {
@@ -486,25 +661,49 @@ li.rank-row:nth-child(3) .rank-num { color: #c98a4b; }
 table.data { width: 100%; border-collapse: collapse; font-size: .86rem; margin-top: .75rem; }
 table.data th, table.data td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid var(--border); }
 table.data th { color: var(--faint); font-weight: 700; text-transform: uppercase; font-size: .72rem; letter-spacing: .08em; }
-table.data tr.bad td { color: #ff8f8f; }
+table.data tr.bad td { color: var(--danger); }
 table.data tr.ok td:first-child { color: var(--text); }
 .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
 .table-wrap table.data { margin-top: 0; }
-.run-errors { max-width: 26rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #ff8f8f; }
+.run-errors { max-width: 26rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--danger); }
 .status-dot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; margin-right: .45rem; vertical-align: baseline; }
-.status-dot.ok { background: var(--green); }
-.status-dot.err { background: var(--red); }
-.status-dot.run { background: var(--gold); animation: pulse 2s infinite; }
-
+.status-dot.ok { background: var(--success); }
+.status-dot.err { background: var(--danger); }
+.status-dot.run { background: var(--accent); animation: pulse 2s infinite; }
 /* ---- footer ---- */
 .site-footer { border-top: 1px solid var(--border); margin-top: 4rem; }
 .site-footer-inner {
-  max-width: 1180px; margin: 0 auto; padding: 2rem 1.25rem;
+  max-width: 1180px; margin: 0 auto; padding: 2.5rem 1.25rem 2rem;
   color: var(--faint); font-size: .85rem;
-  display: flex; gap: 1rem; flex-wrap: wrap; justify-content: space-between; align-items: baseline;
+  display: grid; gap: 2rem;
+  grid-template-columns: 1fr;
 }
-.tmdb-attribution a { color: inherit; text-decoration: underline; }
+@media (min-width: 720px) {
+  .site-footer-inner { grid-template-columns: 1.4fr 1fr 1fr; }
+}
+.footer-brand p { margin: .5rem 0; color: var(--muted); font-size: .88rem; }
+.footer-wordmark {
+  font-family: var(--serif); font-size: 1.05rem; font-weight: 700; color: var(--text);
+}
+.footer-wordmark .brand-arrow { color: var(--accent-deep); }
+.copyright { font-size: .8rem; }
+.footer-heading {
+  font-size: .72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .14em; color: var(--text); margin: 0 0 .75rem;
+}
+.footer-links { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }
+.footer-links a { color: var(--muted); }
+.footer-links a:hover { color: var(--text); }
+.footer-attribution {
+  grid-column: 1 / -1; margin: .5rem 0 0; padding-top: 1.25rem;
+  border-top: 1px solid var(--border); font-size: .78rem; color: var(--faint);
+}
+.footer-attribution a { color: inherit; text-decoration: underline; }
 `;
+
+// ---------------------------------------------------------------------------
+// Layout — header nav + footer
+// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Layout — header nav + footer
@@ -518,6 +717,7 @@ export function Layout({
   description,
   image,
   canonicalPath,
+  theme,
 }: {
   title: string;
   children: Child;
@@ -526,11 +726,16 @@ export function Layout({
   origin?: string;
   description?: string;
   image?: string;
-  /** Defaults to '/'; pass the request path for canonical URLs. */
+  /** Defaults to '/'; pass the request path for canonical URLs. Also the `next` target for the theme toggle. */
   canonicalPath?: string;
+  /** Active theme ('light' default). Thread through via `theme={themeOf(c)}` —
+      renders data-theme in the SSR head, so there is no flash of the wrong theme. */
+  theme?: ThemeName;
 }) {
+  const activeTheme: ThemeName = theme ?? 'light';
+  const nextPath = canonicalPath ?? '/';
   return (
-    <html lang="en">
+    <html lang="en" data-theme={activeTheme}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -538,7 +743,7 @@ export function Layout({
         {origin
           ? seoHead(origin, { title, description, image, path: canonicalPath ?? '/' })
           : null}
-        <meta name="theme-color" content="#0a0b0f" />
+        <meta name="theme-color" content={activeTheme === 'dark' ? '#0b0c10' : '#faf9f6'} />
         <link rel="icon" type="image/png" href="/favicon.png" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         {/* Track A: Fraunces (literary-cinematic display) + Inter (clean body).
@@ -554,17 +759,15 @@ export function Layout({
       <body>
         <header class="site-header">
           <div class="site-header-inner">
-            <a class="brand" href="/">
-              Novel Adaptations<span class="brand-arrow">.</span>
-              <span class="brand-tag">books → screen</span>
+            <a class="brand" href="/" aria-label="Novel Adaptations — home">
+              <span class="brand-wordmark">Novel Adaptations</span><span class="brand-arrow">.</span>
             </a>
             <nav class="main-nav" aria-label="Primary">
-              <a class="nav-link" href="/">Browse</a>
-              <a class="nav-link" href="/most-wanted">Most Wanted</a>
-              <a class="nav-link" href="/shelves">Shelves</a>
-              <a class="nav-link" href="/lists">Lists</a>
+              <a class="nav-link" href="/">Home</a>
               <a class="nav-link" href="/calendar">Calendar</a>
-              <a class="nav-link" href="/admin/news">News curation</a>
+              <a class="nav-link" href="/most-wanted">Most Wanted</a>
+              <a class="nav-link" href="/lists">Lists</a>
+              <a class="nav-link" href="/shelves">Shelves</a>
             </nav>
             <form class="header-search" action="/search" method="get" role="search">
               <input
@@ -578,49 +781,135 @@ export function Layout({
                 Search
               </button>
             </form>
-            <div class="header-user">
-              {user?.email ? (
-                <>
-                  <span class="email" title={user.email}>{user.email}</span>
-                  {user.isAdmin && (
-                    <a class="admin-badge" href="/admin/news" title="Admin curation console">Admin</a>
-                  )}
-                  <form class="logout-form" action="/auth/logout" method="post">
-                    <button class="btn btn-sm" type="submit">Log out</button>
-                  </form>
-                </>
-              ) : (
-                <a class="btn btn-sm" href="/auth/login">Log in</a>
-              )}
+            <div class="header-actions">
+              <form class="theme-form" action="/api/theme" method="post">
+                <input
+                  type="hidden"
+                  name="theme"
+                  value={activeTheme === 'dark' ? 'light' : 'dark'}
+                />
+                <input type="hidden" name="next" value={nextPath} />
+                <button
+                  class="theme-toggle"
+                  type="submit"
+                  aria-label="Toggle dark mode"
+                  title="Toggle dark mode"
+                >
+                  {activeTheme === 'dark' ? <SunIcon /> : <MoonIcon />}
+                </button>
+              </form>
+              <div class="header-user">
+                {user?.email ? (
+                  <div class="user-menu">
+                    <button
+                      class="avatar-btn"
+                      type="button"
+                      data-user-menu-btn
+                      aria-haspopup="menu"
+                      aria-expanded="false"
+                      aria-controls="account-menu"
+                      title={user.email}
+                    >
+                      {initialsFor(user.email)}
+                    </button>
+                    <div class="menu" id="account-menu" role="menu" data-user-menu hidden>
+                      <a class="menu-item" role="menuitem" href="/shelves">Shelves</a>
+                      <a class="menu-item" role="menuitem" href="/lists">My Lists</a>
+                      <a class="menu-item" role="menuitem" href="/feedback">Feedback</a>
+                      <hr class="menu-divider" />
+                      {user.isAdmin ? (
+                        <>
+                          <p class="menu-label">Admin</p>
+                          <a class="menu-item" role="menuitem" href="/admin/news">News curation</a>
+                          <a class="menu-item" role="menuitem" href="/admin/feedback">Feedback triage</a>
+                          <a class="menu-item" role="menuitem" href="/admin/screen-works">Screen works</a>
+                          <hr class="menu-divider" />
+                        </>
+                      ) : null}
+                      <form class="menu-logout" action="/auth/logout" method="post">
+                        <button class="menu-item" role="menuitem" type="submit">Log out</button>
+                      </form>
+                    </div>
+                  </div>
+                ) : (
+                  <a class="btn btn-sm" href="/auth/login">Log in</a>
+                )}
+              </div>
             </div>
           </div>
         </header>
         <main class="page">{children}</main>
         <footer class="site-footer">
           <div class="site-footer-inner">
-            <span>Novel Adaptations — tracking every book's journey to the screen.</span>
-            <span class="tmdb-attribution">
+            <div class="footer-brand">
+              <span class="footer-wordmark">Novel Adaptations<span class="brand-arrow">.</span></span>
+              <p>Tracking every book's journey to the screen.</p>
+              <p class="copyright">© 2026 Novel Adaptations.</p>
+            </div>
+            <nav aria-label="Footer">
+              <h2 class="footer-heading">Explore</h2>
+              <ul class="footer-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/calendar">Calendar</a></li>
+                <li><a href="/most-wanted">Most Wanted</a></li>
+                <li><a href="/lists">Lists</a></li>
+                <li><a href="/shelves">Shelves</a></li>
+              </ul>
+            </nav>
+            <div>
+              <h2 class="footer-heading">Feedback</h2>
+              <ul class="footer-links">
+                <li><a href="/feedback?type=feature">Suggest a feature</a></li>
+                <li><a href="/feedback?type=adaptation_tip">Report an adaptation</a></li>
+                <li><a href="/feedback?type=correction">Suggest a correction</a></li>
+              </ul>
+            </div>
+            <p class="footer-attribution tmdb-attribution">
               This product uses the TMDB API but is not endorsed or certified by TMDB.
               Data and images via <a href="https://www.themoviedb.org/" {...extLink}>The Movie Database</a>.
-            </span>
-            <span>
-              <a href="/feedback?type=feature">Suggest a feature</a>
-              {' · '}
-              <a href="/feedback?type=adaptation_tip">Report an adaptation</a>
-              {' · '}
-              <a href="/feedback?type=correction">Suggest a correction</a>
-            </span>
-            <span>
-              <a href="/docs/DESIGN.md">Design doc</a>
-            </span>
+            </p>
           </div>
         </footer>
+        <script dangerouslySetInnerHTML={{ __html: MENU_SCRIPT }} />
       </body>
     </html>
   );
 }
 
-// ---------------------------------------------------------------------------
+/** Sun glyph for the theme toggle (shown in dark mode → switches to light). */
+function SunIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </svg>
+  );
+}
+
+/** Moon glyph for the theme toggle (shown in light mode → switches to dark). */
+function MoonIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+    </svg>
+  );
+}
+
 // Badges
 // ---------------------------------------------------------------------------
 
@@ -758,6 +1047,31 @@ export function StatusTimeline({ events }: { events: TimelineEvent[] }) {
 // ---------------------------------------------------------------------------
 
 /**
+ * MENU_SCRIPT wires the header account dropdown: toggles aria-expanded,
+ * closes on outside click and on Escape (returning focus to the button).
+ * Rendered by Layout on every page so the menu works without any framework.
+ */
+const MENU_SCRIPT = `
+(function () {
+  var btn = document.querySelector('[data-user-menu-btn]');
+  var menu = document.querySelector('[data-user-menu]');
+  if (!btn || !menu) return;
+  function open() { menu.hidden = false; btn.setAttribute('aria-expanded', 'true'); }
+  function close() { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+  btn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (menu.hidden) open(); else close();
+  });
+  document.addEventListener('click', function (e) {
+    if (!menu.hidden && !menu.contains(e.target) && !btn.contains(e.target)) close();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !menu.hidden) { close(); btn.focus(); }
+  });
+})();
+`;
+
+/**
  * USER_SCRIPT wires:
  *  - [data-vote-btn] (books only): POST /api/votes { bookId } to vote,
  *    DELETE /api/votes/:bookId to unvote. Toggles .voted, the label, and the
@@ -892,13 +1206,15 @@ export function HomePage({
   adaptations,
   user,
   origin,
+  theme,
 }: {
   adaptations: AdaptationSummary[];
   user?: AuthUser;
   origin?: string;
+  theme?: ThemeName;
 }) {
   return (
-    <Layout title="Browse" user={user} origin={origin} canonicalPath="/">
+    <Layout title="Browse" user={user} origin={origin} canonicalPath="/" theme={theme}>
       <p class="kicker">The adaptation tracker</p>
       <h1 class="display-title">Every book's journey to the screen.</h1>
       <p class="lede">
@@ -933,6 +1249,7 @@ export function AdaptationPage({
   news,
   origin,
   canonicalPath,
+  theme,
 }: {
   adaptation: AdaptationWithPoster;
   timeline?: TimelineEvent[];
@@ -944,6 +1261,7 @@ export function AdaptationPage({
   news?: NewsItem[];
   origin?: string;
   canonicalPath?: string;
+  theme?: ThemeName;
 }) {
   const authed = !!user?.email;
   const targetType = 'adaptation' as const;
@@ -953,6 +1271,7 @@ export function AdaptationPage({
       user={user}
       origin={origin}
       canonicalPath={canonicalPath}
+      theme={theme}
       description={`Follow ${adaptation.book_title} by ${adaptation.book_authors} from page to screen — adaptation status, timeline, and news.`}
       image={adaptation.screen_poster_url ?? adaptation.book_cover_url ?? undefined}
     >
@@ -1110,6 +1429,7 @@ export function BookPage({
   user,
   origin,
   canonicalPath,
+  theme,
 }: {
   book: Book;
   adaptations: AdaptationSummary[];
@@ -1123,6 +1443,7 @@ export function BookPage({
   user?: AuthUser;
   origin?: string;
   canonicalPath?: string;
+  theme?: ThemeName;
 }) {
   const authed = !!user?.email;
   const correctionHref = `/feedback?type=correction&subject=${encodeURIComponent(book.title)}`;
@@ -1132,6 +1453,7 @@ export function BookPage({
       user={user}
       origin={origin}
       canonicalPath={canonicalPath}
+      theme={theme}
       description={`Follow ${book.title} by ${book.authors} from page to screen — adaptation status, release dates, and news.`}
       image={book.cover_url ?? undefined}
     >
@@ -1229,6 +1551,7 @@ export function MostWantedPage({
   items,
   user,
   origin,
+  theme,
 }: {
   items: {
     book: { id: number; title: string; authors: string; coverUrl: string | null };
@@ -1237,10 +1560,11 @@ export function MostWantedPage({
   }[];
   user: AuthUser;
   origin?: string;
+  theme?: ThemeName;
 }) {
   const authed = !!user?.email;
   return (
-    <Layout title="Most Wanted" user={user} origin={origin} canonicalPath="/most-wanted">
+    <Layout title="Most Wanted" user={user} origin={origin} canonicalPath="/most-wanted" theme={theme}>
       <p class="kicker">Community leaderboard</p>
       <h1 class="display-title">Most Wanted Adaptations</h1>
       <p class="lede">
@@ -1317,6 +1641,7 @@ const SHELF_SECTION_TITLES: Record<string, string> = {
 export function ShelvesPage({
   shelves,
   user,
+  theme,
 }: {
   shelves: {
     targetType: 'book' | 'adaptation';
@@ -1325,6 +1650,7 @@ export function ShelvesPage({
     shelf: string;
   }[];
   user: { email: string; isAdmin?: boolean };
+  theme?: ThemeName;
 }) {
   const grouped = new Map<string, typeof shelves>();
   for (const s of shelves) {
@@ -1334,7 +1660,7 @@ export function ShelvesPage({
   }
   const ordered = [...SHELF_ORDER.filter((s) => grouped.has(s)), ...[...grouped.keys()].filter((k) => !(SHELF_ORDER as readonly string[]).includes(k))];
   return (
-    <Layout title="My shelves" user={user}>
+    <Layout title="My shelves" user={user} theme={theme}>
       <p class="kicker">Your collection</p>
       <h1 class="display-title">Shelves</h1>
       <p class="lede">Everything you've shelved — reading, read, watchlist, and watched.</p>
@@ -1374,9 +1700,9 @@ export function ShelvesPage({
 // Auth pages
 // ---------------------------------------------------------------------------
 
-export function LoginPage({ error }: { error?: string }) {
+export function LoginPage({ error, theme }: { error?: string; theme?: ThemeName }) {
   return (
-    <Layout title="Log in">
+    <Layout title="Log in" theme={theme}>
       <div class="auth-card">
         <p class="kicker">Welcome back</p>
         <h1>Log in</h1>
@@ -1392,9 +1718,17 @@ export function LoginPage({ error }: { error?: string }) {
   );
 }
 
-export function MagicLinkSentPage({ email, devLink }: { email: string; devLink?: string }) {
+export function MagicLinkSentPage({
+  email,
+  devLink,
+  theme,
+}: {
+  email: string;
+  devLink?: string;
+  theme?: ThemeName;
+}) {
   return (
-    <Layout title="Check your email">
+    <Layout title="Check your email" theme={theme}>
       <div class="auth-card">
         <p class="kicker">Almost there</p>
         <h1>Check your inbox</h1>
@@ -1414,9 +1748,9 @@ export function MagicLinkSentPage({ email, devLink }: { email: string; devLink?:
   );
 }
 
-export function AuthErrorPage({ message }: { message: string }) {
+export function AuthErrorPage({ message, theme }: { message: string; theme?: ThemeName }) {
   return (
-    <Layout title="Sign-in problem">
+    <Layout title="Sign-in problem" theme={theme}>
       <div class="auth-card">
         <p class="kicker">Hmm</p>
         <h1>Couldn't sign you in</h1>
@@ -1534,14 +1868,16 @@ export function NewsQueuePage({
   items,
   sources,
   counts,
+  theme,
 }: {
   status: NewsStatus;
   items: NewsItem[];
   sources: SourceRow[];
   counts: Record<NewsStatus, number>;
+  theme?: ThemeName;
 }) {
   return (
-    <Layout title="News curation">
+    <Layout title="News curation" theme={theme}>
       <p class="kicker">Owner console</p>
       <h1 class="display-title">News curation</h1>
       <p class="lede">
@@ -1658,12 +1994,14 @@ export function NewsQueuePage({
 export function PipelineRunsPage({
   runs,
   sources,
+  theme,
 }: {
   runs: PipelineRun[];
   sources: SourceRow[];
+  theme?: ThemeName;
 }) {
   return (
-    <Layout title="Pipeline runs">
+    <Layout title="Pipeline runs" theme={theme}>
       <p class="kicker">Owner console</p>
       <h1 class="display-title">Pipeline runs</h1>
       <p class="lede">
