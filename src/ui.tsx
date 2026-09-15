@@ -83,17 +83,19 @@ export function themeOf(c: Context): ThemeName {
   return getCookie(c, THEME_COOKIE) === 'dark' ? 'dark' : 'light';
 }
 
-/** Two-letter avatar initials from an email address, e.g. tannerwj@x → "TW". */
+/** Avatar initials from an email address, e.g. admin@example.com → "AD",
+ *  tanner.wj@example.com → "TW". */
 function initialsFor(email: string): string {
   const local = (email.split('@')[0] ?? '').trim();
   const parts = local.split(/[^a-zA-Z0-9]+/).filter(Boolean);
-  const source = parts.length > 0 ? parts : [local || 'N'];
-  return source
-    .slice(0, 2)
-    .map((p) => p[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
+  const initials =
+    parts.length >= 2
+      ? parts
+          .slice(0, 2)
+          .map((p) => p[0])
+          .join('')
+      : (parts[0] ?? local).slice(0, 2);
+  return (initials || 'N').toUpperCase().slice(0, 2);
 }
 
 // ---------------------------------------------------------------------------
