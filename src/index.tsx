@@ -8,6 +8,7 @@ import { mountAuth } from './auth/routes';
 import { mountVotes } from './votes/routes';
 import { getAdaptationTimeline, getBookVoteState } from './votes/detail';
 import { getShelf } from './votes/db';
+import { serveFavicon } from './favicon';
 
 export interface Env {
   DB: D1Database;
@@ -95,6 +96,12 @@ app.get('/api/adaptations', async (c) => {
   const adaptations = await listAdaptations(c.env.DB);
   return c.json(adaptations);
 });
+
+// Track A: embedded favicon (src/favicon.ts — no [assets] static dir).
+// Registered before auth/vote mounts so the icon paths are never shadowed.
+app.get('/favicon.png', () => serveFavicon());
+app.get('/favicon.ico', () => serveFavicon());
+app.get('/apple-touch-icon.png', () => serveFavicon());
 
 // Phase 2: magic-link auth + voting/shelves.
 mountAuth(app);

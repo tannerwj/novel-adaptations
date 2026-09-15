@@ -114,16 +114,18 @@ const GLOBAL_CSS = `
   --surface-2: #171a23;
   --border: #262b38;
   --text: #f2f3f6;
-  --muted: #9aa3b5;
-  --faint: #6b7284;
+  --muted: #aab2c4;   /* bumped for ≥4.5:1 body-text contrast on --bg */
+  --faint: #818898;   /* bumped; still reads as secondary on dark surfaces */
   --gold: #e3a83e;
   --gold-soft: #f0c368;
   --red: #e05252;
   --green: #4caf6d;
   --blue: #4f9cf0;
   --link: #8fc7ff;
-  --serif: Georgia, 'Times New Roman', serif;
-  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Fraunces for literary-cinematic display, Inter for clean body text.
+     System stacks remain as zero-cost fallbacks. */
+  --serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --radius: 12px;
 }
 * { box-sizing: border-box; }
@@ -135,7 +137,8 @@ body {
     radial-gradient(1200px 500px at 50% -10%, rgba(227,168,62,.07), transparent 60%),
     radial-gradient(900px 400px at 90% 0%, rgba(79,156,240,.05), transparent 60%);
   color: var(--text);
-  line-height: 1.6;
+  line-height: 1.65;
+  font-optical-sizing: auto; /* lets Fraunces tune itself at display sizes */
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
 }
@@ -155,8 +158,8 @@ a:hover { text-decoration: underline; }
   display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
 }
 .brand {
-  font-family: var(--serif); font-size: 1.4rem; font-weight: 700;
-  letter-spacing: .01em; color: #fff; white-space: nowrap;
+  font-family: var(--serif); font-size: 1.45rem; font-weight: 700;
+  letter-spacing: .005em; color: #fff; white-space: nowrap;
 }
 .brand:hover { text-decoration: none; }
 .brand .brand-arrow { color: var(--gold); }
@@ -185,20 +188,20 @@ a:hover { text-decoration: underline; }
 .btn-sm { font-size: .8rem; padding: .35rem .8rem; }
 
 /* ---- page shell ---- */
-.page { max-width: 1180px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+.page { max-width: 1180px; margin: 0 auto; padding: 2.5rem 1.25rem 4.5rem; }
 .page-narrow { max-width: 760px; }
 .kicker {
   text-transform: uppercase; letter-spacing: .22em; font-size: .72rem; font-weight: 700;
   color: var(--gold); margin: 0 0 .5rem;
 }
 .display-title {
-  font-family: var(--serif); font-weight: 700; line-height: 1.08;
-  font-size: clamp(2rem, 5vw, 3.4rem); margin: 0 0 .75rem; letter-spacing: -.01em;
+  font-family: var(--serif); font-weight: 700; line-height: 1.06;
+  font-size: clamp(2.1rem, 5vw, 3.4rem); margin: 0 0 .8rem; letter-spacing: -.015em;
 }
-.lede { color: var(--muted); font-size: 1.05rem; max-width: 44rem; margin: 0 0 2rem; }
+.lede { color: var(--muted); font-size: 1.06rem; max-width: 44rem; margin: 0 0 2.25rem; }
 .section-title {
-  font-family: var(--serif); font-size: 1.5rem; font-weight: 700; margin: 2.75rem 0 1.25rem;
-  display: flex; align-items: baseline; gap: .75rem;
+  font-family: var(--serif); font-size: 1.55rem; font-weight: 700; margin: 3rem 0 1.25rem;
+  display: flex; align-items: baseline; gap: .75rem; letter-spacing: -.01em;
 }
 .section-title .count { font-family: var(--sans); font-size: .85rem; color: var(--faint); font-weight: 600; }
 .meta { color: var(--muted); font-size: .9rem; }
@@ -273,7 +276,7 @@ a:hover { text-decoration: underline; }
 }
 @media (min-width: 820px) { .hero { grid-template-columns: 300px 1fr; gap: 3rem; } }
 .hero .poster { aspect-ratio: 2 / 3; max-width: 300px; box-shadow: 0 24px 60px rgba(0,0,0,.6); }
-.hero h1 { font-family: var(--serif); font-size: clamp(2.2rem, 5.5vw, 3.6rem); line-height: 1.05; margin: 0 0 .5rem; letter-spacing: -.01em; }
+.hero h1 { font-family: var(--serif); font-size: clamp(2.3rem, 5.5vw, 3.6rem); line-height: 1.04; margin: 0 0 .5rem; letter-spacing: -.015em; }
 .hero .byline { color: var(--muted); font-size: 1.05rem; margin: 0 0 1.25rem; }
 .hero .byline a { color: var(--text); }
 .hero-badges { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.5rem; }
@@ -476,6 +479,17 @@ export function Layout({
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{title} — Novel Adaptations</title>
+        <meta name="theme-color" content="#0a0b0f" />
+        <link rel="icon" type="image/png" href="/favicon.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        {/* Track A: Fraunces (literary-cinematic display) + Inter (clean body).
+            System fallbacks keep pages legible if Google Fonts is unreachable. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
         <style>{GLOBAL_CSS}</style>
       </head>
       <body>
