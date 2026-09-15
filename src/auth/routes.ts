@@ -1,8 +1,9 @@
 // src/auth/routes.ts — passwordless auth (magic-link) routes.
 //
 //   GET  /auth/login       — sign-in form (LoginPage)
-//   POST /auth/magic-link  — email form → magic link (sent via Resend, or
-//                           shown on a dev page when no key is configured)
+//   POST /auth/magic-link  — email form → magic link (sent via Cloudflare Email
+//                           Service, or shown on a dev page when no sender is
+//                           configured)
 //   GET  /auth/verify      — single-use token → 30-day httpOnly session
 //   POST /auth/logout      — destroy session, clear cookie
 //
@@ -17,9 +18,9 @@ import { newToken, sha256Hex } from './crypto';
 import { sendMagicLink } from './email';
 import { SESSION_COOKIE } from './session';
 
-/** Bindings once the coordinator adds the auth env vars to Env. */
+/** Bindings for the auth routes (EMAIL send binding comes from Env). */
 export interface AuthBindings extends Env {
-  RESEND_API_KEY?: string;
+  /** 'development' shows magic links on-screen when email is unconfigured. Unset/anything else → fail closed. */
   ENVIRONMENT?: string;
 }
 
@@ -31,7 +32,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Magic-link rate limit: max 5 links per email per rolling hour. Prevents
- * email-bombing / Resend cost abuse via the public /auth/magic-link endpoint.
+ * email-bombing / provider cost abuse via the public /auth/magic-link endpoint.
  */
 const MAGIC_LINK_HOURLY_LIMIT = 5;
 async function checkMagicLinkRate(db: D1Database, email: string): Promise<boolean> {
@@ -122,7 +123,7 @@ export function mountAuth<E extends AuthBindings>(app: Hono<{ Bindings: E }>): v
     return c.html(
       AuthErrorPage({
         message:
-          'Email is not configured yet. Ask the site owner to set RESEND_API_KEY.',
+          'Sign-in email is not configured yet. Ask the site owner to onboard a sending domain in Email Service.',
       }),
       503,
     );

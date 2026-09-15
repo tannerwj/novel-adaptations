@@ -14,6 +14,19 @@ database_name = "novel-adaptations"
 database_id = "c5b38c69-8695-4841-8191-d004b323fdd6"
 migrations_dir = "migrations"
 
+# Outbound email (magic-link sign-in) via Cloudflare Email Service.
+# Per https://developers.cloudflare.com/email-service/api/send-emails/workers-api/
+# the sender address must belong to a domain onboarded for Email Sending.
+# OWNER ACTION REQUIRED before sign-in emails work in production: in the
+# dashboard go to Compute → Email Service → Email Sending → Onboard Domain and
+# pick noveladaptations.com. That only adds DNS records on the cf-bounce
+# subdomain (MX/SPF/DKIM) plus a _dmarc TXT — it does not touch root MX
+# records, so existing mail flow is unaffected. The binding is locked to the
+# single sender address below.
+[[send_email]]
+name = "EMAIL"
+allowed_sender_addresses = ["noreply@noveladaptations.com"]
+
 # News pipeline: daily ingestion run at 06:00 UTC (docs/NEWS_PIPELINE.md §1).
 [triggers]
 crons = ["0 6 * * *"]

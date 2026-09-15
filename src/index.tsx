@@ -17,8 +17,9 @@ export interface Env {
   CURATION_KEY: string;
   /** News-pipeline kill switch (`[vars] PIPELINE_ENABLED = "1"`). Anything else → scheduled run no-ops. */
   PIPELINE_ENABLED?: string;
-  /** Resend API key for magic-link emails (`wrangler secret put RESEND_API_KEY`). Absent → dev-link fallback. */
-  RESEND_API_KEY?: string;
+  /** Cloudflare Email Service send binding (`[[send_email]] name = "EMAIL"` in wrangler.toml).
+      Absent in local dev or until the owner onboards a sending domain → dev-link fallback / 503. */
+  EMAIL?: SendEmail;
   /** 'development' shows magic links on-screen when email is unconfigured. Unset/anything else → fail closed. */
   ENVIRONMENT?: string;
   /** TMDB API key for future poster enrichment (`wrangler secret put TMDB_API_KEY`). Absent → stub no-ops. */

@@ -80,13 +80,54 @@ Then open `https://noveladaptations.com/admin/news?key=<secret>` (or send
 items require a `corroborating_url`). Pending items older than 30 days are
 auto-dismissed at the start of each scheduled run.
 
+> Note: the shared-secret gate is a stopgap. A future step will replace it
+> with real auth + admin roles; **no new routes will be built on the
+> `CURATION_KEY` gate.** (TMDB poster enrichment, for example, runs as a
+> deploy-time script — see `docs/TMDB_BACKFILL.md` — not an admin route.)
+
+**Admin auth:** the `/admin` curation UI is pending a real auth + admin-roles
+implementation (future step, not this wave).
+
+## Email (Cloudflare Email Service)
+
+Magic-link sign-in emails are sent with Cloudflare Email Service through the
+`EMAIL` send binding — no third-party provider, no API keys to manage.
+
+**Note:** Resend was previously considered for magic-link delivery but was
+replaced by Cloudflare Email Service; `RESEND_API_KEY` references have been
+removed from code and docs.
+
+```toml
+# wrangler.toml
+[[send_email]]
+name = "EMAIL"
+allowed_sender_addresses = ["noreply@noveladaptations.com"]
+```
+
+Sender identity: `Novel Adaptations <noreply@noveladaptations.com>` on the
+**apex domain** (`noveladaptations.com`). Onboarding a domain for Email
+Sending only adds DNS records on the `cf-bounce` subdomain (MX/SPF/DKIM)
+plus a `_dmarc` TXT — it never touches root MX records, so existing mail
+flow is unaffected (and no existing mail records are configured on this
+zone today). The binding is locked to the single sender address above.
+
+**Owner action required before sign-in emails work in production:**
+1. Dashboard → **Compute** → **Email Service** → **Email Sending** →
+   **Onboard Domain** → pick `noveladaptations.com` → Done.
+2. Redeploy the Worker (`npx wrangler deploy`).
+
+**Local dev:** `wrangler dev --local` simulates the binding — sends are
+logged and the message content is written to local files for inspection, no
+email is delivered. Set `remote = true` on the binding if you want local
+dev to send real emails through your Cloudflare account instead.
+
 ## Secrets & environment
 
 | Secret / var | How to set | What happens when unset |
 |---|---|---|
 | `CURATION_KEY` | `npx wrangler secret put CURATION_KEY` | `/admin/*` and `/api/news/*` deny everything (fail closed) |
-| `RESEND_API_KEY` | `npx wrangler secret put RESEND_API_KEY` | Magic links are logged to the console; with `ENVIRONMENT=development` they're also shown on-screen; otherwise sign-in shows "not configured" |
-| `TMDB_API_KEY` | `npx wrangler secret put TMDB_API_KEY` | `src/tmdb.ts` enrichment stub no-ops (TODO) |
+| `EMAIL` send binding (`[[send_email]]`) | `wrangler.toml` + owner onboards `noveladaptations.com` for Email Sending (see above) | Magic links are logged to the console; with `ENVIRONMENT=development` they're also shown on-screen; otherwise sign-in shows "not configured" |
+| `TMDB_API_KEY` | operator's shell env when running the backfill script (never committed) | `src/tmdb.ts` enrichment no-ops without a key; see `docs/TMDB_BACKFILL.md` |
 | `ENVIRONMENT` (`[vars]`) | `ENVIRONMENT = "development"` in `.dev.vars` (gitignored) | Defaults to fail-closed production behavior |
 
 **Production deploy needs owner approval.** Don't run `wrangler deploy` or
