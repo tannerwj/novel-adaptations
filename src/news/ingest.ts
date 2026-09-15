@@ -34,6 +34,11 @@
  * sends anything — it only writes `pending` rows for owner curation.
  */
 
+import {
+  CRON_BATCH_SIZE,
+  runEnrichmentBatch,
+} from '../enrichment';
+
 export interface NewsEnv {
   DB: D1Database;
   /** Present in production; may be absent in local dev — code degrades. */
@@ -43,6 +48,11 @@ export interface NewsEnv {
    * Coordinator must add `PIPELINE_ENABLED?: string` to `Env` in src/index.tsx.
    */
   PIPELINE_ENABLED?: string;
+  /**
+   * TMDB API key (worker secret). Feeds the enrichment backstop only; when
+   * absent, enrichment calls are graceful no-ops and the news run continues.
+   */
+  TMDB_API_KEY?: string;
 }
 
 interface Source {
@@ -364,6 +374,43 @@ export async function scheduledNewsRun(env: NewsEnv): Promise<void> {
       ...stats,
     });
     throw e; // rethrow so the cron run still surfaces as failed
+  }
+
+  // Track 5 (Round 3) backstop: drain up to CRON_BATCH_SIZE flagged or
+  // poster-less screen works through TMDB enrichment. The primary path is
+  // the owner-driven POST /admin/backfill/tmdb endpoint (src/enrichment.ts);
+  // this keeps the backlog draining on its own. Never breaks the news run:
+  // sweepEnrichment is itself failure-proof, and this belt-and-braces
+  // try/catch covers anything above it.
+  try {
+    const sw = await sweepEnrichment(env);
+    console.log(
+      `enrichment sweep: ${sw.done} attempted, ${sw.enriched} enriched, ${sw.failed} failed`,
+    );
+  } catch (e) {
+    console.error(
+      'enrichment sweep threw (news run unaffected):',
+      (e as Error).message,
+    );
+  }
+}
+
+/**
+ * The Track 5 (Round 3) backstop: enrich up to CRON_BATCH_SIZE rows that are
+ * flagged (needs_enrichment = 1) or still poster-less, via the same core the
+ * POST /admin/backfill/tmdb endpoint uses. Never throws.
+ */
+export async function sweepEnrichment(
+  env: NewsEnv,
+): Promise<{ done: number; enriched: number; failed: number }> {
+  try {
+    return await runEnrichmentBatch(
+      { DB: env.DB, TMDB_API_KEY: env.TMDB_API_KEY },
+      CRON_BATCH_SIZE,
+    );
+  } catch (e) {
+    console.error('enrichment sweep failed:', (e as Error).message);
+    return { done: 0, enriched: 0, failed: 0 };
   }
 }
 

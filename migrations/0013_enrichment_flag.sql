@@ -1,0 +1,11 @@
+-- migrations/0013_enrichment_flag.sql — Round 3, Track 5 (in-worker TMDB enrichment).
+--
+-- Adds a lightweight "needs enrichment" flag to screen_works. The news
+-- curation promote flow sets it when a promoted adaptation's screen work
+-- has no poster yet; the in-worker POST /admin/backfill/tmdb endpoint and
+-- the daily cron's enrichment sweep (src/news/ingest.ts) clear it once
+-- enrichment has been attempted.
+--
+-- Safe: plain ADD COLUMN with a NOT NULL DEFAULT, so all existing rows get
+-- needs_enrichment = 0 and no table rebuild is needed.
+ALTER TABLE screen_works ADD COLUMN needs_enrichment INTEGER NOT NULL DEFAULT 0;

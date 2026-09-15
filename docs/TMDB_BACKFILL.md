@@ -1,11 +1,55 @@
-# TMDB poster backfill — deploy-time runbook
+# TMDB poster backfill — runbook
 
 > One-time data operation that backfills `poster_url` / `backdrop_url` /
-> `tmdb_id` on `screen_works` rows that lack posters. Deliberately a shell
-> script, **not** an HTTP route — there is no `/admin/*` endpoint for
-> enrichment and none will be built on the shared-secret curation gate.
+> `tmdb_id` on `screen_works` rows that lack posters.
+>
+> **Preferred path (Round 3, Track 5): the in-worker endpoint
+> `POST /admin/backfill/tmdb?n=5`** (see "In-worker enrichment" below). It
+> runs inside the worker with the production `TMDB_API_KEY` secret, is gated
+> by admin sessions, and shares the same guardrails as the script. The shell
+> script below remains as the offline fallback (review-generated-SQL-first
+> workflow, or when you need to enrich against a different D1 database).
 
-## Safety properties (baked into the script)
+## In-worker enrichment (preferred path)
+
+`POST /admin/backfill/tmdb?n=5` (src/enrichment.ts) — hit it from an owner
+browser session or `curl` with the `na_session` cookie.
+
+- **Gating:** self-gated by `requireAdminPage` — logged-out → 303 to
+  `/auth/login`, logged-in non-admin → 403.
+- **Batching:** `?n=` sets the batch size (default 5, max 10). Each call
+  enriches up to N rows: flagged rows (`needs_enrichment = 1`) first, then
+  anything still poster-less. Repeat calls until `remaining` is 0.
+- **Response:** `{ done, enriched, failed, remaining }` — `remaining` is the
+  count still needing enrichment after this batch.
+- **Guardrails** (same as the script): never overwrites a manually-set
+  `poster_url` (guarded `UPDATE`), idempotent, ~300 ms between TMDB calls,
+  per-item failures counted and never fatal.
+- **Flag lifecycle:** the news curation promote flow sets
+  `needs_enrichment = 1` on the promoted adaptation's screen work when it
+  lacks a poster; the endpoint (and the daily cron's backstop sweep in
+  `src/news/ingest.ts`) clears the flag once enrichment is attempted.
+
+Example (owner session cookie required):
+
+```sh
+curl -s -X POST -b na_session='<session-cookie-value>' \
+  "https://noveladaptations.com/admin/backfill/tmdb?n=10"
+# → {"done":10,"enriched":9,"failed":1,"remaining":42}
+```
+
+The daily cron (`scheduledNewsRun`) calls `sweepEnrichment()` after the news
+pipeline work — up to 5 flagged/poster-less rows per run, wrapped in
+try/catch so enrichment can never break the news run. It's the backstop; the
+endpoint above is the primary path.
+
+## Shell script (offline fallback)
+
+`scripts/backfill-tmdb-posters.ts` — the original deploy-time data operation.
+Use it when you want to review the generated SQL before applying, or to run
+against a non-production D1 database (`--db`).
+
+### Safety properties (baked into the script)
 
 - **Never overwrites a poster.** The SELECT only reads poster-less rows, and
   every generated `UPDATE` carries `WHERE … AND (poster_url IS NULL OR
@@ -70,5 +114,6 @@ node scripts/backfill-tmdb-posters.ts --dry-run --limit 5
 - TMDB attribution (required by their API terms) lives in the site footer
   (`src/ui.tsx`): "This product uses the TMDB API but is not endorsed or
   certified by TMDB." with a link to themoviedb.org.
-- Ongoing enrichment (new screen works added by the news pipeline) is a future
-  step; this backfill covers the existing catalog only.
+- Ongoing enrichment (new screen works added by the news pipeline) is covered
+  by the promote-flow `needs_enrichment` flag + the in-worker endpoint + the
+  daily cron backstop — the backfill only needs to cover the existing catalog.
