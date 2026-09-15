@@ -7,16 +7,16 @@
  *   POST /api/news/:id/dismiss        — status → dismissed (+ optional reason)
  *   POST /api/news/:id/promote        — approve + advance a linked adaptation
  *
- * AUTH: every route is gated behind a shared secret. The client sends
- * `X-Curation-Key` (or `?key=`); the value is compared in constant time
- * against env CURATION_KEY. Fail closed: if CURATION_KEY is unset, ALL
- * requests are denied.
- *
- * NOTE: a shared secret is a stopgap. Real owner auth (sessions / passkeys)
- * is a Phase 2 item — see the comment on `curationAuth`.
+ * AUTH: every route is gated behind admin sessions. /admin/* uses
+ * requireAdminPage (logged-out → 303 to /auth/login; non-admin → 403) and
+ * /api/news/* uses requireAdminApi (→ 403 JSON). Fail closed: without a
+ * valid admin session, ALL requests are denied. Admin status is granted
+ * solely via the ADMIN_EMAILS bootstrap in GET /auth/verify
+ * (see migration 0007_admin_roles.sql) — no route here mutates is_admin.
  */
 
-import type { Context, Hono, Next } from 'hono';
+import type { Context, Hono } from 'hono';
+import { requireAdminApi, requireAdminPage } from '../auth/session';
 import {
   ADAPTATION_STATUSES,
   countNewsByStatus,
@@ -37,39 +37,9 @@ import { NewsQueuePage, PipelineRunsPage } from '../ui';
 
 type CurationBindings = {
   DB: D1Database;
-  /** Set via `wrangler secret put CURATION_KEY`. Absent → all denied. */
-  CURATION_KEY?: string;
 };
 
 const VALID_QUEUE_STATUSES: NewsStatus[] = ['pending', 'approved', 'dismissed'];
-
-/** Constant-time string comparison (length check first; lengths aren't secret). */
-function timingSafeEqual(a: string, b: string): boolean {
-  const ab = new TextEncoder().encode(a);
-  const bb = new TextEncoder().encode(b);
-  if (ab.length !== bb.length) return false;
-  let diff = 0;
-  for (let i = 0; i < ab.length; i++) diff |= ab[i]! ^ bb[i]!;
-  return diff === 0;
-}
-
-/**
- * Owner gate. PHASE 2 TODO: replace the shared secret with real auth
- * (session cookie / passkey). The secret-in-URL fallback exists so the
- * owner can open the queue in a plain browser tab.
- */
-async function curationAuth<E extends CurationBindings>(
-  c: Context<{ Bindings: E }>,
-  next: Next,
-): Promise<Response | void> {
-  const expected = c.env.CURATION_KEY;
-  const provided =
-    c.req.header('X-Curation-Key') ?? c.req.query('key') ?? '';
-  if (!expected || !provided || !timingSafeEqual(provided, expected)) {
-    return c.text('Forbidden — owner curation key required.', 403);
-  }
-  await next();
-}
 
 async function parseJsonBody(c: Context): Promise<Record<string, unknown>> {
   try {
@@ -83,8 +53,10 @@ async function parseJsonBody(c: Context): Promise<Record<string, unknown>> {
 export function registerCurationRoutes<E extends CurationBindings>(
   app: Hono<{ Bindings: E }>,
 ): void {
-  app.use('/admin/*', curationAuth);
-  app.use('/api/news/*', curationAuth);
+  // Admin-only: page routes redirect logged-out users to sign-in,
+  // API routes answer 403 JSON. Both fail closed.
+  app.use('/admin/*', requireAdminPage);
+  app.use('/api/news/*', requireAdminApi);
 
   app.get('/admin/news', async (c) => {
     const raw = c.req.query('status') ?? 'pending';
@@ -98,11 +70,6 @@ export function registerCurationRoutes<E extends CurationBindings>(
       listSources(c.env.DB),
       countNewsByStatus(c.env.DB),
     ]);
-    const key = c.req.query('key') ?? '';
-    const withKey = (href: string) =>
-      key
-        ? `${href}${href.includes('?') ? '&' : '?'}key=${encodeURIComponent(key)}`
-        : href;
     // Caution guardrail: needs_review=1 items sort to the top of the pending
     // queue so the owner sees uncertain classifications first. (Ordering is
     // done here, not in src/db.ts's listNewsItems, which Track A doesn't own.)
@@ -113,22 +80,21 @@ export function registerCurationRoutes<E extends CurationBindings>(
     return c.html(
       <>
         <nav class="tabs" aria-label="admin">
-          <a href={withKey('/admin/news/runs')}>Pipeline runs</a>
+          <a href="/admin/news/runs">Pipeline runs</a>
         </nav>
         <NewsQueuePage
           status={status}
           items={ordered}
           sources={sources}
           counts={counts}
-          keyParam={key}
         />
       </>,
     );
   });
 
   // Owner-visible observability for the autonomous pipeline: every scheduled
-  // run (ran/disabled/error) with its counters. Same CURATION_KEY gate as the
-  // queue (app.use('/admin/*', curationAuth) above).
+  // run (ran/disabled/error) with its counters. Same admin-session gate as
+  // the queue (app.use('/admin/*', requireAdminPage) above).
   app.get('/admin/news/runs', async (c) => {
     const [runs, sources] = await Promise.all([
       listPipelineRuns(c.env.DB, 50),

@@ -71,6 +71,41 @@ async function findOrCreateUser(db: D1Database, email: string): Promise<number> 
   return row.id;
 }
 
+/**
+ * Admin bootstrap — the ONLY promotion path in the codebase.
+ *
+ * ADMIN_EMAILS is a comma-separated allow-list of owner emails (set via
+ * `wrangler secret put ADMIN_EMAILS`). Both sides are normalized (trim +
+ * lowercase); empties are dropped. On match, grants is_admin=1. Runs on
+ * every successful /auth/verify so later list edits promote existing
+ * users. NEVER demotes: removing an email from the list does not revoke
+ * access (revoke manually with
+ *   UPDATE users SET is_admin = 0 WHERE email = '…';).
+ * No route, API, or UI may mutate is_admin.
+ */
+async function promoteAdmin(
+  db: D1Database,
+  adminEmails: string | undefined,
+  userId: number,
+): Promise<void> {
+  const allowList = (adminEmails ?? '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e.length > 0);
+  if (allowList.length === 0) return;
+  const row = await db
+    .prepare('SELECT email FROM users WHERE id = ?1')
+    .bind(userId)
+    .first<{ email: string }>();
+  if (!row) return;
+  if (allowList.includes(row.email.trim().toLowerCase())) {
+    await db
+      .prepare('UPDATE users SET is_admin = 1 WHERE id = ?1')
+      .bind(userId)
+      .run();
+  }
+}
+
 export function mountAuth<E extends AuthBindings>(app: Hono<{ Bindings: E }>): void {
   app.get('/auth/login', (c) => {
     return c.html(LoginPage({}));
@@ -170,6 +205,13 @@ export function mountAuth<E extends AuthBindings>(app: Hono<{ Bindings: E }>): v
         )
         .bind(row.user_id, sessionHash),
     ]);
+
+    // Admin bootstrap (the ONLY promotion path in the codebase): if the
+    // sign-in email is on the ADMIN_EMAILS allow-list, grant is_admin. Runs
+    // on every successful verify so later list edits promote existing users.
+    // NEVER demotes — removing an email from ADMIN_EMAILS does not revoke
+    // access; revoke manually via SQL if needed. See migration 0007.
+    await promoteAdmin(c.env.DB, c.env.ADMIN_EMAILS, row.user_id);
 
     const secure = new URL(c.req.url).protocol === 'https:';
     setCookie(c, SESSION_COOKIE, sessionToken, {

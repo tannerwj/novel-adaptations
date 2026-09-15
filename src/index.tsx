@@ -3,7 +3,7 @@ import { AdaptationPage, BookPage, HomePage, Layout } from './ui';
 import { getAdaptationSummary, getBook, getBookAdaptations, listAdaptations } from './db';
 import { registerCurationRoutes } from './news/curation';
 import { scheduledNewsRun } from './news/ingest';
-import { getUser } from './auth/session';
+import { getUser, type SessionUser } from './auth/session';
 import { mountAuth } from './auth/routes';
 import { mountVotes } from './votes/routes';
 import { getAdaptationTimeline, getBookVoteState } from './votes/detail';
@@ -13,8 +13,11 @@ export interface Env {
   DB: D1Database;
   /** Workers AI binding (wrangler `[ai]`). May be absent in local dev. */
   AI: Ai;
-  /** Owner curation secret (`wrangler secret put CURATION_KEY`). Absent → curation routes deny all. */
-  CURATION_KEY: string;
+  /** Admin allow-list for the news curation console (`wrangler secret put ADMIN_EMAILS`
+      with a comma-separated list of owner emails). On every successful magic-link verify,
+      matching users get users.is_admin = 1. Removing an email does NOT revoke (documented
+      limitation); revoke manually via SQL. */
+  ADMIN_EMAILS?: string;
   /** News-pipeline kill switch (`[vars] PIPELINE_ENABLED = "1"`). Anything else → scheduled run no-ops. */
   PIPELINE_ENABLED?: string;
   /** Cloudflare Email Service send binding (`[[send_email]] name = "EMAIL"` in wrangler.toml).
@@ -28,11 +31,15 @@ export interface Env {
 
 const app = new Hono<{ Bindings: Env }>();
 
+/** Project a SessionUser into the shape pages/header consume. */
+const toAuthUser = (user: SessionUser | null) =>
+  user ? { email: user.email, isAdmin: user.isAdmin } : null;
+
 app.get('/', async (c) => {
   const adaptations = await listAdaptations(c.env.DB);
   const user = await getUser(c);
   return c.html(
-    <HomePage adaptations={adaptations} user={user ? { email: user.email } : null} />,
+    <HomePage adaptations={adaptations} user={toAuthUser(user)} />,
   );
 });
 
@@ -55,7 +62,7 @@ app.get('/adaptations/:id', async (c) => {
       timeline={timeline}
       userVoted={userVoted}
       userShelf={userShelf}
-      user={user ? { email: user.email } : null}
+      user={toAuthUser(user)}
     />,
   );
 });
@@ -79,7 +86,7 @@ app.get('/books/:id', async (c) => {
       adaptations={adaptations}
       userVoted={userVoted}
       userShelf={userShelf}
-      user={user ? { email: user.email } : null}
+      user={toAuthUser(user)}
     />,
   );
 });
@@ -93,7 +100,8 @@ app.get('/api/adaptations', async (c) => {
 mountAuth(app);
 mountVotes(app);
 
-// Owner-only news curation queue + API (gated by CURATION_KEY in curation.ts).
+// Owner-only news curation queue + API (gated by admin sessions; see
+// src/auth/session.ts requireAdminPage / requireAdminApi).
 registerCurationRoutes(app);
 
 app.notFound((c) => c.html(<Layout title="Not found">404 — page not found.</Layout>, 404));

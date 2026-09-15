@@ -1,7 +1,7 @@
 // src/auth/session.ts — read the logged-in user from the na_session cookie.
 // Sessions are long-lived (30 days), httpOnly, and stored as hashes in D1.
 
-import type { Context } from 'hono';
+import type { Context, Next } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { sha256Hex } from './crypto';
 
@@ -10,6 +10,8 @@ export const SESSION_COOKIE = 'na_session';
 export interface SessionUser {
   id: number;
   email: string;
+  /** True when the user is an owner/admin (users.is_admin = 1). */
+  isAdmin: boolean;
 }
 
 type DbBindings = { DB: D1Database };
@@ -22,7 +24,7 @@ export async function getUser<E extends DbBindings>(
   if (!token) return null;
   const tokenHash = await sha256Hex(token);
   const row = await c.env.DB.prepare(
-    `SELECT u.id AS id, u.email AS email
+    `SELECT u.id AS id, u.email AS email, u.is_admin AS isAdmin
        FROM sessions s
        JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = ?1
@@ -41,4 +43,33 @@ export async function requireUser<E extends DbBindings>(
   c: Context<{ Bindings: E }>,
 ): Promise<SessionUser | null> {
   return getUser(c);
+}
+
+/**
+ * Admin gate for page routes (/admin/*). Fail closed: logged-out → 303 to
+ * /auth/login; logged in but not an admin → 403.
+ */
+export async function requireAdminPage<E extends DbBindings>(
+  c: Context<{ Bindings: E }>,
+  next: Next,
+): Promise<Response | void> {
+  const user = await getUser(c);
+  if (!user) return c.redirect('/auth/login', 303);
+  if (!user.isAdmin) return c.text('Forbidden — admin access required.', 403);
+  await next();
+}
+
+/**
+ * Admin gate for API routes (/api/news/*). Fail closed: anything that isn't
+ * an authenticated admin session → 403 JSON.
+ */
+export async function requireAdminApi<E extends DbBindings>(
+  c: Context<{ Bindings: E }>,
+  next: Next,
+): Promise<Response | void> {
+  const user = await getUser(c);
+  if (!user || !user.isAdmin) {
+    return c.json({ error: 'Forbidden — admin access required.' }, 403);
+  }
+  await next();
 }
