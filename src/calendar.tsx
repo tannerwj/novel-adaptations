@@ -187,10 +187,8 @@ function ComingSoonSection({
   return (
     <>
       {groups.map((g) => (
-        <div key={g.heading} style="margin-bottom:1.5rem">
-          <h3
-            style="font-family:var(--serif);font-size:1.05rem;margin:0 0 .75rem;color:var(--muted)"
-          >
+        <div key={g.heading} class="cal-group">
+          <h3 class="cal-month">
             {g.heading}
           </h3>
           <ul class="shelf-list">

@@ -34,12 +34,12 @@ export const REVIEW_CSS = `
 }
 .review-item h3 { margin: 0 0 .35rem; font-size: 1.08rem; line-height: 1.35; }
 .review-item .meta { color: var(--muted); font-size: .82rem; margin-bottom: .7rem; }
-.review-body { white-space: pre-wrap; font-size: .95rem; color: #c9cdd6; line-height: 1.65; }
+.review-body { white-space: pre-wrap; font-size: .95rem; color: var(--text); line-height: 1.65; }
 .review-body.spoiler-blurred { filter: blur(6px); user-select: none; pointer-events: none; }
 .spoiler-toggle { margin-bottom: .7rem; }
 .spoiler-badge {
   display: inline-block; font-size: .72rem; text-transform: uppercase; letter-spacing: .1em;
-  color: var(--gold-soft); border: 1px solid var(--gold); border-radius: 999px;
+  color: var(--accent-deep); border: 1px solid var(--accent); border-radius: 999px;
   padding: .15rem .6rem; margin-left: .6rem; vertical-align: middle;
 }
 .review-actions { display: flex; gap: .5rem; margin-top: .9rem; }
@@ -60,7 +60,7 @@ export const REVIEW_CSS = `
   display: flex; gap: .5rem; align-items: center; font-weight: 400;
 }
 .review-form .checkbox-row input, .review-edit-form .checkbox-row input { width: auto; }
-.review-form .form-error, .review-edit-form .form-error { color: #e0734f; font-size: .85rem; }
+.review-form .form-error, .review-edit-form .form-error { color: var(--danger); font-size: .85rem; }
 .review-signin { margin-bottom: 1.5rem; }
 `;
 

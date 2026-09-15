@@ -136,15 +136,23 @@ function hueFor(s: string): number {
   return h % 360;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  rumored: '#9aa4b2',
-  optioned: '#d9a441',
-  in_development: '#4f9cf0',
-  filming: '#a06cd5',
-  post_production: '#e0734f',
-  released: '#4caf6d',
-  cancelled: '#e05252',
-};
+/**
+ * Status badge colors live in GLOBAL_CSS as `.status-badge.status-<status>`
+ * rules with a `[data-theme="dark"]` override per status — never inline
+ * styles. Every light/dark text color passes >= 4.5:1 on its surface
+ * (the old single-hex map failed on light surfaces, e.g. #9aa4b2 ≈ 2.8:1
+ * on white). Statuses missing from KNOWN_STATUSES fall back to the gray
+ * `.status-unknown` treatment.
+ */
+const KNOWN_STATUSES: ReadonlySet<string> = new Set([
+  'rumored',
+  'optioned',
+  'in_development',
+  'filming',
+  'post_production',
+  'released',
+  'cancelled',
+]);
 
 /** The pipeline ladder (cancelled is a terminal side-branch, not a step). */
 const PIPELINE: string[] = [
@@ -281,11 +289,24 @@ a:hover { text-decoration: underline; }
 ::selection { background: rgba(199, 143, 46, .3); }
 [data-theme="dark"] ::selection { background: rgba(227, 168, 62, .35); }
 
-/* Visible keyboard focus everywhere — no-JS friendly, theme aware. */
+/* Visible keyboard focus everywhere — no-JS friendly, theme aware.
+   The outline follows each element's own border-radius (pills stay pill-shaped). */
 :focus-visible {
   outline: 2px solid var(--link);
   outline-offset: 2px;
-  border-radius: 4px;
+}
+/* Consistent, theme-aware focus ring for text-like controls. */
+input[type="text"], input[type="email"], input[type="url"], input[type="number"],
+input[type="search"], input[type="date"], textarea, select {
+  accent-color: var(--accent);
+}
+input[type="text"]:focus-visible, input[type="email"]:focus-visible,
+input[type="url"]:focus-visible, input[type="number"]:focus-visible,
+input[type="search"]:focus-visible, input[type="date"]:focus-visible,
+textarea:focus-visible, select:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-tint);
+  outline: none;
 }
 
 /* ---- header / nav ---- */
@@ -378,7 +399,11 @@ a.menu-item:hover, button.menu-item:hover { background: var(--surface-2); text-d
 .btn:active { transform: scale(.97); }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .btn-primary:hover { background: var(--accent-soft); border-color: var(--accent-soft); }
+/* Ghost: tertiary actions (move up/down, remove) — no chrome until hover. */
+.btn-ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.btn-ghost:hover { background: var(--surface-2); border-color: transparent; color: var(--text); }
 .btn-sm { font-size: .8rem; padding: .35rem .8rem; }
+.btn[disabled] { opacity: .55; cursor: wait; }
 
 /* ---- page shell ---- */
 .page { max-width: 1180px; margin: 0 auto; padding: 2.5rem 1.25rem 4.5rem; }
@@ -467,6 +492,27 @@ a.menu-item:hover, button.menu-item:hover { background: var(--surface-2); text-d
 [data-theme="dark"] .flag-review { background: rgba(227, 168, 62, .14); color: var(--accent-soft); border-color: rgba(227, 168, 62, .45); }
 [data-theme="dark"] .flag-lowconf { background: rgba(154, 163, 181, .12); color: var(--muted); border-color: rgba(154, 163, 181, .35); }
 [data-theme="dark"] .kind-pill { background: rgba(255, 255, 255, .06); color: var(--muted); border-color: var(--border); }
+/* ---- status badges (book→screen pipeline) ----
+ * Rendered by StatusBadge via .status-<status> classes so the dark-theme
+ * override always applies. Every light/dark text color below was verified
+ * >= 4.5:1 against its surface (#fff / #12141b); the pre-revamp single-hex
+ * map (e.g. #9aa4b2 ≈ 2.8:1 on white) failed in light mode. */
+.status-rumored { background: rgba(87, 98, 110, .1); color: #57626e; border-color: rgba(87, 98, 110, .4); }
+.status-optioned { background: rgba(138, 95, 20, .1); color: #8a5f14; border-color: rgba(138, 95, 20, .4); }
+.status-in_development { background: rgba(43, 108, 176, .1); color: #2b6cb0; border-color: rgba(43, 108, 176, .4); }
+.status-filming { background: rgba(122, 63, 160, .1); color: #7a3fa0; border-color: rgba(122, 63, 160, .4); }
+.status-post_production { background: rgba(179, 74, 31, .1); color: #b34a1f; border-color: rgba(179, 74, 31, .4); }
+.status-released { background: rgba(47, 125, 68, .1); color: #2f7d44; border-color: rgba(47, 125, 68, .4); }
+.status-cancelled { background: rgba(179, 53, 47, .1); color: #b3352f; border-color: rgba(179, 53, 47, .4); }
+.status-unknown { background: rgba(87, 98, 110, .1); color: #57626e; border-color: rgba(87, 98, 110, .4); }
+[data-theme="dark"] .status-rumored { background: rgba(154, 164, 178, .14); color: #9aa4b2; border-color: rgba(154, 164, 178, .45); }
+[data-theme="dark"] .status-optioned { background: rgba(217, 164, 65, .14); color: #d9a441; border-color: rgba(217, 164, 65, .45); }
+[data-theme="dark"] .status-in_development { background: rgba(79, 156, 240, .14); color: #4f9cf0; border-color: rgba(79, 156, 240, .45); }
+[data-theme="dark"] .status-filming { background: rgba(160, 108, 213, .14); color: #a06cd5; border-color: rgba(160, 108, 213, .45); }
+[data-theme="dark"] .status-post_production { background: rgba(224, 115, 79, .14); color: #e0734f; border-color: rgba(224, 115, 79, .45); }
+[data-theme="dark"] .status-released { background: rgba(76, 175, 109, .14); color: #4caf6d; border-color: rgba(76, 175, 109, .45); }
+[data-theme="dark"] .status-cancelled { background: rgba(224, 82, 82, .14); color: #e05252; border-color: rgba(224, 82, 82, .5); }
+[data-theme="dark"] .status-unknown { background: rgba(154, 164, 178, .14); color: #9aa4b2; border-color: rgba(154, 164, 178, .45); }
 
 /* ---- hero (detail pages) ---- */
 .hero {
@@ -486,6 +532,7 @@ select.shelf-select {
   border-radius: 999px; border: 1px solid var(--border);
   background: var(--surface-2); color: var(--text); cursor: pointer;
 }
+select.shelf-select:hover { border-color: var(--accent); }
 
 /* ---- detail sections ---- */
 .detail-grid { display: grid; gap: 1.5rem; grid-template-columns: 1fr; }
@@ -672,6 +719,22 @@ table.data tr.ok td:first-child { color: var(--text); }
 .status-dot.ok { background: var(--success); }
 .status-dot.err { background: var(--danger); }
 .status-dot.run { background: var(--accent); animation: pulse 2s infinite; }
+/* ---- search page ---- */
+.search-form { display: flex; gap: .5rem; margin: 1.25rem 0 2rem; max-width: 32rem; }
+.search-form input[type="search"] {
+  flex: 1; min-width: 0; font: inherit; padding: .7rem 1rem; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--bg-soft); color: var(--text);
+}
+.search-form input[type="search"]::placeholder { color: var(--faint); }
+.search-result-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .75rem; }
+.search-result-list > li > a:first-child { font-weight: 600; }
+.search-result-list .sub { color: var(--muted); font-size: .88rem; }
+.adapt-story { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; }
+/* ---- calendar page ---- */
+.cal-group { margin-bottom: 1.5rem; }
+.cal-month {
+  font-family: var(--serif); font-size: 1.05rem; margin: 0 0 .75rem; color: var(--muted);
+}
 /* ---- footer ---- */
 .site-footer { border-top: 1px solid var(--border); margin-top: 4rem; }
 .site-footer-inner {
@@ -916,9 +979,9 @@ function MoonIcon() {
 // ---------------------------------------------------------------------------
 
 export function StatusBadge({ status }: { status: string }) {
-  const color = STATUS_COLORS[status] ?? '#9aa4b2';
+  const cls = KNOWN_STATUSES.has(status) ? `status-${status}` : 'status-unknown';
   return (
-    <span class="status-badge" style={`background:${color}1f;color:${color};border-color:${color}66`}>
+    <span class={`status-badge ${cls}`}>
       {statusLabel(status)}
     </span>
   );

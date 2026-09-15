@@ -168,7 +168,6 @@ function SearchForm({ q }: { q: string }) {
       action="/search"
       method="get"
       role="search"
-      style="display:flex;gap:.5rem;margin:1.25rem 0 2rem;max-width:32rem"
     >
       <input
         type="search"
@@ -177,7 +176,6 @@ function SearchForm({ q }: { q: string }) {
         placeholder="Search books, movies, shows…"
         aria-label="Search books, movies, and shows"
         maxlength={QUERY_MAX_LEN}
-        style="flex:1"
       />
       <button class="btn btn-primary" type="submit">
         Search
@@ -271,13 +269,11 @@ function SearchPage({
               <h2 class="section-title">
                 Books <span class="count">{books.length}</span>
               </h2>
-              <ul style="list-style:none;margin:0;padding:0;display:grid;gap:.6rem">
+              <ul class="search-result-list">
                 {books.map((b) => (
                   <li key={b.id}>
-                    <a href={`/books/${b.id}`} style="font-weight:600">
-                      {b.title}
-                    </a>
-                    <span style="color:var(--muted)"> by {b.authors}</span>
+                    <a href={`/books/${b.id}`}>{b.title}</a>
+                    <span class="sub"> by {b.authors}</span>
                   </li>
                 ))}
               </ul>
@@ -322,16 +318,13 @@ function SearchPage({
               <h2 class="section-title">
                 Adaptation stories <span class="count">{stories.length}</span>
               </h2>
-              <ul style="list-style:none;margin:0;padding:0;display:grid;gap:.9rem">
+              <ul class="search-result-list">
                 {stories.map((s) => (
-                  <li
-                    key={s.id}
-                    style="display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem"
-                  >
-                    <a href={`/adaptations/${s.id}`} style="font-weight:600">
+                  <li key={s.id} class="adapt-story">
+                    <a href={`/adaptations/${s.id}`}>
                       {s.book_title} → {s.screen_title}
                     </a>
-                    <span style="color:var(--muted);font-size:.88rem">
+                    <span class="sub">
                       {kindLabel(s.screen_kind)} · by {s.book_authors}
                     </span>
                     <StatusBadge status={s.status} />

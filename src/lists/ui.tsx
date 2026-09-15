@@ -16,11 +16,11 @@ import type { ListTargetType } from './db';
 
 const LIST_CSS = `
 .list-card { display: flex; gap: 1.1rem; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.1rem 1.3rem; margin-bottom: .8rem; transition: border-color .2s; }
-.list-card:hover { border-color: #3a4152; }
+.list-card:hover { border-color: var(--border-strong); }
 .list-card .grow { flex: 1; min-width: 0; }
 .list-card h3 { margin: 0 0 .3rem; font-size: 1.12rem; line-height: 1.3; }
 .list-card h3 a { color: var(--text); }
-.list-card h3 a:hover { color: var(--gold-soft); text-decoration: none; }
+.list-card h3 a:hover { color: var(--accent-deep); text-decoration: none; }
 .list-card .desc { color: var(--muted); font-size: .9rem; margin: .25rem 0 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .list-card .row-actions, .list-item .row-actions { display: flex; gap: .45rem; flex-wrap: wrap; align-items: center; flex: none; }
 .list-item { display: flex; gap: 1rem; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .85rem 1.1rem; margin-bottom: .7rem; }
@@ -28,22 +28,22 @@ const LIST_CSS = `
 .list-item .grow { flex: 1; min-width: 0; }
 .list-item h3 { margin: 0 0 .2rem; font-size: 1.02rem; }
 .list-item h3 a { color: var(--text); }
-.list-item h3 a:hover { color: var(--gold-soft); text-decoration: none; }
+.list-item h3 a:hover { color: var(--accent-deep); text-decoration: none; }
 .list-item .sub { color: var(--muted); font-size: .85rem; margin: 0; }
-.list-item .note { color: #c9cdd6; font-size: .88rem; font-style: italic; margin: .35rem 0 0; border-left: 2px solid var(--gold); padding-left: .6rem; }
+.list-item .note { color: var(--muted); font-size: .88rem; font-style: italic; margin: .35rem 0 0; border-left: 2px solid var(--accent); padding-left: .6rem; }
 .list-item .pos { color: var(--faint); font-family: var(--serif); font-size: 1.25rem; font-weight: 700; width: 2rem; text-align: center; flex: none; }
 .f-label { font-size: .85rem; font-weight: 600; color: var(--muted); display: grid; gap: .35rem; }
 .f-input { font: inherit; padding: .65rem .9rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-soft); color: var(--text); width: 100%; box-sizing: border-box; }
-.f-input:focus { outline: none; border-color: var(--gold); }
+.f-input:focus { outline: none; border-color: var(--accent); }
 textarea.f-input { min-height: 4.5rem; resize: vertical; }
 .f-row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: flex-end; }
 .f-row .f-label { flex: 1 1 10rem; }
 .check-row { display: flex; gap: .5rem; align-items: center; font-size: .9rem; color: var(--muted); }
-.form-error { background: rgba(224,82,82,.12); border: 1px solid rgba(224,82,82,.5); color: #ff9d9d; border-radius: 10px; padding: .7rem 1rem; font-size: .88rem; display: none; }
+.form-error { background: rgba(224,82,82,.12); border: 1px solid rgba(224,82,82,.5); color: var(--danger); border-radius: 10px; padding: .7rem 1rem; font-size: .88rem; display: none; }
 .share-box { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 10px; padding: .7rem 1rem; margin-top: 1.25rem; }
 .share-box code { font-size: .85rem; color: var(--link); word-break: break-all; }
 .add-to-list { display: flex; gap: .5rem; align-items: center; }
-.add-to-list.done .btn { border-color: var(--green); color: var(--green); }
+.add-to-list.done .btn { border-color: var(--success); color: var(--success); }
 .add-to-list .msg { font-size: .82rem; color: var(--muted); }
 `;
 
@@ -491,7 +491,7 @@ export function ListDetailPage({
               {isOwner && (
                 <div class="row-actions">
                   <button
-                    class="btn btn-sm"
+                    class="btn btn-sm btn-ghost"
                     type="button"
                     title="Move up"
                     aria-label={`Move ${item.title} up`}
@@ -501,7 +501,7 @@ export function ListDetailPage({
                     ↑
                   </button>
                   <button
-                    class="btn btn-sm"
+                    class="btn btn-sm btn-ghost"
                     type="button"
                     title="Move down"
                     aria-label={`Move ${item.title} down`}
@@ -511,7 +511,7 @@ export function ListDetailPage({
                     ↓
                   </button>
                   <button
-                    class="btn btn-sm"
+                    class="btn btn-sm btn-ghost"
                     type="button"
                     data-item-delete={String(item.id)}
                     data-list-id={String(list.id)}

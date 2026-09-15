@@ -26,16 +26,17 @@ const WIDGET_CSS = `
 .rating-widget { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
 .rating-stars { display: inline-flex; gap: .15rem; }
 .rating-stars .star {
-  font-size: 1.35rem; line-height: 1; color: var(--faint, #5b6272);
+  font-size: 1.35rem; line-height: 1; color: var(--faint);
   background: none; border: none; padding: 0 .1rem; cursor: default;
 }
 .rating-stars button.star { cursor: pointer; transition: transform .12s; }
-.rating-stars button.star:hover, .rating-stars button.star:focus-visible { transform: scale(1.2); outline: none; }
-.rating-stars .star.filled { color: var(--gold, #e3a83e); }
-.rating-meta { color: var(--muted, #9aa0ae); font-size: .88rem; }
-.rating-average { font-weight: 700; color: var(--text, #f2f0ea); }
-.rating-login { color: var(--gold-soft, #f0c368); font-size: .88rem; }
-.rating-login:hover { color: #fff; }
+.rating-stars button.star:hover { transform: scale(1.2); }
+/* (keyboard focus keeps the global :focus-visible outline — never suppressed) */
+.rating-stars .star.filled { color: var(--accent); }
+.rating-meta { color: var(--muted); font-size: .88rem; }
+.rating-average { font-weight: 700; color: var(--text); }
+.rating-login { color: var(--accent-deep); font-size: .88rem; font-weight: 600; }
+.rating-login:hover { color: var(--text); }
 `;
 
 /**
