@@ -414,6 +414,25 @@ li.rank-row:nth-child(3) .rank-num { color: #c98a4b; }
   padding: 1rem; font-size: .85rem; word-break: break-all; margin-top: 1rem;
 }
 
+/* ---- feedback (Track D) ---- */
+.feedback-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 2.5rem; max-width: 36rem; margin: 3rem auto;
+  box-shadow: 0 24px 60px rgba(0,0,0,.45);
+}
+.feedback-card h1 { font-family: var(--serif); font-size: 1.8rem; margin: 0 0 .5rem; }
+.feedback-card p { color: var(--muted); font-size: .95rem; }
+.feedback-card form { display: grid; gap: 1rem; margin-top: 1.5rem; }
+.feedback-card label { font-size: .85rem; font-weight: 600; color: var(--muted); display: grid; gap: .4rem; }
+.feedback-card .hint { font-size: .78rem; color: var(--faint); font-weight: 400; }
+.feedback-card input[type="email"], .feedback-card input[type="text"], .feedback-card input[type="url"],
+.feedback-card select, .feedback-card textarea {
+  font: inherit; padding: .7rem 1rem; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--bg-soft); color: var(--text);
+  width: 100%; box-sizing: border-box;
+}
+.feedback-card textarea { min-height: 9rem; resize: vertical; }
+
 /* ---- admin / queue ---- */
 .tabs { display: flex; gap: .5rem; margin: 1.25rem 0 1.75rem; flex-wrap: wrap; }
 .tabs a {
@@ -537,6 +556,13 @@ export function Layout({
             <span class="tmdb-attribution">
               This product uses the TMDB API but is not endorsed or certified by TMDB.
               Data and images via <a href="https://www.themoviedb.org/" {...extLink}>The Movie Database</a>.
+            </span>
+            <span>
+              <a href="/feedback?type=feature">Suggest a feature</a>
+              {' · '}
+              <a href="/feedback?type=adaptation_tip">Report an adaptation</a>
+              {' · '}
+              <a href="/feedback?type=correction">Suggest a correction</a>
             </span>
             <span>
               <a href="/docs/DESIGN.md">Design doc</a>
@@ -908,6 +934,9 @@ export function AdaptationPage({
             {!authed && <span class="meta">Log in to vote and shelve.</span>}
           </div>
           <StatusTimeline events={timeline ?? [{ status: adaptation.status, at: null, sourceUrl: adaptation.source_url }]} />
+          <p class="meta" style="margin-top:1rem">
+            <a href={`/feedback?type=correction&subject=${encodeURIComponent(adaptation.screen_title)}`}>Suggest a correction</a>
+          </p>
         </div>
       </div>
 
@@ -1009,6 +1038,7 @@ export function BookPage({
   user?: AuthUser;
 }) {
   const authed = !!user?.email;
+  const correctionHref = `/feedback?type=correction&subject=${encodeURIComponent(book.title)}`;
   return (
     <Layout title={book.title} user={user}>
       <a class="back-link" href="/">← All adaptations</a>
@@ -1038,6 +1068,9 @@ export function BookPage({
             />
             {!authed && <span class="meta">Log in to vote and shelve.</span>}
           </div>
+          <p class="meta" style="margin-top:1rem">
+            <a href={correctionHref}>Suggest a correction</a>
+          </p>
         </div>
       </div>
 

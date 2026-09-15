@@ -14,6 +14,7 @@ import { scheduledNewsRun } from './news/ingest';
 import { getUser, type SessionUser } from './auth/session';
 import { mountAuth } from './auth/routes';
 import { mountVotes } from './votes/routes';
+import { mountFeedback } from './feedback/routes';
 import { getAdaptationTimeline, getBookVoteState } from './votes/detail';
 import { getShelf } from './votes/db';
 import { serveFavicon } from './favicon';
@@ -105,6 +106,12 @@ app.get('/api/adaptations', async (c) => {
   return c.json(adaptations);
 });
 
+// Embedded favicon (src/favicon.ts — no [assets] static dir).
+// Registered before auth/vote mounts so the icon paths are never shadowed.
+app.get('/favicon.png', () => serveFavicon());
+app.get('/favicon.ico', () => serveFavicon());
+app.get('/apple-touch-icon.png', () => serveFavicon());
+
 // /watch/:id = the screen work itself (film/series), NOT the adaptation story.
 // /adaptations/:id remains "the adaptation story" (book→screen journey + timeline).
 app.get('/watch/:id', async (c) => {
@@ -126,15 +133,12 @@ app.get('/watch/:id', async (c) => {
   );
 });
 
-// Track A: embedded favicon (src/favicon.ts — no [assets] static dir).
-// Registered before auth/vote mounts so the icon paths are never shadowed.
-app.get('/favicon.png', () => serveFavicon());
-app.get('/favicon.ico', () => serveFavicon());
-app.get('/apple-touch-icon.png', () => serveFavicon());
-
 // Phase 2: magic-link auth + voting/shelves.
 mountAuth(app);
 mountVotes(app);
+
+// Public feedback + admin triage queue.
+mountFeedback(app);
 
 // Owner-only news curation queue + API (gated by admin sessions; see
 // src/auth/session.ts requireAdminPage / requireAdminApi).
