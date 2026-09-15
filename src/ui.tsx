@@ -45,6 +45,12 @@ export interface PipelineRun {
 
 export type AuthUser = { email: string; isAdmin?: boolean } | null;
 
+/**
+ * Spread onto <a> tags that point at external URLs: opens in a new tab
+ * without handing the new page access to window.opener.
+ */
+export const extLink = { target: '_blank', rel: 'noopener noreferrer' } as const;
+
 // ---------------------------------------------------------------------------
 // Small helpers (labels)
 // ---------------------------------------------------------------------------
@@ -67,8 +73,10 @@ function shelfLabel(shelf: string): string {
       return 'Want to Read';
     case 'want_to_watch':
       return 'Want to Watch';
-    case 'done':
-      return 'Done';
+    case 'read':
+      return 'Read';
+    case 'watched':
+      return 'Watched';
     default:
       return shelf.replace(/_/g, ' ');
   }
@@ -528,7 +536,7 @@ export function Layout({
             <span>Novel Adaptations — tracking every book's journey to the screen.</span>
             <span class="tmdb-attribution">
               This product uses the TMDB API but is not endorsed or certified by TMDB.
-              Data and images via <a href="https://www.themoviedb.org/">The Movie Database</a>.
+              Data and images via <a href="https://www.themoviedb.org/" {...extLink}>The Movie Database</a>.
             </span>
             <span>
               <a href="/docs/DESIGN.md">Design doc</a>
@@ -621,7 +629,7 @@ export function StatusTimeline({ events }: { events: TimelineEvent[] }) {
               {cancelled.sourceUrl && (
                 <>
                   {' · '}
-                  <a href={cancelled.sourceUrl} rel="noopener noreferrer">source</a>
+                  <a href={cancelled.sourceUrl} {...extLink}>source</a>
                 </>
               )}
             </div>
@@ -661,7 +669,7 @@ export function StatusTimeline({ events }: { events: TimelineEvent[] }) {
                 {e?.sourceUrl && (
                   <>
                     {' · '}
-                    <a href={e.sourceUrl} rel="noopener noreferrer">source</a>
+                    <a href={e.sourceUrl} {...extLink}>source</a>
                   </>
                 )}
               </div>
@@ -769,7 +777,7 @@ function ShelfPicker({
       aria-label="Add to a shelf"
     >
       <option value="">＋ Shelf…</option>
-      {(['want_to_read', 'want_to_watch', 'done'] as const).map((s) => (
+      {(['want_to_read', 'read', 'want_to_watch', 'watched'] as const).map((s) => (
         <option value={s} selected={userShelf === s} key={s}>
           {userShelf === s ? '✓ ' : ''}{shelfLabel(s)}
         </option>
@@ -939,7 +947,7 @@ export function AdaptationPage({
             <dt>Source</dt>
             <dd>
               {adaptation.source_url ? (
-                <a href={adaptation.source_url} rel="noopener noreferrer">source link ↗</a>
+                <a href={adaptation.source_url} {...extLink}>source link ↗</a>
               ) : (
                 '—'
               )}
@@ -960,7 +968,7 @@ export function AdaptationPage({
               {news.map((n) => (
                 <li key={n.id}>
                   <p class="news-title">
-                    <a href={n.url} rel="noopener noreferrer">{n.title}</a>
+                    <a href={n.url} {...extLink}>{n.title}</a>
                   </p>
                   <p class="news-meta">
                     <TrustBadge tier={n.trust_tier} />
@@ -1142,7 +1150,15 @@ export function MostWantedPage({
 // ShelvesPage — grouped by shelf
 // ---------------------------------------------------------------------------
 
-const SHELF_ORDER = ['want_to_read', 'want_to_watch', 'done'] as const;
+const SHELF_ORDER = ['want_to_read', 'read', 'want_to_watch', 'watched'] as const;
+
+/** Section headings for the ShelvesPage groups (nicer than the raw labels). */
+const SHELF_SECTION_TITLES: Record<string, string> = {
+  want_to_read: 'Reading',
+  read: 'Read',
+  want_to_watch: 'Watchlist',
+  watched: 'Watched',
+};
 
 export function ShelvesPage({
   shelves,
@@ -1167,7 +1183,7 @@ export function ShelvesPage({
     <Layout title="My shelves" user={user}>
       <p class="kicker">Your collection</p>
       <h1 class="display-title">Shelves</h1>
-      <p class="lede">Everything you've shelved — want to read, want to watch, and done.</p>
+      <p class="lede">Everything you've shelved — reading, read, watchlist, and watched.</p>
       {shelves.length === 0 ? (
         <p class="empty">
           Your shelves are empty. Browse <a href="/">adaptations</a> and shelve something.
@@ -1176,7 +1192,8 @@ export function ShelvesPage({
         ordered.map((shelf) => (
           <section class="shelf-group" key={shelf}>
             <h2>
-              {shelfLabel(shelf)} <span class="count">({grouped.get(shelf)?.length ?? 0})</span>
+              {SHELF_SECTION_TITLES[shelf] ?? shelfLabel(shelf)}{' '}
+              <span class="count">({grouped.get(shelf)?.length ?? 0})</span>
             </h2>
             <ul class="shelf-list">
               {(grouped.get(shelf) ?? []).map((s) => (
@@ -1391,7 +1408,7 @@ export function NewsQueuePage({
         items.map((item) => (
           <article class="queue-item" key={item.id}>
             <h3>
-              <a href={item.url} rel="noopener noreferrer">
+              <a href={item.url} {...extLink}>
                 {item.title}
               </a>
             </h3>

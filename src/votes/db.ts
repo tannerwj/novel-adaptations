@@ -1,10 +1,10 @@
 // src/votes/db.ts — Track B SQL: votes, Most Wanted leaderboard, shelves,
 // vote rate limiting. (src/db.ts is owned by others — DO NOT EDIT it.)
 
-export type ShelfName = 'want_to_read' | 'want_to_watch' | 'done';
+export type ShelfName = 'want_to_read' | 'read' | 'want_to_watch' | 'watched';
 export type ShelfTargetType = 'book' | 'adaptation';
 
-export const SHELVES: ShelfName[] = ['want_to_read', 'want_to_watch', 'done'];
+export const SHELVES: ShelfName[] = ['want_to_read', 'read', 'want_to_watch', 'watched'];
 export const SHELF_TARGET_TYPES: ShelfTargetType[] = ['book', 'adaptation'];
 
 /** One Most Wanted row: book identity + vote count + current user's state. */

@@ -9,7 +9,7 @@
 //   Shelf:  <button data-shelf-action="set|remove"
 //                   data-target-type="book|adaptation"
 //                   data-target-id="123"
-//                   data-shelf="want_to_read|want_to_watch|done">…</button>
+//                   data-shelf="want_to_read|read|want_to_watch|watched">…</button>
 //
 // Vote responses update the button in place; 401s bounce to /auth/login.
 

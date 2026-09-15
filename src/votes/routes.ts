@@ -157,7 +157,7 @@ export function mountVotes<E extends { DB: D1Database }>(
       return c.json({ error: "targetType must be 'book' or 'adaptation'." }, 400);
     }
     if (!shelf || !SHELVES.includes(shelf)) {
-      return c.json({ error: "shelf must be 'want_to_read', 'want_to_watch', or 'done'." }, 400);
+      return c.json({ error: "shelf must be 'want_to_read', 'read', 'want_to_watch', or 'watched'." }, 400);
     }
     if (targetId === null || targetId < 1) {
       return c.json({ error: 'targetId must be a positive integer.' }, 400);
