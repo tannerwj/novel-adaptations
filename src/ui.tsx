@@ -13,6 +13,14 @@ import type { Child } from 'hono/jsx';
 import type { AdaptationSummary, Book, NewsItem, NewsStatus, SourceRow } from './db';
 // Round 3 (SEO): per-page meta/OG/Twitter tags; no-op when origin is absent.
 import { seoHead } from './seo';
+// Round 4 (community): rating stars, spoiler-safe reviews, book-vs-screen
+// polls, shareable-list controls.
+import { RatingWidget } from './ratings/ui';
+import type { RatingSummary } from './ratings/db';
+import { ReviewsSection, type ReviewView } from './reviews/ui';
+import { PollWidget } from './polls/ui';
+import type { PollChoice, PollResults } from './polls/db';
+import { AddToListControl } from './lists/ui';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -554,6 +562,7 @@ export function Layout({
               <a class="nav-link" href="/">Browse</a>
               <a class="nav-link" href="/most-wanted">Most Wanted</a>
               <a class="nav-link" href="/shelves">Shelves</a>
+              <a class="nav-link" href="/lists">Lists</a>
               <a class="nav-link" href="/calendar">Calendar</a>
               <a class="nav-link" href="/admin/news">News curation</a>
             </nav>
@@ -918,6 +927,8 @@ export function AdaptationPage({
   timeline,
   userVoted,
   userShelf,
+  pollResults,
+  pollChoice,
   user,
   news,
   origin,
@@ -927,6 +938,8 @@ export function AdaptationPage({
   timeline?: TimelineEvent[];
   userVoted?: boolean;
   userShelf?: string | null;
+  pollResults?: PollResults;
+  pollChoice?: PollChoice | null;
   user?: AuthUser;
   news?: NewsItem[];
   origin?: string;
@@ -1019,6 +1032,16 @@ export function AdaptationPage({
         </section>
       </div>
 
+      <section class="panel" style="margin-top:1.5rem">
+        <PollWidget
+          adaptationId={adaptation.id}
+          counts={pollResults?.counts ?? { book: 0, screen: 0, both: 0, undecided: 0 }}
+          total={pollResults?.total ?? 0}
+          userChoice={pollChoice ?? null}
+          signedIn={authed}
+        />
+      </section>
+
       <div class="detail-grid" style="margin-top:1.5rem">
         <section class="panel">
           <h2>Adaptation status</h2>
@@ -1079,6 +1102,11 @@ export function BookPage({
   adaptations,
   userVoted,
   userShelf,
+  ratingSummary,
+  userRating,
+  reviews,
+  userId,
+  userLists,
   user,
   origin,
   canonicalPath,
@@ -1087,6 +1115,11 @@ export function BookPage({
   adaptations: AdaptationSummary[];
   userVoted?: boolean;
   userShelf?: string | null;
+  ratingSummary?: RatingSummary;
+  userRating?: number | null;
+  reviews?: ReviewView[];
+  userId?: number | null;
+  userLists?: { id: number; title: string }[];
   user?: AuthUser;
   origin?: string;
   canonicalPath?: string;
@@ -1127,6 +1160,20 @@ export function BookPage({
               userShelf={userShelf}
               authed={authed}
             />
+            <RatingWidget
+              targetType="book"
+              targetId={book.id}
+              average={ratingSummary?.average ?? 0}
+              count={ratingSummary?.count ?? 0}
+              userRating={userRating ?? null}
+              signedIn={authed}
+            />
+            <AddToListControl
+              targetType="book"
+              targetId={book.id}
+              userLists={userLists ?? []}
+              signedIn={authed}
+            />
             {!authed && <span class="meta">Log in to vote and shelve.</span>}
           </div>
           <p class="meta" style="margin-top:1rem">
@@ -1161,6 +1208,13 @@ export function BookPage({
           </div>
         )}
       </section>
+
+      <ReviewsSection
+        targetType="book"
+        targetId={book.id}
+        reviews={reviews ?? []}
+        currentUserId={userId ?? null}
+      />
 
       <script dangerouslySetInnerHTML={{ __html: USER_SCRIPT }} />
     </Layout>

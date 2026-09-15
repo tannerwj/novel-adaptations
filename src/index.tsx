@@ -24,6 +24,17 @@ import { getWatchProviders } from './watch_providers';
 import { registerSearchRoutes } from './search';
 import { registerSeoRoutes } from './seo';
 import { registerEnrichmentRoutes } from './enrichment';
+// Round 4: community — ratings, spoiler-safe reviews, polls, hype, lists.
+import { mountRatings } from './ratings/routes';
+import { mountReviews } from './reviews/routes';
+import { mountPolls } from './polls/routes';
+import { mountHype } from './hype/routes';
+import { mountLists } from './lists/routes';
+import { getRatingSummary, getUserRating } from './ratings/db';
+import { listReviews } from './reviews/db';
+import { getPollResults, getUserChoice } from './polls/db';
+import { getHypeSummary, getUserHype, isUnreleased } from './hype/db';
+import { listUserLists } from './lists/db';
 
 export interface Env {
   DB: D1Database;
@@ -76,12 +87,16 @@ app.get('/adaptations/:id', async (c) => {
   const timeline = await getAdaptationTimeline(c.env.DB, id);
   const userVoted = user ? await getBookVoteState(c.env.DB, user.id, adaptation.book_id) : false;
   const userShelf = user ? await getShelf(c.env.DB, user.id, 'adaptation', id) : null;
+  const pollResults = await getPollResults(c.env.DB, id);
+  const pollChoice = user ? await getUserChoice(c.env.DB, user.id, id) : null;
   return c.html(
     <AdaptationPage
       adaptation={adaptation}
       timeline={timeline}
       userVoted={userVoted}
       userShelf={userShelf}
+      pollResults={pollResults}
+      pollChoice={pollChoice}
       user={toAuthUser(user)}
       origin={new URL(c.req.url).origin}
       canonicalPath={c.req.path}
@@ -102,12 +117,23 @@ app.get('/books/:id', async (c) => {
   const user = await getUser(c);
   const userVoted = user ? await getBookVoteState(c.env.DB, user.id, id) : false;
   const userShelf = user ? await getShelf(c.env.DB, user.id, 'book', id) : null;
+  const ratingSummary = await getRatingSummary(c.env.DB, 'book', id);
+  const userRating = user ? await getUserRating(c.env.DB, user.id, 'book', id) : null;
+  const reviews = await listReviews(c.env.DB, 'book', id);
+  const userLists = user
+    ? (await listUserLists(c.env.DB, user.id)).map((l) => ({ id: l.id, title: l.title }))
+    : [];
   return c.html(
     <BookPage
       book={book}
       adaptations={adaptations}
       userVoted={userVoted}
       userShelf={userShelf}
+      ratingSummary={ratingSummary}
+      userRating={userRating}
+      reviews={reviews}
+      userId={user?.id ?? null}
+      userLists={userLists}
       user={toAuthUser(user)}
       origin={new URL(c.req.url).origin}
       canonicalPath={c.req.path}
@@ -150,6 +176,16 @@ app.get('/watch/:id', async (c) => {
   });
   const user = await getUser(c);
   const origin = new URL(c.req.url).origin;
+  // Round 4: community widgets — ratings, reviews, hype (unreleased only), lists.
+  const ratingSummary = await getRatingSummary(c.env.DB, 'screen_work', id);
+  const userRating = user ? await getUserRating(c.env.DB, user.id, 'screen_work', id) : null;
+  const reviews = await listReviews(c.env.DB, 'screen_work', id);
+  const showHype = isUnreleased(work.release_date);
+  const hypeSummary = showHype ? await getHypeSummary(c.env.DB, id) : null;
+  const userHype = showHype && user ? await getUserHype(c.env.DB, user.id, id) : null;
+  const userLists = user
+    ? (await listUserLists(c.env.DB, user.id)).map((l) => ({ id: l.id, title: l.title }))
+    : [];
   return c.html(
     <ScreenWorkPage
       work={work}
@@ -158,6 +194,12 @@ app.get('/watch/:id', async (c) => {
       origin={origin}
       canonicalPath={c.req.path}
       user={toAuthUser(user)}
+      ratingSummary={ratingSummary}
+      userRating={userRating}
+      reviews={reviews}
+      userId={user?.id ?? null}
+      hype={hypeSummary ? { ...hypeSummary, userLevel: userHype } : null}
+      userLists={userLists}
     />,
   );
 });
@@ -165,6 +207,14 @@ app.get('/watch/:id', async (c) => {
 // Phase 2: magic-link auth + voting/shelves.
 mountAuth(app);
 mountVotes(app);
+
+// Round 4: community — ratings, spoiler-safe reviews, book-vs-screen polls,
+// hype meter, shareable lists.
+mountRatings(app);
+mountReviews(app);
+mountPolls(app);
+mountHype(app);
+mountLists(app);
 
 // Public feedback + admin triage queue.
 mountFeedback(app);

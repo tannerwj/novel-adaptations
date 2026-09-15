@@ -65,6 +65,11 @@ adaptation news as rumors or trusted items for human curation.
   challenges ("12 adaptations in 12 months").
 - Newsletter: "This week in adaptations."
 - Spoiler-safe ratings/reviews (spoiler-blur toggles).
+  - Reviews moderation (as of 2026-09-15): reviews are author-owned — authors
+    can edit and delete their own reviews, and there is no reporting or admin
+    triage UI for reviews yet. An admin review queue for reported reviews
+    (report button, admin list, hide/remove actions) is future work; don't add
+    reporting UI without pairing it with that queue.
 - Affiliate monetization (Phase 4/5): book purchase links (Amazon Associates
   etc. — schema: `books.purchase_url_book`, migration 0009) and
   where-to-watch/purchase links for screen works

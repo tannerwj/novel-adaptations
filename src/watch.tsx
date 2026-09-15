@@ -17,6 +17,12 @@ import type { AuthUser } from './ui';
 import { Layout, PosterArt, StatusBadge, TrustBadge } from './ui';
 // Round 3: where-to-watch providers (TMDB, 7-day D1 cache).
 import { WhereToWatch, type WatchProviders } from './watch_providers';
+// Round 4 (community): ratings, hype meter, spoiler-safe reviews, list controls.
+import { RatingWidget } from './ratings/ui';
+import type { RatingSummary } from './ratings/db';
+import { HypeWidget } from './hype/ui';
+import { ReviewsSection, type ReviewView } from './reviews/ui';
+import { AddToListControl } from './lists/ui';
 import type { NewsItem, ScreenWorkDetail } from './db';
 
 function kindLabel(kind: string): string {
@@ -41,6 +47,12 @@ export function ScreenWorkPage({
   origin,
   canonicalPath,
   user,
+  ratingSummary,
+  userRating,
+  reviews,
+  userId,
+  hype,
+  userLists,
 }: {
   work: ScreenWorkDetail;
   news: NewsItem[];
@@ -48,8 +60,16 @@ export function ScreenWorkPage({
   origin?: string;
   canonicalPath?: string;
   user?: AuthUser;
+  ratingSummary?: RatingSummary;
+  userRating?: number | null;
+  reviews?: ReviewView[];
+  userId?: number | null;
+  /** Null when the work is released (hype is unreleased-only). */
+  hype?: { average: number; count: number; userLevel: number | null } | null;
+  userLists?: { id: number; title: string }[];
 }) {
   const year = releaseYear(work.release_date);
+  const authed = !!user?.email;
   return (
     <Layout
       title={work.title}
@@ -100,8 +120,34 @@ export function ScreenWorkPage({
               <>linked adaptation pages below.</>
             )}
           </p>
+          <div class="hero-actions">
+            <RatingWidget
+              targetType="screen_work"
+              targetId={work.id}
+              average={ratingSummary?.average ?? 0}
+              count={ratingSummary?.count ?? 0}
+              userRating={userRating ?? null}
+              signedIn={authed}
+            />
+            <AddToListControl
+              targetType="screen_work"
+              targetId={work.id}
+              userLists={userLists ?? []}
+              signedIn={authed}
+            />
+          </div>
         </div>
       </div>
+
+      {hype && (
+        <HypeWidget
+          screenWorkId={work.id}
+          average={hype.average}
+          count={hype.count}
+          userLevel={hype.userLevel}
+          signedIn={authed}
+        />
+      )}
 
       <section class="panel" style="margin-top:1.5rem">
         <h2>Synopsis</h2>
@@ -220,6 +266,13 @@ export function ScreenWorkPage({
           </ul>
         )}
       </section>
+
+      <ReviewsSection
+        targetType="screen_work"
+        targetId={work.id}
+        reviews={reviews ?? []}
+        currentUserId={userId ?? null}
+      />
     </Layout>
   );
 }
