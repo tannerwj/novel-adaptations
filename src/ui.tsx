@@ -860,7 +860,12 @@ export function Layout({
                   aria-label="Toggle dark mode"
                   title="Toggle dark mode"
                 >
-                  {activeTheme === 'dark' ? <SunIcon /> : <MoonIcon />}
+                  <span data-theme-icon="sun" hidden={activeTheme !== 'dark'}>
+                    <SunIcon />
+                  </span>
+                  <span data-theme-icon="moon" hidden={activeTheme === 'dark'}>
+                    <MoonIcon />
+                  </span>
                 </button>
               </form>
               <div class="header-user">
@@ -936,6 +941,7 @@ export function Layout({
           </div>
         </footer>
         <script dangerouslySetInnerHTML={{ __html: MENU_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </body>
     </html>
   );
@@ -1133,6 +1139,44 @@ const MENU_SCRIPT = `
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !menu.hidden) { close(); btn.focus(); }
   });
+})();
+`;
+
+/**
+ * THEME_SCRIPT makes the header theme toggle instant: it intercepts the
+ * `.theme-form` submit, sends it via fetch, and flips `data-theme` on
+ * `<html>` without a page reload. If the fetch fails (or JS is disabled),
+ * the plain form POST still works as the progressive-enhancement fallback.
+ */
+const THEME_SCRIPT = `
+(function () {
+  var DARK_META = '#0b0c10';
+  var LIGHT_META = '#faf9f6';
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!form || form.nodeName !== 'FORM' || !form.classList.contains('theme-form')) return;
+    e.preventDefault();
+    var data = new FormData(form);
+    var next = String(data.get('theme') || 'light');
+    if (next !== 'dark' && next !== 'light') next = 'light';
+    fetch(form.action, { method: 'POST', body: data, credentials: 'same-origin', redirect: 'manual' }).then(
+      function () { applyTheme(form, next); },
+      function () { form.submit(); }
+    );
+  });
+  function applyTheme(form, next) {
+    document.documentElement.setAttribute('data-theme', next);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', next === 'dark' ? DARK_META : LIGHT_META);
+    var input = form.querySelector('input[name="theme"]');
+    if (input) input.value = next === 'dark' ? 'light' : 'dark';
+    var sun = form.querySelector('[data-theme-icon="sun"]');
+    var moon = form.querySelector('[data-theme-icon="moon"]');
+    if (sun) sun.hidden = next !== 'dark';
+    if (moon) moon.hidden = next === 'dark';
+    var btn = form.querySelector('.theme-toggle');
+    if (btn) btn.setAttribute('aria-label', next === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+  }
 })();
 `;
 

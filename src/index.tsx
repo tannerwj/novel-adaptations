@@ -92,12 +92,36 @@ app.post('/api/theme', async (c) => {
     // fall through with defaults
   }
   const theme = rawTheme === 'dark' || rawTheme === 'light' ? rawTheme : 'light';
-  const next =
-    rawNext && /^\/[^/\\]/.test(rawNext) && !rawNext.includes('://') ? rawNext : '/';
+  // Where to send the no-JS fallback after the toggle: prefer the Referer
+  // (same-origin only) so the toggle returns to the page it was used on,
+  // then the explicit `next` form field, then '/'.
+  const isLocalPath = (p: string) => /^\/[^/\\]/.test(p) && !p.includes('://');
+  let next = '/';
+  const selfUrl = new URL(c.req.url);
+  const ref = c.req.header('referer');
+  if (ref) {
+    try {
+      const u = new URL(ref, selfUrl);
+      if (u.origin === selfUrl.origin && isLocalPath(u.pathname)) {
+        next = u.pathname + u.search;
+      }
+    } catch {
+      // malformed Referer — fall through to `next` field / '/'
+    }
+  }
+  if (next === '/' && rawNext && isLocalPath(rawNext)) next = rawNext;
+  // Share the theme cookie between apex and www so the toggle sticks on
+  // both hosts. Never set Domain on other hosts (e.g. workers.dev previews).
+  const host = new URL(c.req.url).hostname;
+  const sharedDomain =
+    host === 'noveladaptations.com' || host === 'www.noveladaptations.com'
+      ? 'noveladaptations.com'
+      : undefined;
   setCookie(c, THEME_COOKIE, theme, {
     path: '/',
     maxAge: 31536000,
     sameSite: 'Lax',
+    ...(sharedDomain ? { domain: sharedDomain } : {}),
   });
   return c.redirect(next, 303);
 });
