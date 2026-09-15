@@ -2,8 +2,13 @@ name = "novel-adaptations"
 main = "src/index.tsx"
 compatibility_date = "2026-09-01"
 
+# Production route: apex domain (managed via API; declared here so deploys keep it)
+[[routes]]
+pattern = "noveladaptations.com/*"
+zone_name = "noveladaptations.com"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "novel-adaptations"
-database_id = "local-dev-placeholder"
+database_id = "c5b38c69-8695-4841-8191-d004b323fdd6"
 migrations_dir = "migrations"
