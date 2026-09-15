@@ -30,7 +30,10 @@ import {
   type NewsItem,
   type NewsStatus,
 } from '../db';
-import { NewsQueuePage } from '../ui';
+import { listPipelineRuns } from './ingest';
+// PipelineRunsPage is provided by the UI track in src/ui.tsx with props
+// { runs: PipelineRun[], sources: SourceRow[] }.
+import { NewsQueuePage, PipelineRunsPage } from '../ui';
 
 type CurationBindings = {
   DB: D1Database;
@@ -96,8 +99,60 @@ export function registerCurationRoutes<E extends CurationBindings>(
       countNewsByStatus(c.env.DB),
     ]);
     const key = c.req.query('key') ?? '';
+    const withKey = (href: string) =>
+      key
+        ? `${href}${href.includes('?') ? '&' : '?'}key=${encodeURIComponent(key)}`
+        : href;
+    // Caution guardrail: needs_review=1 items sort to the top of the pending
+    // queue so the owner sees uncertain classifications first. (Ordering is
+    // done here, not in src/db.ts's listNewsItems, which Track A doesn't own.)
+    const ordered =
+      status === 'pending'
+        ? [...items].sort((a, b) => (b.needs_review ?? 0) - (a.needs_review ?? 0))
+        : items;
     return c.html(
-      <NewsQueuePage status={status} items={items} sources={sources} counts={counts} keyParam={key} />,
+      <>
+        <nav class="tabs" aria-label="admin">
+          <a href={withKey('/admin/news/runs')}>Pipeline runs</a>
+        </nav>
+        <NewsQueuePage
+          status={status}
+          items={ordered}
+          sources={sources}
+          counts={counts}
+          keyParam={key}
+        />
+      </>,
+    );
+  });
+
+  // Owner-visible observability for the autonomous pipeline: every scheduled
+  // run (ran/disabled/error) with its counters. Same CURATION_KEY gate as the
+  // queue (app.use('/admin/*', curationAuth) above).
+  app.get('/admin/news/runs', async (c) => {
+    const [runs, sources] = await Promise.all([
+      listPipelineRuns(c.env.DB, 50),
+      listSources(c.env.DB),
+    ]);
+    // PipelineRun rows are snake_case (DB convention); PipelineRunsPage takes
+    // the camelCase view-model from src/ui.tsx.
+    return c.html(
+      <PipelineRunsPage
+        runs={runs.map((r) => ({
+          id: r.id,
+          startedAt: r.started_at,
+          finishedAt: r.finished_at,
+          status: r.status,
+          feedsOk: r.feeds_ok,
+          feedsFailed: r.feeds_failed,
+          itemsFetched: r.items_fetched,
+          itemsNew: r.items_new,
+          itemsSkippedCap: r.items_skipped_cap,
+          llmCalls: r.llm_calls,
+          errors: r.errors,
+        }))}
+        sources={sources}
+      />,
     );
   });
 

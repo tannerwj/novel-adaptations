@@ -288,3 +288,66 @@ Suggested routes on the main Hono app (owner-only, behind auth):
    like rumors do, or is one click enough?
 3. Newsletter ("This week in adaptations") — digest from approved items?
    That's Phase 4, but the data model already supports it.
+
+## Autonomy policy (caution-first)
+
+Until the pipeline is tested and trusted, it runs under strict boundaries.
+Every scheduled run — whether it ran, was disabled, or errored — writes a
+row to `pipeline_runs` (migration 0004), viewable by the owner at
+`GET /admin/news/runs` (gated by `CURATION_KEY`, same as the curation
+queue). The pipeline never publishes, never changes adaptation statuses,
+and never sends anything: it only writes `pending` rows for owner curation.
+
+### MAY do unsupervised
+
+- Fetch the 8 RSS feeds (15s timeout each; one failure never kills the run).
+- Classify candidate items with the LLM via the AI Gateway.
+- Insert **at most 40** new `pending` rows into `news_items` per run
+  (quarantine cap; extras are skipped, never queued, and counted as
+  `items_skipped_cap` in the run record).
+- Log one `pipeline_runs` row per run with feed/item/LLM counters.
+- Pause failing feeds (circuit breaker: `is_active = 0` after 5 consecutive
+  failures).
+
+### MUST NEVER do unsupervised
+
+- Publish anything to users (no auto-posting, no feed changes).
+- Change adaptation statuses in any way.
+- Approve, promote, or dismiss news items.
+- Send email, notifications, or any outbound messages.
+- Modify DNS, routes, Workers configuration, or other infrastructure.
+- Status changes happen **only** via the owner's manual Promote action in
+  `/admin/news`.
+
+### Current limits
+
+| Limit | Value | Where it lives |
+|---|---|---|
+| Kill switch | `PIPELINE_ENABLED` must be `"1"` or the run is recorded as `disabled` and does nothing (fail closed when unset) | `[vars]` in `wrangler.toml`; read in `src/news/ingest.ts` |
+| LLM calls per run | 25 | `MAX_LLM_CALLS_PER_RUN` in `src/news/ingest.ts` |
+| New `pending` rows per run | 40 | `MAX_PENDING_INSERTS_PER_RUN` in `src/news/ingest.ts` |
+| Confidence gate | `< 0.6` → `needs_review = 1` | `CONFIDENCE_REVIEW_THRESHOLD` in `src/news/ingest.ts` |
+
+Overflow behavior: when the 25-call LLM cap is hit, remaining gated items
+fall back to keyword heuristics and are flagged `needs_review=1` (they are
+still queued, so nothing is silently dropped). When the 40-row quarantine
+cap is hit, further new items are skipped entirely and counted.
+
+### How the owner tightens/loosens these
+
+- **Kill switch:** set `PIPELINE_ENABLED = "0"` (or remove the var) in
+  `wrangler.toml` `[vars]` and redeploy. The next scheduled run records
+  `status = 'disabled'` in `pipeline_runs` and touches nothing else. This
+  is the emergency stop — prefer it over deleting the cron trigger, since
+  disabled runs stay visible in `/admin/news/runs`.
+- **Caps and gate:** edit the three constants at the top of
+  `src/news/ingest.ts` and redeploy. Lower them while testing (e.g. 10 LLM
+  calls, 20-row cap); raise them only after the owner trusts the
+  classifications coming out of the queue.
+- **Feeds:** a feed can be paused immediately by setting `is_active = 0`
+  for its row in `sources` (via `wrangler d1 execute`); the ingestor already
+  auto-pauses feeds after 5 consecutive failures.
+
+Note: this section supersedes §8's "per-run cap of 100 LLM calls" line —
+the cap is now 25, and overflow falls back to heuristics flagged for review
+rather than deferring to the next run.

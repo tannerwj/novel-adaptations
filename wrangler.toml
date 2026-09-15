@@ -22,3 +22,11 @@ crons = ["0 6 * * *"]
 # (see src/news/ingest.ts). Heuristic fallback if unavailable.
 [ai]
 binding = "AI"
+
+# News pipeline kill switch (Track A guardrails; see docs/NEWS_PIPELINE.md
+# "Autonomy policy"). scheduledNewsRun() in src/news/ingest.ts does nothing
+# unless this is exactly "1" — fail closed when unset. Set to "0" (or remove
+# the var) and redeploy for an emergency stop; disabled runs stay visible in
+# /admin/news/runs.
+[vars]
+PIPELINE_ENABLED = "1"

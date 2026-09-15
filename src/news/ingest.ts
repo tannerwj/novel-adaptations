@@ -20,12 +20,29 @@
  * LLM's *user* message, output is schema-validated, and extracted strings
  * are stored as data (HTML-escaped on render). No feed content ever becomes
  * an instruction to the worker.
+ *
+ * CAUTION GUARDRAILS (Track A):
+ * - Kill switch: `PIPELINE_ENABLED` must be exactly "1" or the run is
+ *   recorded as 'disabled' and does nothing else (fail closed).
+ * - At most 25 LLM calls per run; overflow falls back to keyword heuristics
+ *   and is flagged needs_review=1.
+ * - At most 40 new `pending` rows per run; extras are skipped (never
+ *   queued) and counted as items_skipped_cap.
+ * - Any classification with confidence < 0.6 is flagged needs_review=1.
+ * - Every run (ran/disabled/error) writes a row to `pipeline_runs`.
+ * This module never publishes, never changes adaptation statuses, never
+ * sends anything — it only writes `pending` rows for owner curation.
  */
 
 export interface NewsEnv {
   DB: D1Database;
   /** Present in production; may be absent in local dev — code degrades. */
   AI?: Ai;
+  /**
+   * Kill switch. The scheduled run does nothing unless this is exactly "1".
+   * Coordinator must add `PIPELINE_ENABLED?: string` to `Env` in src/index.tsx.
+   */
+  PIPELINE_ENABLED?: string;
 }
 
 interface Source {
@@ -61,7 +78,11 @@ Rules:
 - status_signal "rumored" only when the text hedges ("in talks", "eyed", "reportedly", "could").
 - confidence < 0.5 stays pending but sorts to the bottom of the curation queue.`;
 
-const MAX_LLM_CALLS_PER_RUN = 100;
+const MAX_LLM_CALLS_PER_RUN = 25;
+/** Quarantine cap: at most this many new `pending` rows per run. */
+const MAX_PENDING_INSERTS_PER_RUN = 40;
+/** Classifications below this confidence are flagged needs_review=1. */
+const CONFIDENCE_REVIEW_THRESHOLD = 0.6;
 const GATEWAY_ID = 'novel-adaptations';
 const MODEL = '@cf/meta/llama-3.1-8b-instruct';
 /** Spec §8: pending items older than this are auto-dismissed each run. */
@@ -231,10 +252,136 @@ async function classifyWithLLM(
 }
 
 /**
+ * One row of the `pipeline_runs` observability table (migrations/0004).
+ * Defined here (not src/db.ts) — Track A owns this surface.
+ */
+export interface PipelineRun {
+  id: number;
+  started_at: string;
+  finished_at: string | null;
+  status: 'ran' | 'disabled' | 'error';
+  feeds_ok: number;
+  feeds_failed: number;
+  items_fetched: number;
+  items_new: number;
+  items_skipped_cap: number;
+  llm_calls: number;
+  errors: string | null;
+  created_at: string;
+}
+
+type PipelineRunInsert = Omit<PipelineRun, 'id' | 'created_at'>;
+
+/** Write a completed/disabled/failed run to `pipeline_runs`. */
+async function recordPipelineRun(
+  db: D1Database,
+  run: PipelineRunInsert,
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO pipeline_runs
+         (started_at, finished_at, status, feeds_ok, feeds_failed,
+          items_fetched, items_new, items_skipped_cap, llm_calls, errors)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      run.started_at,
+      run.finished_at,
+      run.status,
+      run.feeds_ok,
+      run.feeds_failed,
+      run.items_fetched,
+      run.items_new,
+      run.items_skipped_cap,
+      run.llm_calls,
+      run.errors,
+    )
+    .run();
+}
+
+/** Newest-first listing for the owner-visible "Pipeline runs" admin view. */
+export async function listPipelineRuns(
+  db: D1Database,
+  limit: number,
+): Promise<PipelineRun[]> {
+  const rows = await db
+    .prepare(`SELECT * FROM pipeline_runs ORDER BY id DESC LIMIT ?`)
+    .bind(Math.max(1, Math.min(200, limit)))
+    .all<PipelineRun>();
+  return rows.results ?? [];
+}
+
+/**
  * The scheduled entry point, wired into src/index.tsx's default export.
  * Idempotent: re-running the same day inserts nothing new.
  */
 export async function scheduledNewsRun(env: NewsEnv): Promise<void> {
+  // KILL SWITCH — fail closed. Unset or any value other than "1" records a
+  // 'disabled' run and does nothing else.
+  const startedAt = new Date().toISOString();
+  if (env.PIPELINE_ENABLED !== '1') {
+    await recordPipelineRun(env.DB, {
+      started_at: startedAt,
+      finished_at: new Date().toISOString(),
+      status: 'disabled',
+      feeds_ok: 0,
+      feeds_failed: 0,
+      items_fetched: 0,
+      items_new: 0,
+      items_skipped_cap: 0,
+      llm_calls: 0,
+      errors: 'PIPELINE_ENABLED is not "1" (kill switch engaged)',
+    });
+    console.log('news run disabled: PIPELINE_ENABLED is not "1"');
+    return;
+  }
+
+  const stats = {
+    feeds_ok: 0,
+    feeds_failed: 0,
+    items_fetched: 0,
+    items_new: 0,
+    items_skipped_cap: 0,
+    llm_calls: 0,
+  };
+
+  try {
+    await runIngestion(env, stats);
+    await recordPipelineRun(env.DB, {
+      started_at: startedAt,
+      finished_at: new Date().toISOString(),
+      status: 'ran',
+      errors: null,
+      ...stats,
+    });
+  } catch (e) {
+    const msg = (e as Error)?.message ?? String(e);
+    await recordPipelineRun(env.DB, {
+      started_at: startedAt,
+      finished_at: new Date().toISOString(),
+      status: 'error',
+      errors: msg.slice(0, 2000),
+      ...stats,
+    });
+    throw e; // rethrow so the cron run still surfaces as failed
+  }
+}
+
+/**
+ * The actual ingestion work. `stats` is mutated in place so the caller can
+ * record the run even if this throws partway through.
+ */
+async function runIngestion(
+  env: NewsEnv,
+  stats: {
+    feeds_ok: number;
+    feeds_failed: number;
+    items_fetched: number;
+    items_new: number;
+    items_skipped_cap: number;
+    llm_calls: number;
+  },
+): Promise<void> {
   // Step 0 — SLA: auto-dismiss pending items older than 30 days (spec §8).
   const sla = await env.DB.prepare(
     `UPDATE news_items SET status = 'dismissed', dismiss_reason = 'auto-dismissed: pending > 30 days'
@@ -245,9 +392,6 @@ export async function scheduledNewsRun(env: NewsEnv): Promise<void> {
   if ((sla.meta?.changes ?? 0) > 0) {
     console.log(`SLA auto-dismissed ${sla.meta.changes} stale pending items`);
   }
-
-  let llmCalls = 0;
-  let inserted = 0;
 
   // Secondary dedupe (spec §4.1): normalized titles seen in the last 7 days.
   const recentRows = await env.DB.prepare(
@@ -274,7 +418,7 @@ export async function scheduledNewsRun(env: NewsEnv): Promise<void> {
         )
           .bind(src.name, src.feed_url, src.trust_tier)
           .run();
-        return { src, items };
+        return { src, items, ok: true };
       } catch (e) {
         await env.DB.prepare(
           `INSERT INTO sources (name, feed_url, trust_tier, last_status, consecutive_failures)
@@ -286,7 +430,7 @@ export async function scheduledNewsRun(env: NewsEnv): Promise<void> {
           .bind(src.name, src.feed_url, src.trust_tier)
           .run();
         console.error(`Feed failed: ${src.name}:`, (e as Error).message);
-        return { src, items: [] as FeedItem[] };
+        return { src, items: [] as FeedItem[], ok: false };
       } finally {
         clearTimeout(t);
       }
@@ -294,8 +438,14 @@ export async function scheduledNewsRun(env: NewsEnv): Promise<void> {
   );
 
   for (const r of results) {
-    if (r.status !== 'fulfilled') continue;
-    const { src, items } = r.value;
+    if (r.status !== 'fulfilled') {
+      stats.feeds_failed++;
+      continue;
+    }
+    const { src, items, ok } = r.value;
+    if (ok) stats.feeds_ok++;
+    else stats.feeds_failed++;
+    stats.items_fetched += items.length;
     for (const item of items) {
       if (!item.title || !item.url) continue;
       const url = canonicalUrl(item.url);
@@ -305,6 +455,12 @@ export async function scheduledNewsRun(env: NewsEnv): Promise<void> {
       const titleNorm = normalizeTitle(item.title);
       if (recentTitles.has(titleNorm)) continue; // dedupe: same title, new URL
 
+      // QUARANTINE CAP: extras are skipped (never queued) and counted.
+      if (stats.items_new >= MAX_PENDING_INSERTS_PER_RUN) {
+        stats.items_skipped_cap++;
+        continue;
+      }
+
       const text = `${item.title} ${item.summary}`;
       const passesGate = keywordGate(text);
 
@@ -312,8 +468,8 @@ export async function scheduledNewsRun(env: NewsEnv): Promise<void> {
       let llmModel = 'none';
       let needsReview = 0;
 
-      if (passesGate && llmCalls < MAX_LLM_CALLS_PER_RUN) {
-        llmCalls++;
+      if (passesGate && stats.llm_calls < MAX_LLM_CALLS_PER_RUN) {
+        stats.llm_calls++;
         const { c, failed } = await classifyWithLLM(env, item.title, item.summary);
         if (!failed && c) {
           cls = c;
@@ -333,9 +489,24 @@ export async function scheduledNewsRun(env: NewsEnv): Promise<void> {
           llmModel = 'heuristic';
           needsReview = 1;
         }
+      } else if (passesGate) {
+        // Over the per-run LLM cap: keyword heuristics instead of inference,
+        // flagged for owner review.
+        const s = heuristicScore(text);
+        cls = {
+          is_adaptation_news: s >= 2,
+          book_title: null,
+          author: null,
+          screen_kind: 'unknown',
+          status_signal: 'none',
+          confidence: 0.3,
+          reason: 'heuristic fallback (per-run LLM cap reached)',
+        };
+        llmModel = 'heuristic';
+        needsReview = 1;
       } else {
-        // Below the keyword gate (or over the per-run LLM cap): record as
-        // non-adaptation without spending inference.
+        // Below the keyword gate: record as non-adaptation without spending
+        // inference.
         cls = {
           is_adaptation_news: false,
           book_title: null,
@@ -343,10 +514,13 @@ export async function scheduledNewsRun(env: NewsEnv): Promise<void> {
           screen_kind: 'unknown',
           status_signal: 'none',
           confidence: 0.9,
-          reason: passesGate ? 'deferred: per-run LLM cap reached' : 'below keyword gate',
+          reason: 'below keyword gate',
         };
         llmModel = 'prefilter';
       }
+
+      // CONFIDENCE GATING: low-confidence classifications need owner review.
+      if (cls.confidence < CONFIDENCE_REVIEW_THRESHOLD) needsReview = 1;
 
       await env.DB.prepare(
         `INSERT OR IGNORE INTO news_items
@@ -374,9 +548,11 @@ export async function scheduledNewsRun(env: NewsEnv): Promise<void> {
         )
         .run();
       recentTitles.add(titleNorm);
-      inserted++;
+      stats.items_new++;
     }
   }
 
-  console.log(`news run complete: ${inserted} items inserted, ${llmCalls} LLM calls`);
+  console.log(
+    `news run complete: ${stats.items_new} items inserted, ${stats.items_skipped_cap} skipped (cap), ${stats.llm_calls} LLM calls, ${stats.feeds_ok} feeds ok / ${stats.feeds_failed} failed`,
+  );
 }
