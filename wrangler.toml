@@ -1,6 +1,7 @@
 name = "novel-adaptations"
 main = "src/index.tsx"
 compatibility_date = "2026-09-01"
+workers_dev = true
 
 # Production route: apex domain (managed via API; declared here so deploys keep it)
 [[routes]]
