@@ -1,0 +1,19 @@
+{
+  "dependencies": {
+    "hono": "^4.7.0"
+  },
+  "description": "Novel Adaptations — a directory of books and their film/TV adaptations, rebuilt on Cloudflare Workers + Hono + D1.",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260915.1",
+    "typescript": "^5.8.0",
+    "wrangler": "^4.14.0"
+  },
+  "name": "novel-adaptations",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev --local",
+    "typecheck": "tsc --noEmit"
+  },
+  "type": "module",
+  "version": "0.1.0"
+}
