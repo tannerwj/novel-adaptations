@@ -819,7 +819,7 @@ export function Layout({
           href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
-        <style>{GLOBAL_CSS}</style>
+        <style dangerouslySetInnerHTML={{ __html: GLOBAL_CSS }} />
       </head>
       <body>
         <header class="site-header">
@@ -857,8 +857,8 @@ export function Layout({
                 <button
                   class="theme-toggle"
                   type="submit"
-                  aria-label="Toggle dark mode"
-                  title="Toggle dark mode"
+                  aria-label={activeTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                  title={activeTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                 >
                   <span data-theme-icon="sun" hidden={activeTheme !== 'dark'}>
                     <SunIcon />
@@ -1157,12 +1157,21 @@ const THEME_SCRIPT = `
     if (!form || form.nodeName !== 'FORM' || !form.classList.contains('theme-form')) return;
     e.preventDefault();
     var data = new FormData(form);
-    var next = String(data.get('theme') || 'light');
-    if (next !== 'dark' && next !== 'light') next = 'light';
-    fetch(form.action, { method: 'POST', body: data, credentials: 'same-origin', redirect: 'manual' }).then(
-      function () { applyTheme(form, next); },
-      function () { form.submit(); }
-    );
+    fetch(form.action, {
+      method: 'POST',
+      body: data,
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' }
+    }).then(
+      function (res) { return res.json(); },
+      function () { return null; }
+    ).then(function (json) {
+      if (json && (json.theme === 'dark' || json.theme === 'light')) {
+        applyTheme(form, json.theme);
+      } else {
+        form.submit(); // server didn't speak JSON — fall back to the plain POST
+      }
+    });
   });
   function applyTheme(form, next) {
     document.documentElement.setAttribute('data-theme', next);
@@ -1175,7 +1184,11 @@ const THEME_SCRIPT = `
     if (sun) sun.hidden = next !== 'dark';
     if (moon) moon.hidden = next === 'dark';
     var btn = form.querySelector('.theme-toggle');
-    if (btn) btn.setAttribute('aria-label', next === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+    if (btn) {
+      var label = next === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+      btn.setAttribute('aria-label', label);
+      btn.setAttribute('title', label);
+    }
   }
 })();
 `;

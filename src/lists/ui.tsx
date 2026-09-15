@@ -263,7 +263,7 @@ export function ListsPage({
 }) {
   return (
     <Layout title="My lists" user={user} canonicalPath="/lists" theme={theme}>
-      <style>{LIST_CSS}</style>
+      <style dangerouslySetInnerHTML={{ __html: LIST_CSS }} />
       <p class="kicker">Your collection</p>
       <h1 class="display-title">My Lists</h1>
       <p class="lede">
@@ -376,7 +376,7 @@ export function ListDetailPage({
       image={ogImage}
       theme={theme}
     >
-      <style>{LIST_CSS}</style>
+      <style dangerouslySetInnerHTML={{ __html: LIST_CSS }} />
       <a class="back-link" href={isOwner ? '/lists' : '/'}>← {isOwner ? 'My lists' : 'Browse'}</a>
       <p class="kicker">{list.isPublic ? 'Public list' : 'Private list'}</p>
       <h1 class="display-title">{list.title}</h1>

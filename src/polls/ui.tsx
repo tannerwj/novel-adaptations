@@ -124,7 +124,7 @@ export function PollWidget({
 }: PollWidgetProps) {
   return (
     <div data-poll-widget={String(adaptationId)} data-poll-signed-in={signedIn ? '1' : '0'}>
-      <style>{POLL_CSS}</style>
+      <style dangerouslySetInnerHTML={{ __html: POLL_CSS }} />
       <h2 class="section-title">Which was better?</h2>
       <div class="poll-options" role="group" aria-label="Which was better?">
         {CHOICE_ORDER.map((choice) => (

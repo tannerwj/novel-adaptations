@@ -76,9 +76,10 @@ app.get('/', async (c) => {
   );
 });
 
-// Track A: theme toggle (no-JS friendly). Accepts form fields `theme` and
-// `next`; sets the 1-year `theme` cookie, then 303s back to `next`.
-// `next` is validated as a local path to avoid open redirects.
+// Track A: theme toggle. Accepts form fields `theme` and `next`; sets the
+// 1-year `theme` cookie. API clients (Accept: application/json) get
+// `{ok, theme}` as JSON; plain form posts 303 back to `next` (Referer-aware,
+// validated as a local path to avoid open redirects).
 app.post('/api/theme', async (c) => {
   let rawTheme: string | null = null;
   let rawNext: string | null = null;
@@ -123,6 +124,9 @@ app.post('/api/theme', async (c) => {
     sameSite: 'Lax',
     ...(sharedDomain ? { domain: sharedDomain } : {}),
   });
+  if ((c.req.header('accept') ?? '').includes('application/json')) {
+    return c.json({ ok: true, theme });
+  }
   return c.redirect(next, 303);
 });
 
