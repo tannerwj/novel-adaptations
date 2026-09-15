@@ -1,1 +1,84 @@
-IyBOb3ZlbCBBZGFwdGF0aW9ucwoKQSBkaXJlY3Rvcnkgb2YgYm9va3MgYW5kIHRoZWlyIGZpbG0vVFYgYWRhcHRhdGlvbnM6IHdoaWNoIG5vdmVscyBiZWNhbWUgbW92aWVzCm9yIHNlcmllcywgd2hhdCBzdGFnZSBlYWNoIGFkYXB0YXRpb24gaXMgYXQsIGFuZCB3aGVyZSB0byBmb2xsb3cgaXRzIHByb2dyZXNzLgpUaGlzIHJlcG8gaXMgYSBmcmVzaCByZWJ1aWxkIG9uICoqQ2xvdWRmbGFyZSBXb3JrZXJzICsgSG9ubyArIEQxKiosCnNlcnZlci1yZW5kZXJlZCB3aXRoIEhvbm8gSlNYLgoKIyMgUGhhc2UgMSBzY29wZQoKLSBEMSBzY2hlbWE6IGBib29rc2AsIGBzY3JlZW5fd29ya3NgLCBgYWRhcHRhdGlvbnNgLCBgbmV3c19pdGVtc2AKICAoYHVzZXJzYC9gdm90ZXNgIHRhYmxlcyBhcmUgc3R1YnMgZm9yIFBoYXNlIDIpLgotIFNlcnZlci1yZW5kZXJlZCBicm93c2UgKyBkZXRhaWwgcGFnZXMgKGAvYCwgYC9hZGFwdGF0aW9ucy86aWRgLCBgL2Jvb2tzLzppZGApCiAgYW5kIGEgSlNPTiBsaXN0IGVuZHBvaW50IChgL2FwaS9hZGFwdGF0aW9uc2ApLgotIERlbW8gc2VlZCBkYXRhOiA4IGZhbW91cyBhZGFwdGF0aW9ucyBjb3ZlcmluZyBgcmVsZWFzZWRgLAogIGBpbl9kZXZlbG9wbWVudGAsIGBvcHRpb25lZGAsIGFuZCBgcnVtb3JlZGAgc3RhdHVzZXMuCgojIyBQcm9qZWN0IHN0cnVjdHVyZQoKYGBgCm5vdmVsLWFkYXB0YXRpb25zLwrilJzilIDilIAgZG9jcy8gICAgICAgICAgICAgICMgZGVzaWduIGRvYyDigJQgRE8gTk9UIEVESVQgKG93bmVyLW93bmVkKQrilJzilIDilIAgbGVnYWN5LyAgICAgICAgICAgICMgdGhlIDIwMTYtZXJhIG9yaWdpbmFsIOKAlCBETyBOT1QgRURJVArilJzilIDilIAgbWlncmF0aW9ucy8gICAgICAgICMgRDEgbWlncmF0aW9ucyAoU1FMaXRlKSwgYXBwbGllZCBieSB3cmFuZ2xlcgrilIIgICDilJzilIDilIAgMDAwMV9pbml0LnNxbCAgIyBzY2hlbWEK4pSCICAg4pSU4pSA4pSAIDAwMDJfc2VlZC5zcWwgICMgZGVtbyBkYXRhCuKUnOKUgOKUgCBzcmMvCuKUgiAgIOKUnOKUgOKUgCBpbmRleC50c3ggICAgICAjIEhvbm8gYXBwICsgcm91dGVzCuKUgiAgIOKUnOKUgOKUgCBkYi50cyAgICAgICAgICAjIEQxIGRhdGEtYWNjZXNzIGhlbHBlcnMgKGFsbCBTUUwgbGl2ZXMgaGVyZSkK4pSCICAg4pSU4pSA4pSAIHVpLnRzeCAgICAgICAgICMgSG9ubyBKU1ggY29tcG9uZW50cyAoTGF5b3V0LCBIb21lUGFnZSwgQWRhcHRhdGlvblBhZ2UsIEJvb2tQYWdlKQrilJzilIDilIAgcGFja2FnZS5qc29uCuKUnOKUgOKUgCB0c2NvbmZpZy5qc29uCuKUnOKUgOKUgCB3cmFuZ2xlci50b21sICAgICAgIyB3b3JrZXIgY29uZmlnICsgRDEgYmluZGluZyAoZGF0YWJhc2VfaWQgaXMgYQrilIIgICAgICAgICAgICAgICAgICAgICAgIyAgIHBsYWNlaG9sZGVyIHVudGlsIHByb2R1Y3Rpb24gREIgaXMgY3JlYXRlZCkK4pSU4pSA4pSAIFJFQURNRS5tZApgYGAKCiMjIFJ1biBsb2NhbGx5CgpgYGBzaApucG0gaW5zdGFsbApucG0gcnVuIGRldiAgICAgICAgIyB3cmFuZ2xlciBkZXYgLS1sb2NhbApgYGAKCk9wZW4gaHR0cDovL2xvY2FsaG9zdDo4Nzg3LyAob3IgdGhlIHBvcnQgd3JhbmdsZXIgcGlja3MpLiBMb2NhbCBEMSBhcHBsaWVzCm1pZ3JhdGlvbnMgYXV0b21hdGljYWxseSBvbiBkZXYgc3RhcnQ7IGlmIHRoZSBzZWVkIGRhdGEgaXNuJ3QgdGhlcmUsIGFwcGx5CnRoZW0gbWFudWFsbHkgd2l0aCBgbnB4IHdyYW5nbGVyIGQxIG1pZ3JhdGlvbnMgYXBwbHkgLS1sb2NhbCBEQmAgYW5kIHJlc3RhcnQuCgpPdGhlciBzY3JpcHRzOgoKYGBgc2gKbnBtIHJ1biB0eXBlY2hlY2sgICMgdHNjIC0tbm9FbWl0Cm5wbSBydW4gZGVwbG95ICAgICAjIHdyYW5nbGVyIGRlcGxveSAocHJvZHVjdGlvbiDigJQgb3duZXIgYXBwcm92YWwgcmVxdWlyZWQpCmBgYAoKIyMgRG9jcwoKLSBGdWxsIGRlc2lnbjogW2Bkb2NzL0RFU0lHTi5tZGBdKGRvY3MvREVTSUdOLm1kKQotIE5ld3MgcGlwZWxpbmUgc3BlYzogW2Bkb2NzL05FV1NfUElQRUxJTkUubWRgXShkb2NzL05FV1NfUElQRUxJTkUubWQpCi0gYGxlZ2FjeS9gIGhvbGRzIHRoZSAyMDE2IG9yaWdpbmFsLCBwcmVzZXJ2ZWQgZm9yIHJlZmVyZW5jZS4KCiMjIE5ld3MgcGlwZWxpbmUgKFBoYXNlIDMpCgpBIGRhaWx5IGNyb24gKGAwIDYgKiAqICpgLCAwNjowMCBVVEMpIGZldGNoZXMgOCBSU1MgZmVlZHMsIGRlZHVwZXMsCnByZS1maWx0ZXJzLCBjbGFzc2lmaWVzIHdpdGggV29ya2VycyBBSSAoTGxhbWEgMy4xIDhCIHZpYSB0aGUKYG5vdmVsLWFkYXB0YXRpb25zYCBBSSBHYXRld2F5OyBrZXl3b3JkLWhldXJpc3RpYyBmYWxsYmFjayBpZiB0aGUgTExNIGlzCnVuYXZhaWxhYmxlKSwgYW5kIGZpbGxzIHRoZSBvd25lciBjdXJhdGlvbiBxdWV1ZSBhdCBgL2FkbWluL25ld3NgLgoKKipPd25lciBjdXJhdGlvbiBrZXk6KiogYWxsIGAvYWRtaW4vKmAgYW5kIGAvYXBpL25ld3MvKmAgcm91dGVzIGFyZSBnYXRlZApiZWhpbmQgYSBzaGFyZWQgc2VjcmV0IChjb25zdGFudC10aW1lIGNvbXBhcmUsIGZhaWwgY2xvc2VkIOKAlCByZWFsIGF1dGggaXMgYQpQaGFzZSAyIGl0ZW0pLiBTZXQgaXQgd2l0aDoKCmBgYHNoCm5weCB3cmFuZ2xlciBzZWNyZXQgcHV0IENVUkFUSU9OX0tFWQpgYGAKClRoZW4gb3BlbiBgaHR0cHM6Ly9ub3ZlbGFkYXB0YXRpb25zLmNvbS9hZG1pbi9uZXdzP2tleT08c2VjcmV0PmAgKG9yIHNlbmQKYFgtQ3VyYXRpb24tS2V5OiA8c2VjcmV0PmApLiBRdWV1ZSBhY3Rpb25zOiAqKmFwcHJvdmUqKiwgKipkaXNtaXNzKiosCioqcHJvbW90ZSoqIChhZHZhbmNlcyBhIGxpbmtlZCBhZGFwdGF0aW9uJ3Mgc3RhdHVzIG9uZSBzdGVwIOKAlCBlLmcuCmBydW1vcmVkIOKGkiBvcHRpb25lZGAg4oCUIHdyaXRlcyBhbiBgYWRhcHRhdGlvbl9zdGF0dXNfYXVkaXRgIHJvdzsgcnVtb3ItdGllcgppdGVtcyByZXF1aXJlIGEgYGNvcnJvYm9yYXRpbmdfdXJsYCkuIFBlbmRpbmcgaXRlbXMgb2xkZXIgdGhhbiAzMCBkYXlzIGFyZQphdXRvLWRpc21pc3NlZCBhdCB0aGUgc3RhcnQgb2YgZWFjaCBzY2hlZHVsZWQgcnVuLgoKKipQcm9kdWN0aW9uIGRlcGxveSBuZWVkcyBvd25lciBhcHByb3ZhbC4qKiBEb24ndCBydW4gYHdyYW5nbGVyIGRlcGxveWAgb3IKdG91Y2ggdGhlIHJlbW90ZSBEMSB3aXRob3V0IGl0Lgo=
+# Novel Adaptations
+
+A directory of books and their film/TV adaptations: which novels became movies
+or series, what stage each adaptation is at, and where to follow its progress.
+This repo is a fresh rebuild on **Cloudflare Workers + Hono + D1**,
+server-rendered with Hono JSX.
+
+## Phase 1 scope
+
+- D1 schema: `books`, `screen_works`, `adaptations`, `news_items`
+  (`users`/`votes` tables are stubs for Phase 2).
+- Server-rendered browse + detail pages (`/`, `/adaptations/:id`, `/books/:id`)
+  and a JSON list endpoint (`/api/adaptations`).
+- Demo seed data: 8 famous adaptations covering `released`,
+  `in_development`, `optioned`, and `rumored` statuses.
+
+## Project structure
+
+```
+novel-adaptations/
+├── docs/              # design doc — DO NOT EDIT (owner-owned)
+├── legacy/            # the 2016-era original — DO NOT EDIT
+├── migrations/        # D1 migrations (SQLite), applied by wrangler
+│   ├── 0001_init.sql  # schema
+│   └── 0002_seed.sql  # demo data
+├── src/
+│   ├── index.tsx      # Hono app + routes
+│   ├── db.ts          # D1 data-access helpers (all SQL lives here)
+│   └── ui.tsx         # Hono JSX components (Layout, HomePage, AdaptationPage, BookPage)
+├── package.json
+├── tsconfig.json
+├── wrangler.toml      # worker config + D1 binding (database_id is a
+│                      #   placeholder until production DB is created)
+└── README.md
+```
+
+## Run locally
+
+```sh
+npm install
+npm run dev        # wrangler dev --local
+```
+
+Open http://localhost:8787/ (or the port wrangler picks). Local D1 applies
+migrations automatically on dev start; if the seed data isn't there, apply
+them manually with `npx wrangler d1 migrations apply --local DB` and restart.
+
+Other scripts:
+
+```sh
+npm run typecheck  # tsc --noEmit
+npm run deploy     # wrangler deploy (production — owner approval required)
+```
+
+## Docs
+
+- Full design: [`docs/DESIGN.md`](docs/DESIGN.md)
+- News pipeline spec: [`docs/NEWS_PIPELINE.md`](docs/NEWS_PIPELINE.md)
+- `legacy/` holds the 2016 original, preserved for reference.
+
+## News pipeline (Phase 3)
+
+A daily cron (`0 6 * * *`, 06:00 UTC) fetches 8 RSS feeds, dedupes,
+pre-filters, classifies with Workers AI (Llama 3.1 8B via the
+`novel-adaptations` AI Gateway; keyword-heuristic fallback if the LLM is
+unavailable), and fills the owner curation queue at `/admin/news`.
+
+**Owner curation key:** all `/admin/*` and `/api/news/*` routes are gated
+behind a shared secret (constant-time compare, fail closed — real auth is a
+Phase 2 item). Set it with:
+
+```sh
+npx wrangler secret put CURATION_KEY
+```
+
+Then open `https://noveladaptations.com/admin/news?key=<secret>` (or send
+`X-Curation-Key: <secret>`). Queue actions: **approve**, **dismiss**,
+**promote** (advances a linked adaptation's status one step — e.g.
+`rumored → optioned` — writes an `adaptation_status_audit` row; rumor-tier
+items require a `corroborating_url`). Pending items older than 30 days are
+auto-dismissed at the start of each scheduled run.
+
+**Production deploy needs owner approval.** Don't run `wrangler deploy` or
+touch the remote D1 without it.

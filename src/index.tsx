@@ -1,1 +1,63 @@
-aW1wb3J0IHsgSG9ubyB9IGZyb20gJ2hvbm8nOwppbXBvcnQgeyBBZGFwdGF0aW9uUGFnZSwgQm9va1BhZ2UsIEhvbWVQYWdlLCBMYXlvdXQgfSBmcm9tICcuL3VpJzsKaW1wb3J0IHsgZ2V0QWRhcHRhdGlvblN1bW1hcnksIGdldEJvb2ssIGdldEJvb2tBZGFwdGF0aW9ucywgbGlzdEFkYXB0YXRpb25zIH0gZnJvbSAnLi9kYic7CmltcG9ydCB7IHJlZ2lzdGVyQ3VyYXRpb25Sb3V0ZXMgfSBmcm9tICcuL25ld3MvY3VyYXRpb24nOwppbXBvcnQgeyBzY2hlZHVsZWROZXdzUnVuIH0gZnJvbSAnLi9uZXdzL2luZ2VzdCc7CgpleHBvcnQgaW50ZXJmYWNlIEVudiB7CiAgREI6IEQxRGF0YWJhc2U7CiAgLyoqIFdvcmtlcnMgQUkgYmluZGluZyAod3JhbmdsZXIgYFthaV1gKS4gTWF5IGJlIGFic2VudCBpbiBsb2NhbCBkZXYuICovCiAgQUk6IEFpOwogIC8qKiBPd25lciBjdXJhdGlvbiBzZWNyZXQgKGB3cmFuZ2xlciBzZWNyZXQgcHV0IENVUkFUSU9OX0tFWWApLiBBYnNlbnQg4oaSIGN1cmF0aW9uIHJvdXRlcyBkZW55IGFsbC4gKi8KICBDVVJBVElPTl9LRVk6IHN0cmluZzsKfQoKY29uc3QgYXBwID0gbmV3IEhvbm88eyBCaW5kaW5nczogRW52IH0+KCk7CgphcHAuZ2V0KCcvJywgYXN5bmMgKGMpID0+IHsKICBjb25zdCBhZGFwdGF0aW9ucyA9IGF3YWl0IGxpc3RBZGFwdGF0aW9ucyhjLmVudi5EQik7CiAgcmV0dXJuIGMuaHRtbCg8SG9tZVBhZ2UgYWRhcHRhdGlvbnM9e2FkYXB0YXRpb25zfSAvPik7Cn0pOwoKYXBwLmdldCgnL2FkYXB0YXRpb25zLzppZCcsIGFzeW5jIChjKSA9PiB7CiAgY29uc3QgaWQgPSBOdW1iZXIoYy5yZXEucGFyYW0oJ2lkJykpOwogIGlmICghTnVtYmVyLmlzSW50ZWdlcihpZCkpIHsKICAgIHJldHVybiBjLmh0bWwoPExheW91dCB0aXRsZT0iTm90IGZvdW5kIj40MDQg4oCUIGFkYXB0YXRpb24gbm90IGZvdW5kLjwvTGF5b3V0PiwgNDA0KTsKICB9CiAgY29uc3QgYWRhcHRhdGlvbiA9IGF3YWl0IGdldEFkYXB0YXRpb25TdW1tYXJ5KGMuZW52LkRCLCBpZCk7CiAgaWYgKCFhZGFwdGF0aW9uKSB7CiAgICByZXR1cm4gYy5odG1sKDxMYXlvdXQgdGl0bGU9Ik5vdCBmb3VuZCI+NDA0IOKAlCBhZGFwdGF0aW9uIG5vdCBmb3VuZC48L0xheW91dD4sIDQwNCk7CiAgfQogIHJldHVybiBjLmh0bWwoPEFkYXB0YXRpb25QYWdlIGFkYXB0YXRpb249e2FkYXB0YXRpb259IC8+KTsKfSk7CgphcHAuZ2V0KCcvYm9va3MvOmlkJywgYXN5bmMgKGMpID0+IHsKICBjb25zdCBpZCA9IE51bWJlcihjLnJlcS5wYXJhbSgnaWQnKSk7CiAgaWYgKCFOdW1iZXIuaXNJbnRlZ2VyKGlkKSkgewogICAgcmV0dXJuIGMuaHRtbCg8TGF5b3V0IHRpdGxlPSJOb3QgZm91bmQiPjQwNCDigJQgYm9vayBub3QgZm91bmQuPC9MYXlvdXQ+LCA0MDQpOwogIH0KICBjb25zdCBib29rID0gYXdhaXQgZ2V0Qm9vayhjLmVudi5EQiwgaWQpOwogIGlmICghYm9vaykgewogICAgcmV0dXJuIGMuaHRtbCg8TGF5b3V0IHRpdGxlPSJOb3QgZm91bmQiPjQwNCDigJQgYm9vayBub3QgZm91bmQuPC9MYXlvdXQ+LCA0MDQpOwogIH0KICBjb25zdCBhZGFwdGF0aW9ucyA9IGF3YWl0IGdldEJvb2tBZGFwdGF0aW9ucyhjLmVudi5EQiwgaWQpOwogIHJldHVybiBjLmh0bWwoPEJvb2tQYWdlIGJvb2s9e2Jvb2t9IGFkYXB0YXRpb25zPXthZGFwdGF0aW9uc30gLz4pOwp9KTsKCmFwcC5nZXQoJy9hcGkvYWRhcHRhdGlvbnMnLCBhc3luYyAoYykgPT4gewogIGNvbnN0IGFkYXB0YXRpb25zID0gYXdhaXQgbGlzdEFkYXB0YXRpb25zKGMuZW52LkRCKTsKICByZXR1cm4gYy5qc29uKGFkYXB0YXRpb25zKTsKfSk7CgovLyBPd25lci1vbmx5IG5ld3MgY3VyYXRpb24gcXVldWUgKyBBUEkgKGdhdGVkIGJ5IENVUkFUSU9OX0tFWSBpbiBjdXJhdGlvbi50cykuCnJlZ2lzdGVyQ3VyYXRpb25Sb3V0ZXMoYXBwKTsKCmFwcC5ub3RGb3VuZCgoYykgPT4gYy5odG1sKDxMYXlvdXQgdGl0bGU9Ik5vdCBmb3VuZCI+NDA0IOKAlCBwYWdlIG5vdCBmb3VuZC48L0xheW91dD4sIDQwNCkpOwoKZXhwb3J0IGRlZmF1bHQgewogIC8vIEhvbm8ncyBmZXRjaCBpcyBhbiBhcnJvdy1mdW5jdGlvbiBwcm9wZXJ0eSwgc28gaXQgY2FuIGJlIHJlLWhvbWVkIHNhZmVseS4KICBmZXRjaDogYXBwLmZldGNoLAogIGFzeW5jIHNjaGVkdWxlZChldmVudDogU2NoZWR1bGVkRXZlbnQsIGVudjogRW52LCBfY3R4OiBFeGVjdXRpb25Db250ZXh0KTogUHJvbWlzZTx2b2lkPiB7CiAgICBhd2FpdCBzY2hlZHVsZWROZXdzUnVuKGVudik7CiAgfSwKfTsK
+import { Hono } from 'hono';
+import { AdaptationPage, BookPage, HomePage, Layout } from './ui';
+import { getAdaptationSummary, getBook, getBookAdaptations, listAdaptations } from './db';
+import { registerCurationRoutes } from './news/curation';
+import { scheduledNewsRun } from './news/ingest';
+
+export interface Env {
+  DB: D1Database;
+  /** Workers AI binding (wrangler `[ai]`). May be absent in local dev. */
+  AI: Ai;
+  /** Owner curation secret (`wrangler secret put CURATION_KEY`). Absent → curation routes deny all. */
+  CURATION_KEY: string;
+}
+
+const app = new Hono<{ Bindings: Env }>();
+
+app.get('/', async (c) => {
+  const adaptations = await listAdaptations(c.env.DB);
+  return c.html(<HomePage adaptations={adaptations} />);
+});
+
+app.get('/adaptations/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id)) {
+    return c.html(<Layout title="Not found">404 — adaptation not found.</Layout>, 404);
+  }
+  const adaptation = await getAdaptationSummary(c.env.DB, id);
+  if (!adaptation) {
+    return c.html(<Layout title="Not found">404 — adaptation not found.</Layout>, 404);
+  }
+  return c.html(<AdaptationPage adaptation={adaptation} />);
+});
+
+app.get('/books/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id)) {
+    return c.html(<Layout title="Not found">404 — book not found.</Layout>, 404);
+  }
+  const book = await getBook(c.env.DB, id);
+  if (!book) {
+    return c.html(<Layout title="Not found">404 — book not found.</Layout>, 404);
+  }
+  const adaptations = await getBookAdaptations(c.env.DB, id);
+  return c.html(<BookPage book={book} adaptations={adaptations} />);
+});
+
+app.get('/api/adaptations', async (c) => {
+  const adaptations = await listAdaptations(c.env.DB);
+  return c.json(adaptations);
+});
+
+// Owner-only news curation queue + API (gated by CURATION_KEY in curation.ts).
+registerCurationRoutes(app);
+
+app.notFound((c) => c.html(<Layout title="Not found">404 — page not found.</Layout>, 404));
+
+export default {
+  // Hono's fetch is an arrow-function property, so it can be re-homed safely.
+  fetch: app.fetch,
+  async scheduled(event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
+    await scheduledNewsRun(env);
+  },
+};

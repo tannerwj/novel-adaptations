@@ -1,1 +1,245 @@
-Ly8gc3JjL2RiLnRzIOKAlCBzbWFsbCBEMSBkYXRhLWFjY2VzcyBoZWxwZXJzLiBBbGwgU1FMIGxpdmVzIGhlcmUuCgpleHBvcnQgaW50ZXJmYWNlIEJvb2sgewogIGlkOiBudW1iZXI7CiAgdGl0bGU6IHN0cmluZzsKICBhdXRob3JzOiBzdHJpbmc7CiAgY292ZXJfdXJsOiBzdHJpbmcgfCBudWxsOwogIHB1Yl9kYXRlOiBzdHJpbmcgfCBudWxsOwogIGlzYm46IHN0cmluZyB8IG51bGw7CiAgb3BlbmxpYnJhcnlfaWQ6IHN0cmluZyB8IG51bGw7CiAgZ29vZ2xlYm9va3NfaWQ6IHN0cmluZyB8IG51bGw7Cn0KCmV4cG9ydCBpbnRlcmZhY2UgU2NyZWVuV29yayB7CiAgaWQ6IG51bWJlcjsKICB0bWRiX2lkOiBudW1iZXIgfCBudWxsOwogIHRpdGxlOiBzdHJpbmc7CiAga2luZDogJ2ZpbG0nIHwgJ3Nlcmllcyc7CiAgcG9zdGVyX3VybDogc3RyaW5nIHwgbnVsbDsKICByZWxlYXNlX2RhdGU6IHN0cmluZyB8IG51bGw7Cn0KCmV4cG9ydCBpbnRlcmZhY2UgQWRhcHRhdGlvbiB7CiAgaWQ6IG51bWJlcjsKICBib29rX2lkOiBudW1iZXI7CiAgc2NyZWVuX3dvcmtfaWQ6IG51bWJlcjsKICBzdGF0dXM6CiAgICB8ICdydW1vcmVkJwogICAgfCAnb3B0aW9uZWQnCiAgICB8ICdpbl9kZXZlbG9wbWVudCcKICAgIHwgJ2ZpbG1pbmcnCiAgICB8ICdwb3N0X3Byb2R1Y3Rpb24nCiAgICB8ICdyZWxlYXNlZCcKICAgIHwgJ2NhbmNlbGxlZCc7CiAgc291cmNlX3VybDogc3RyaW5nIHwgbnVsbDsKfQoKLyoqIE9uZSByb3cgb2YgdGhlIGpvaW5lZCBhZGFwdGF0aW9uIGxpc3QgdXNlZCBieSB0aGUgYnJvd3NlIHBhZ2UgYW5kIEFQSS4gKi8KZXhwb3J0IGludGVyZmFjZSBBZGFwdGF0aW9uU3VtbWFyeSBleHRlbmRzIEFkYXB0YXRpb24gewogIGJvb2tfdGl0bGU6IHN0cmluZzsKICBib29rX2F1dGhvcnM6IHN0cmluZzsKICBib29rX2NvdmVyX3VybDogc3RyaW5nIHwgbnVsbDsKICBzY3JlZW5fdGl0bGU6IHN0cmluZzsKICBzY3JlZW5fa2luZDogJ2ZpbG0nIHwgJ3Nlcmllcyc7CiAgc2NyZWVuX3JlbGVhc2VfZGF0ZTogc3RyaW5nIHwgbnVsbDsKfQoKY29uc3QgU0VMRUNUX0FEQVBUQVRJT05fU1VNTUFSWSA9IGAKICBTRUxFQ1QgYS5pZCwgYS5ib29rX2lkLCBhLnNjcmVlbl93b3JrX2lkLCBhLnN0YXR1cywgYS5zb3VyY2VfdXJsLAogICAgICAgICBiLnRpdGxlIEFTIGJvb2tfdGl0bGUsIGIuYXV0aG9ycyBBUyBib29rX2F1dGhvcnMsCiAgICAgICAgIGIuY292ZXJfdXJsIEFTIGJvb2tfY292ZXJfdXJsLAogICAgICAgICBzLnRpdGxlIEFTIHNjcmVlbl90aXRsZSwgcy5raW5kIEFTIHNjcmVlbl9raW5kLAogICAgICAgICBzLnJlbGVhc2VfZGF0ZSBBUyBzY3JlZW5fcmVsZWFzZV9kYXRlCiAgRlJPTSBhZGFwdGF0aW9ucyBhCiAgSk9JTiBib29rcyBiIE9OIGIuaWQgPSBhLmJvb2tfaWQKICBKT0lOIHNjcmVlbl93b3JrcyBzIE9OIHMuaWQgPSBhLnNjcmVlbl93b3JrX2lkCmA7CgpleHBvcnQgYXN5bmMgZnVuY3Rpb24gbGlzdEFkYXB0YXRpb25zKGRiOiBEMURhdGFiYXNlKTogUHJvbWlzZTxBZGFwdGF0aW9uU3VtbWFyeVtdPiB7CiAgY29uc3QgeyByZXN1bHRzIH0gPSBhd2FpdCBkYgogICAgLnByZXBhcmUoYCR7U0VMRUNUX0FEQVBUQVRJT05fU1VNTUFSWX0gT1JERVIgQlkgYS5pZCBBU0NgKQogICAgLmFsbDxBZGFwdGF0aW9uU3VtbWFyeT4oKTsKICByZXR1cm4gcmVzdWx0cyA/PyBbXTsKfQoKZXhwb3J0IGFzeW5jIGZ1bmN0aW9uIGdldEFkYXB0YXRpb25TdW1tYXJ5KAogIGRiOiBEMURhdGFiYXNlLAogIGlkOiBudW1iZXIsCik6IFByb21pc2U8QWRhcHRhdGlvblN1bW1hcnkgfCBudWxsPiB7CiAgY29uc3Qgcm93ID0gYXdhaXQgZGIKICAgIC5wcmVwYXJlKGAke1NFTEVDVF9BREFQVEFUSU9OX1NVTU1BUll9IFdIRVJFIGEuaWQgPSA/MWApCiAgICAuYmluZChpZCkKICAgIC5maXJzdDxBZGFwdGF0aW9uU3VtbWFyeT4oKTsKICByZXR1cm4gcm93ID8/IG51bGw7Cn0KCmV4cG9ydCBhc3luYyBmdW5jdGlvbiBnZXRCb29rKGRiOiBEMURhdGFiYXNlLCBpZDogbnVtYmVyKTogUHJvbWlzZTxCb29rIHwgbnVsbD4gewogIGNvbnN0IHJvdyA9IGF3YWl0IGRiLnByZXBhcmUoJ1NFTEVDVCAqIEZST00gYm9va3MgV0hFUkUgaWQgPSA/MScpLmJpbmQoaWQpLmZpcnN0PEJvb2s+KCk7CiAgcmV0dXJuIHJvdyA/PyBudWxsOwp9CgpleHBvcnQgYXN5bmMgZnVuY3Rpb24gZ2V0Qm9va0FkYXB0YXRpb25zKAogIGRiOiBEMURhdGFiYXNlLAogIGJvb2tJZDogbnVtYmVyLAopOiBQcm9taXNlPEFkYXB0YXRpb25TdW1tYXJ5W10+IHsKICBjb25zdCB7IHJlc3VsdHMgfSA9IGF3YWl0IGRiCiAgICAucHJlcGFyZShgJHtTRUxFQ1RfQURBUFRBVElPTl9TVU1NQVJZfSBXSEVSRSBhLmJvb2tfaWQgPSA/MSBPUkRFUiBCWSBhLmlkIEFTQ2ApCiAgICAuYmluZChib29rSWQpCiAgICAuYWxsPEFkYXB0YXRpb25TdW1tYXJ5PigpOwogIHJldHVybiByZXN1bHRzID8/IFtdOwp9CgovLyAtLS0gTmV3cyBwaXBlbGluZSAoUGhhc2UgMykgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCgpleHBvcnQgdHlwZSBOZXdzU3RhdHVzID0gJ3BlbmRpbmcnIHwgJ2FwcHJvdmVkJyB8ICdkaXNtaXNzZWQnOwpleHBvcnQgdHlwZSBUcnVzdFRpZXIgPSAndHJ1c3RlZCcgfCAncmVwdXRhYmxlJyB8ICdydW1vcic7CgpleHBvcnQgaW50ZXJmYWNlIE5ld3NJdGVtIHsKICBpZDogbnVtYmVyOwogIHVybDogc3RyaW5nOwogIHVybF9oYXNoOiBzdHJpbmc7CiAgdGl0bGU6IHN0cmluZzsKICBzdW1tYXJ5OiBzdHJpbmcgfCBudWxsOwogIHNvdXJjZTogc3RyaW5nOwogIHRydXN0X3RpZXI6IFRydXN0VGllcjsKICBwdWJsaXNoZWRfYXQ6IHN0cmluZyB8IG51bGw7CiAgc3RhdHVzOiBOZXdzU3RhdHVzOwogIGlzX2FkYXB0YXRpb25fbmV3czogbnVtYmVyOwogIGJvb2tfdGl0bGU6IHN0cmluZyB8IG51bGw7CiAgYXV0aG9yOiBzdHJpbmcgfCBudWxsOwogIHNjcmVlbl9raW5kOiBzdHJpbmcgfCBudWxsOwogIHN0YXR1c19zaWduYWw6IHN0cmluZyB8IG51bGw7CiAgY29uZmlkZW5jZTogbnVtYmVyIHwgbnVsbDsKICBsbG1fbW9kZWw6IHN0cmluZyB8IG51bGw7CiAgbmVlZHNfcmV2aWV3OiBudW1iZXI7CiAgZGlzbWlzc19yZWFzb246IHN0cmluZyB8IG51bGw7CiAgY3JlYXRlZF9hdDogc3RyaW5nOwp9CgpleHBvcnQgaW50ZXJmYWNlIFNvdXJjZVJvdyB7CiAgbmFtZTogc3RyaW5nOwogIGZlZWRfdXJsOiBzdHJpbmc7CiAgdHJ1c3RfdGllcjogVHJ1c3RUaWVyOwogIGlzX2FjdGl2ZTogbnVtYmVyOwogIGxhc3RfZmV0Y2hlZF9hdDogc3RyaW5nIHwgbnVsbDsKICBsYXN0X3N0YXR1czogc3RyaW5nIHwgbnVsbDsKICBjb25zZWN1dGl2ZV9mYWlsdXJlczogbnVtYmVyOwp9Cgpjb25zdCBWQUxJRF9ORVdTX1NUQVRVU0VTOiBOZXdzU3RhdHVzW10gPSBbJ3BlbmRpbmcnLCAnYXBwcm92ZWQnLCAnZGlzbWlzc2VkJ107CgovKiogQ3VyYXRpb24gcXVldWUsIG9yZGVyZWQgYnkgdHJ1c3QgdGllciB0aGVuIGNvbmZpZGVuY2UgKGxvdy1jb25maWRlbmNlIGxhc3QpLiAqLwpleHBvcnQgYXN5bmMgZnVuY3Rpb24gbGlzdE5ld3NJdGVtcyhkYjogRDFEYXRhYmFzZSwgc3RhdHVzOiBOZXdzU3RhdHVzKTogUHJvbWlzZTxOZXdzSXRlbVtdPiB7CiAgY29uc3QgeyByZXN1bHRzIH0gPSBhd2FpdCBkYgogICAgLnByZXBhcmUoCiAgICAgIGBTRUxFQ1QgKiBGUk9NIG5ld3NfaXRlbXMgV0hFUkUgc3RhdHVzID0gPzEKICAgICAgIE9SREVSIEJZIENBU0UgdHJ1c3RfdGllciBXSEVOICd0cnVzdGVkJyBUSEVOIDAgV0hFTiAncmVwdXRhYmxlJyBUSEVOIDEgRUxTRSAyIEVORCwKICAgICAgICAgICAgICAgIGNvbmZpZGVuY2UgREVTQyBOVUxMUyBMQVNULCBpZCBBU0NgLAogICAgKQogICAgLmJpbmQoc3RhdHVzKQogICAgLmFsbDxOZXdzSXRlbT4oKTsKICByZXR1cm4gcmVzdWx0cyA/PyBbXTsKfQoKZXhwb3J0IGFzeW5jIGZ1bmN0aW9uIGdldE5ld3NJdGVtKGRiOiBEMURhdGFiYXNlLCBpZDogbnVtYmVyKTogUHJvbWlzZTxOZXdzSXRlbSB8IG51bGw+IHsKICBjb25zdCByb3cgPSBhd2FpdCBkYi5wcmVwYXJlKCdTRUxFQ1QgKiBGUk9NIG5ld3NfaXRlbXMgV0hFUkUgaWQgPSA/MScpLmJpbmQoaWQpLmZpcnN0PE5ld3NJdGVtPigpOwogIHJldHVybiByb3cgPz8gbnVsbDsKfQoKZXhwb3J0IGFzeW5jIGZ1bmN0aW9uIGNvdW50TmV3c0J5U3RhdHVzKAogIGRiOiBEMURhdGFiYXNlLAopOiBQcm9taXNlPFJlY29yZDxOZXdzU3RhdHVzLCBudW1iZXI+PiB7CiAgY29uc3QgeyByZXN1bHRzIH0gPSBhd2FpdCBkYgogICAgLnByZXBhcmUoJ1NFTEVDVCBzdGF0dXMsIENPVU5UKCopIEFTIG4gRlJPTSBuZXdzX2l0ZW1zIEdST1VQIEJZIHN0YXR1cycpCiAgICAuYWxsPHsgc3RhdHVzOiBOZXdzU3RhdHVzOyBuOiBudW1iZXIgfT4oKTsKICBjb25zdCBjb3VudHM6IFJlY29yZDxOZXdzU3RhdHVzLCBudW1iZXI+ID0geyBwZW5kaW5nOiAwLCBhcHByb3ZlZDogMCwgZGlzbWlzc2VkOiAwIH07CiAgZm9yIChjb25zdCByIG9mIHJlc3VsdHMgPz8gW10pIHsKICAgIGlmIChWQUxJRF9ORVdTX1NUQVRVU0VTLmluY2x1ZGVzKHIuc3RhdHVzKSkgY291bnRzW3Iuc3RhdHVzXSA9IHIubjsKICB9CiAgcmV0dXJuIGNvdW50czsKfQoKZXhwb3J0IGFzeW5jIGZ1bmN0aW9uIHNldE5ld3NJdGVtU3RhdHVzKAogIGRiOiBEMURhdGFiYXNlLAogIGlkOiBudW1iZXIsCiAgc3RhdHVzOiBOZXdzU3RhdHVzLAogIGRpc21pc3NSZWFzb24/OiBzdHJpbmcsCik6IFByb21pc2U8Ym9vbGVhbj4gewogIGNvbnN0IHJlcyA9IGF3YWl0IGRiCiAgICAucHJlcGFyZSgnVVBEQVRFIG5ld3NfaXRlbXMgU0VUIHN0YXR1cyA9ID8xLCBkaXNtaXNzX3JlYXNvbiA9ID8yIFdIRVJFIGlkID0gPzMnKQogICAgLmJpbmQoc3RhdHVzLCBkaXNtaXNzUmVhc29uID8/IG51bGwsIGlkKQogICAgLnJ1bigpOwogIHJldHVybiAocmVzLm1ldGE/LmNoYW5nZXMgPz8gMCkgPiAwOwp9CgpleHBvcnQgYXN5bmMgZnVuY3Rpb24gbGlzdFNvdXJjZXMoZGI6IEQxRGF0YWJhc2UpOiBQcm9taXNlPFNvdXJjZVJvd1tdPiB7CiAgY29uc3QgeyByZXN1bHRzIH0gPSBhd2FpdCBkYgogICAgLnByZXBhcmUoJ1NFTEVDVCAqIEZST00gc291cmNlcyBPUkRFUiBCWSBuYW1lIEFTQycpCiAgICAuYWxsPFNvdXJjZVJvdz4oKTsKICByZXR1cm4gcmVzdWx0cyA/PyBbXTsKfQoKZXhwb3J0IGNvbnN0IEFEQVBUQVRJT05fU1RBVFVTRVMgPSBbCiAgJ3J1bW9yZWQnLAogICdvcHRpb25lZCcsCiAgJ2luX2RldmVsb3BtZW50JywKICAnZmlsbWluZycsCiAgJ3Bvc3RfcHJvZHVjdGlvbicsCiAgJ3JlbGVhc2VkJywKICAnY2FuY2VsbGVkJywKXSBhcyBjb25zdDsKCi8qKiBUaGUgZGVmYXVsdCBwcm9tb3RlIGxhZGRlcjogcnVtb3JlZCDihpIgb3B0aW9uZWQg4oaSIOKApiDihpIgcmVsZWFzZWQuICovCmNvbnN0IFBST01PVEVfTEFEREVSID0gWwogICdydW1vcmVkJywKICAnb3B0aW9uZWQnLAogICdpbl9kZXZlbG9wbWVudCcsCiAgJ2ZpbG1pbmcnLAogICdwb3N0X3Byb2R1Y3Rpb24nLAogICdyZWxlYXNlZCcsCl0gYXMgY29uc3Q7CgpleHBvcnQgZnVuY3Rpb24gbmV4dFN0YXR1c0FmdGVyKGN1cnJlbnQ6IHN0cmluZyk6IHN0cmluZyB8IG51bGwgewogIGNvbnN0IGkgPSAoUFJPTU9URV9MQURERVIgYXMgcmVhZG9ubHkgc3RyaW5nW10pLmluZGV4T2YoY3VycmVudCk7CiAgcmV0dXJuIGkgPj0gMCAmJiBpIDwgUFJPTU9URV9MQURERVIubGVuZ3RoIC0gMSA/IFBST01PVEVfTEFEREVSW2kgKyAxXSEgOiBudWxsOwp9CgovKioKICogUHJvbW90ZSBhIG5ld3MgaXRlbTogbWFyayBpdCBhcHByb3ZlZCwgYWR2YW5jZSAob3Igc2V0KSB0aGUgbGlua2VkCiAqIGFkYXB0YXRpb24ncyBzdGF0dXMsIGFuZCB3cml0ZSBhbiBhdWRpdCByb3cuIEFsbCBpbiBvbmUgRDEgYmF0Y2ggc28gdGhlCiAqIHRocmVlIHdyaXRlcyBzdGF5IGNvbnNpc3RlbnQuCiAqLwpleHBvcnQgYXN5bmMgZnVuY3Rpb24gcHJvbW90ZU5ld3NJdGVtKAogIGRiOiBEMURhdGFiYXNlLAogIGl0ZW06IE5ld3NJdGVtLAogIGFkYXB0YXRpb25JZDogbnVtYmVyLAogIG5ld1N0YXR1czogc3RyaW5nLAogIHNvdXJjZVVybDogc3RyaW5nLAogIGNoYW5nZWRCeSA9ICdvd25lcicsCik6IFByb21pc2U8eyBvbGRTdGF0dXM6IHN0cmluZzsgbmV3U3RhdHVzOiBzdHJpbmcgfT4gewogIGNvbnN0IGFkYXB0YXRpb24gPSBhd2FpdCBkYgogICAgLnByZXBhcmUoJ1NFTEVDVCBzdGF0dXMgRlJPTSBhZGFwdGF0aW9ucyBXSEVSRSBpZCA9ID8xJykKICAgIC5iaW5kKGFkYXB0YXRpb25JZCkKICAgIC5maXJzdDx7IHN0YXR1czogc3RyaW5nIH0+KCk7CiAgaWYgKCFhZGFwdGF0aW9uKSB0aHJvdyBuZXcgRXJyb3IoJ2FkYXB0YXRpb24gbm90IGZvdW5kJyk7CiAgY29uc3Qgb2xkU3RhdHVzID0gYWRhcHRhdGlvbi5zdGF0dXM7CgogIGNvbnN0IGJhdGNoOiBEMVByZXBhcmVkU3RhdGVtZW50W10gPSBbCiAgICBkYgogICAgICAucHJlcGFyZSgiVVBEQVRFIG5ld3NfaXRlbXMgU0VUIHN0YXR1cyA9ICdhcHByb3ZlZCcgV0hFUkUgaWQgPSA/MSIpCiAgICAgIC5iaW5kKGl0ZW0uaWQpLAogICAgZGIKICAgICAgLnByZXBhcmUoJ1VQREFURSBhZGFwdGF0aW9ucyBTRVQgc3RhdHVzID0gPzEsIHNvdXJjZV91cmwgPSA/MiBXSEVSRSBpZCA9ID8zJykKICAgICAgLmJpbmQobmV3U3RhdHVzLCBzb3VyY2VVcmwsIGFkYXB0YXRpb25JZCksCiAgICBkYgogICAgICAucHJlcGFyZSgKICAgICAgICBgSU5TRVJUIElOVE8gYWRhcHRhdGlvbl9zdGF0dXNfYXVkaXQKICAgICAgICAgICAoYWRhcHRhdGlvbl9pZCwgb2xkX3N0YXR1cywgbmV3X3N0YXR1cywgc291cmNlX3VybCwgbmV3c19pdGVtX2lkLCBjaGFuZ2VkX2J5KQogICAgICAgICBWQUxVRVMgKD8xLCA/MiwgPzMsID80LCA/NSwgPzYpYCwKICAgICAgKQogICAgICAuYmluZChhZGFwdGF0aW9uSWQsIG9sZFN0YXR1cywgbmV3U3RhdHVzLCBzb3VyY2VVcmwsIGl0ZW0uaWQsIGNoYW5nZWRCeSksCiAgXTsKICBhd2FpdCBkYi5iYXRjaChiYXRjaCk7CiAgcmV0dXJuIHsgb2xkU3RhdHVzLCBuZXdTdGF0dXMgfTsKfQo=
+// src/db.ts — small D1 data-access helpers. All SQL lives here.
+
+export interface Book {
+  id: number;
+  title: string;
+  authors: string;
+  cover_url: string | null;
+  pub_date: string | null;
+  isbn: string | null;
+  openlibrary_id: string | null;
+  googlebooks_id: string | null;
+}
+
+export interface ScreenWork {
+  id: number;
+  tmdb_id: number | null;
+  title: string;
+  kind: 'film' | 'series';
+  poster_url: string | null;
+  release_date: string | null;
+}
+
+export interface Adaptation {
+  id: number;
+  book_id: number;
+  screen_work_id: number;
+  status:
+    | 'rumored'
+    | 'optioned'
+    | 'in_development'
+    | 'filming'
+    | 'post_production'
+    | 'released'
+    | 'cancelled';
+  source_url: string | null;
+}
+
+/** One row of the joined adaptation list used by the browse page and API. */
+export interface AdaptationSummary extends Adaptation {
+  book_title: string;
+  book_authors: string;
+  book_cover_url: string | null;
+  screen_title: string;
+  screen_kind: 'film' | 'series';
+  screen_release_date: string | null;
+}
+
+const SELECT_ADAPTATION_SUMMARY = `
+  SELECT a.id, a.book_id, a.screen_work_id, a.status, a.source_url,
+         b.title AS book_title, b.authors AS book_authors,
+         b.cover_url AS book_cover_url,
+         s.title AS screen_title, s.kind AS screen_kind,
+         s.release_date AS screen_release_date
+  FROM adaptations a
+  JOIN books b ON b.id = a.book_id
+  JOIN screen_works s ON s.id = a.screen_work_id
+`;
+
+export async function listAdaptations(db: D1Database): Promise<AdaptationSummary[]> {
+  const { results } = await db
+    .prepare(`${SELECT_ADAPTATION_SUMMARY} ORDER BY a.id ASC`)
+    .all<AdaptationSummary>();
+  return results ?? [];
+}
+
+export async function getAdaptationSummary(
+  db: D1Database,
+  id: number,
+): Promise<AdaptationSummary | null> {
+  const row = await db
+    .prepare(`${SELECT_ADAPTATION_SUMMARY} WHERE a.id = ?1`)
+    .bind(id)
+    .first<AdaptationSummary>();
+  return row ?? null;
+}
+
+export async function getBook(db: D1Database, id: number): Promise<Book | null> {
+  const row = await db.prepare('SELECT * FROM books WHERE id = ?1').bind(id).first<Book>();
+  return row ?? null;
+}
+
+export async function getBookAdaptations(
+  db: D1Database,
+  bookId: number,
+): Promise<AdaptationSummary[]> {
+  const { results } = await db
+    .prepare(`${SELECT_ADAPTATION_SUMMARY} WHERE a.book_id = ?1 ORDER BY a.id ASC`)
+    .bind(bookId)
+    .all<AdaptationSummary>();
+  return results ?? [];
+}
+
+// --- News pipeline (Phase 3) ------------------------------------------------
+
+export type NewsStatus = 'pending' | 'approved' | 'dismissed';
+export type TrustTier = 'trusted' | 'reputable' | 'rumor';
+
+export interface NewsItem {
+  id: number;
+  url: string;
+  url_hash: string;
+  title: string;
+  summary: string | null;
+  source: string;
+  trust_tier: TrustTier;
+  published_at: string | null;
+  status: NewsStatus;
+  is_adaptation_news: number;
+  book_title: string | null;
+  author: string | null;
+  screen_kind: string | null;
+  status_signal: string | null;
+  confidence: number | null;
+  llm_model: string | null;
+  needs_review: number;
+  dismiss_reason: string | null;
+  created_at: string;
+}
+
+export interface SourceRow {
+  name: string;
+  feed_url: string;
+  trust_tier: TrustTier;
+  is_active: number;
+  last_fetched_at: string | null;
+  last_status: string | null;
+  consecutive_failures: number;
+}
+
+const VALID_NEWS_STATUSES: NewsStatus[] = ['pending', 'approved', 'dismissed'];
+
+/** Curation queue, ordered by trust tier then confidence (low-confidence last). */
+export async function listNewsItems(db: D1Database, status: NewsStatus): Promise<NewsItem[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM news_items WHERE status = ?1
+       ORDER BY CASE trust_tier WHEN 'trusted' THEN 0 WHEN 'reputable' THEN 1 ELSE 2 END,
+                confidence DESC NULLS LAST, id ASC`,
+    )
+    .bind(status)
+    .all<NewsItem>();
+  return results ?? [];
+}
+
+export async function getNewsItem(db: D1Database, id: number): Promise<NewsItem | null> {
+  const row = await db.prepare('SELECT * FROM news_items WHERE id = ?1').bind(id).first<NewsItem>();
+  return row ?? null;
+}
+
+export async function countNewsByStatus(
+  db: D1Database,
+): Promise<Record<NewsStatus, number>> {
+  const { results } = await db
+    .prepare('SELECT status, COUNT(*) AS n FROM news_items GROUP BY status')
+    .all<{ status: NewsStatus; n: number }>();
+  const counts: Record<NewsStatus, number> = { pending: 0, approved: 0, dismissed: 0 };
+  for (const r of results ?? []) {
+    if (VALID_NEWS_STATUSES.includes(r.status)) counts[r.status] = r.n;
+  }
+  return counts;
+}
+
+export async function setNewsItemStatus(
+  db: D1Database,
+  id: number,
+  status: NewsStatus,
+  dismissReason?: string,
+): Promise<boolean> {
+  const res = await db
+    .prepare('UPDATE news_items SET status = ?1, dismiss_reason = ?2 WHERE id = ?3')
+    .bind(status, dismissReason ?? null, id)
+    .run();
+  return (res.meta?.changes ?? 0) > 0;
+}
+
+export async function listSources(db: D1Database): Promise<SourceRow[]> {
+  const { results } = await db
+    .prepare('SELECT * FROM sources ORDER BY name ASC')
+    .all<SourceRow>();
+  return results ?? [];
+}
+
+export const ADAPTATION_STATUSES = [
+  'rumored',
+  'optioned',
+  'in_development',
+  'filming',
+  'post_production',
+  'released',
+  'cancelled',
+] as const;
+
+/** The default promote ladder: rumored → optioned → … → released. */
+const PROMOTE_LADDER = [
+  'rumored',
+  'optioned',
+  'in_development',
+  'filming',
+  'post_production',
+  'released',
+] as const;
+
+export function nextStatusAfter(current: string): string | null {
+  const i = (PROMOTE_LADDER as readonly string[]).indexOf(current);
+  return i >= 0 && i < PROMOTE_LADDER.length - 1 ? PROMOTE_LADDER[i + 1]! : null;
+}
+
+/**
+ * Promote a news item: mark it approved, advance (or set) the linked
+ * adaptation's status, and write an audit row. All in one D1 batch so the
+ * three writes stay consistent.
+ */
+export async function promoteNewsItem(
+  db: D1Database,
+  item: NewsItem,
+  adaptationId: number,
+  newStatus: string,
+  sourceUrl: string,
+  changedBy = 'owner',
+): Promise<{ oldStatus: string; newStatus: string }> {
+  const adaptation = await db
+    .prepare('SELECT status FROM adaptations WHERE id = ?1')
+    .bind(adaptationId)
+    .first<{ status: string }>();
+  if (!adaptation) throw new Error('adaptation not found');
+  const oldStatus = adaptation.status;
+
+  const batch: D1PreparedStatement[] = [
+    db
+      .prepare("UPDATE news_items SET status = 'approved' WHERE id = ?1")
+      .bind(item.id),
+    db
+      .prepare('UPDATE adaptations SET status = ?1, source_url = ?2 WHERE id = ?3')
+      .bind(newStatus, sourceUrl, adaptationId),
+    db
+      .prepare(
+        `INSERT INTO adaptation_status_audit
+           (adaptation_id, old_status, new_status, source_url, news_item_id, changed_by)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      )
+      .bind(adaptationId, oldStatus, newStatus, sourceUrl, item.id, changedBy),
+  ];
+  await db.batch(batch);
+  return { oldStatus, newStatus };
+}

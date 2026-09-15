@@ -1,1 +1,202 @@
-LyoqCiAqIHNyYy9uZXdzL2N1cmF0aW9uLnRzIOKAlCBvd25lci1vbmx5IGN1cmF0aW9uIHF1ZXVlIHJvdXRlcyAoUGhhc2UgMykuCiAqCiAqIE1vdW50ZWQgYnkgc3JjL2luZGV4LnRzeDoKICogICBHRVQgIC9hZG1pbi9uZXdzP3N0YXR1cz1wZW5kaW5nICAgIOKAlCBzZXJ2ZXItcmVuZGVyZWQgY3VyYXRpb24gcXVldWUKICogICBQT1NUIC9hcGkvbmV3cy86aWQvYXBwcm92ZSAgICAgICAg4oCUIHN0YXR1cyDihpIgYXBwcm92ZWQKICogICBQT1NUIC9hcGkvbmV3cy86aWQvZGlzbWlzcyAgICAgICAg4oCUIHN0YXR1cyDihpIgZGlzbWlzc2VkICgrIG9wdGlvbmFsIHJlYXNvbikKICogICBQT1NUIC9hcGkvbmV3cy86aWQvcHJvbW90ZSAgICAgICAg4oCUIGFwcHJvdmUgKyBhZHZhbmNlIGEgbGlua2VkIGFkYXB0YXRpb24KICoKICogQVVUSDogZXZlcnkgcm91dGUgaXMgZ2F0ZWQgYmVoaW5kIGEgc2hhcmVkIHNlY3JldC4gVGhlIGNsaWVudCBzZW5kcwogKiBgWC1DdXJhdGlvbi1LZXlgIChvciBgP2tleT1gKTsgdGhlIHZhbHVlIGlzIGNvbXBhcmVkIGluIGNvbnN0YW50IHRpbWUKICogYWdhaW5zdCBlbnYgQ1VSQVRJT05fS0VZLiBGYWlsIGNsb3NlZDogaWYgQ1VSQVRJT05fS0VZIGlzIHVuc2V0LCBBTEwKICogcmVxdWVzdHMgYXJlIGRlbmllZC4KICoKICogTk9URTogYSBzaGFyZWQgc2VjcmV0IGlzIGEgc3RvcGdhcC4gUmVhbCBvd25lciBhdXRoIChzZXNzaW9ucyAvIHBhc3NrZXlzKQogKiBpcyBhIFBoYXNlIDIgaXRlbSDigJQgc2VlIHRoZSBjb21tZW50IG9uIGBjdXJhdGlvbkF1dGhgLgogKi8KCmltcG9ydCB0eXBlIHsgQ29udGV4dCwgSG9ubywgTmV4dCB9IGZyb20gJ2hvbm8nOwppbXBvcnQgewogIEFEQVBUQVRJT05fU1RBVFVTRVMsCiAgY291bnROZXdzQnlTdGF0dXMsCiAgZ2V0QWRhcHRhdGlvblN1bW1hcnksCiAgZ2V0TmV3c0l0ZW0sCiAgbGlzdE5ld3NJdGVtcywKICBsaXN0U291cmNlcywKICBuZXh0U3RhdHVzQWZ0ZXIsCiAgcHJvbW90ZU5ld3NJdGVtLAogIHNldE5ld3NJdGVtU3RhdHVzLAogIHR5cGUgTmV3c0l0ZW0sCiAgdHlwZSBOZXdzU3RhdHVzLAp9IGZyb20gJy4uL2RiJzsKaW1wb3J0IHsgTmV3c1F1ZXVlUGFnZSB9IGZyb20gJy4uL3VpJzsKCnR5cGUgQ3VyYXRpb25CaW5kaW5ncyA9IHsKICBEQjogRDFEYXRhYmFzZTsKICAvKiogU2V0IHZpYSBgd3JhbmdsZXIgc2VjcmV0IHB1dCBDVVJBVElPTl9LRVlgLiBBYnNlbnQg4oaSIGFsbCBkZW5pZWQuICovCiAgQ1VSQVRJT05fS0VZPzogc3RyaW5nOwp9OwoKY29uc3QgVkFMSURfUVVFVUVfU1RBVFVTRVM6IE5ld3NTdGF0dXNbXSA9IFsncGVuZGluZycsICdhcHByb3ZlZCcsICdkaXNtaXNzZWQnXTsKCi8qKiBDb25zdGFudC10aW1lIHN0cmluZyBjb21wYXJpc29uIChsZW5ndGggY2hlY2sgZmlyc3Q7IGxlbmd0aHMgYXJlbid0IHNlY3JldCkuICovCmZ1bmN0aW9uIHRpbWluZ1NhZmVFcXVhbChhOiBzdHJpbmcsIGI6IHN0cmluZyk6IGJvb2xlYW4gewogIGNvbnN0IGFiID0gbmV3IFRleHRFbmNvZGVyKCkuZW5jb2RlKGEpOwogIGNvbnN0IGJiID0gbmV3IFRleHRFbmNvZGVyKCkuZW5jb2RlKGIpOwogIGlmIChhYi5sZW5ndGggIT09IGJiLmxlbmd0aCkgcmV0dXJuIGZhbHNlOwogIGxldCBkaWZmID0gMDsKICBmb3IgKGxldCBpID0gMDsgaSA8IGFiLmxlbmd0aDsgaSsrKSBkaWZmIHw9IGFiW2ldISBeIGJiW2ldITsKICByZXR1cm4gZGlmZiA9PT0gMDsKfQoKLyoqCiAqIE93bmVyIGdhdGUuIFBIQVNFIDIgVE9ETzogcmVwbGFjZSB0aGUgc2hhcmVkIHNlY3JldCB3aXRoIHJlYWwgYXV0aAogKiAoc2Vzc2lvbiBjb29raWUgLyBwYXNza2V5KS4gVGhlIHNlY3JldC1pbi1VUkwgZmFsbGJhY2sgZXhpc3RzIHNvIHRoZQogKiBvd25lciBjYW4gb3BlbiB0aGUgcXVldWUgaW4gYSBwbGFpbiBicm93c2VyIHRhYi4KICovCmFzeW5jIGZ1bmN0aW9uIGN1cmF0aW9uQXV0aDxFIGV4dGVuZHMgQ3VyYXRpb25CaW5kaW5ncz4oCiAgYzogQ29udGV4dDx7IEJpbmRpbmdzOiBFIH0+LAogIG5leHQ6IE5leHQsCik6IFByb21pc2U8UmVzcG9uc2UgfCB2b2lkPiB7CiAgY29uc3QgZXhwZWN0ZWQgPSBjLmVudi5DVVJBVElPTl9LRVk7CiAgY29uc3QgcHJvdmlkZWQgPQogICAgYy5yZXEuaGVhZGVyKCdYLUN1cmF0aW9uLUtleScpID8/IGMucmVxLnF1ZXJ5KCdrZXknKSA/PyAnJzsKICBpZiAoIWV4cGVjdGVkIHx8ICFwcm92aWRlZCB8fCAhdGltaW5nU2FmZUVxdWFsKHByb3ZpZGVkLCBleHBlY3RlZCkpIHsKICAgIHJldHVybiBjLnRleHQoJ0ZvcmJpZGRlbiDigJQgb3duZXIgY3VyYXRpb24ga2V5IHJlcXVpcmVkLicsIDQwMyk7CiAgfQogIGF3YWl0IG5leHQoKTsKfQoKYXN5bmMgZnVuY3Rpb24gcGFyc2VKc29uQm9keShjOiBDb250ZXh0KTogUHJvbWlzZTxSZWNvcmQ8c3RyaW5nLCB1bmtub3duPj4gewogIHRyeSB7CiAgICBjb25zdCBiID0gYXdhaXQgYy5yZXEuanNvbigpOwogICAgcmV0dXJuIHR5cGVvZiBiID09PSAnb2JqZWN0JyAmJiBiICE9PSBudWxsID8gKGIgYXMgUmVjb3JkPHN0cmluZywgdW5rbm93bj4pIDoge307CiAgfSBjYXRjaCB7CiAgICByZXR1cm4ge307CiAgfQp9CgpleHBvcnQgZnVuY3Rpb24gcmVnaXN0ZXJDdXJhdGlvblJvdXRlczxFIGV4dGVuZHMgQ3VyYXRpb25CaW5kaW5ncz4oCiAgYXBwOiBIb25vPHsgQmluZGluZ3M6IEUgfT4sCik6IHZvaWQgewogIGFwcC51c2UoJy9hZG1pbi8qJywgY3VyYXRpb25BdXRoKTsKICBhcHAudXNlKCcvYXBpL25ld3MvKicsIGN1cmF0aW9uQXV0aCk7CgogIGFwcC5nZXQoJy9hZG1pbi9uZXdzJywgYXN5bmMgKGMpID0+IHsKICAgIGNvbnN0IHJhdyA9IGMucmVxLnF1ZXJ5KCdzdGF0dXMnKSA/PyAncGVuZGluZyc7CiAgICBjb25zdCBzdGF0dXM6IE5ld3NTdGF0dXMgPSAoCiAgICAgIFZBTElEX1FVRVVFX1NUQVRVU0VTIGFzIHN0cmluZ1tdCiAgICApLmluY2x1ZGVzKHJhdykKICAgICAgPyAocmF3IGFzIE5ld3NTdGF0dXMpCiAgICAgIDogJ3BlbmRpbmcnOwogICAgY29uc3QgW2l0ZW1zLCBzb3VyY2VzLCBjb3VudHNdID0gYXdhaXQgUHJvbWlzZS5hbGwoWwogICAgICBsaXN0TmV3c0l0ZW1zKGMuZW52LkRCLCBzdGF0dXMpLAogICAgICBsaXN0U291cmNlcyhjLmVudi5EQiksCiAgICAgIGNvdW50TmV3c0J5U3RhdHVzKGMuZW52LkRCKSwKICAgIF0pOwogICAgY29uc3Qga2V5ID0gYy5yZXEucXVlcnkoJ2tleScpID8/ICcnOwogICAgcmV0dXJuIGMuaHRtbCgKICAgICAgPE5ld3NRdWV1ZVBhZ2Ugc3RhdHVzPXtzdGF0dXN9IGl0ZW1zPXtpdGVtc30gc291cmNlcz17c291cmNlc30gY291bnRzPXtjb3VudHN9IGtleVBhcmFtPXtrZXl9IC8+LAogICAgKTsKICB9KTsKCiAgYXBwLnBvc3QoJy9hcGkvbmV3cy86aWQvYXBwcm92ZScsIGFzeW5jIChjKSA9PiB7CiAgICBjb25zdCBpdGVtID0gYXdhaXQgcmVxdWlyZUl0ZW0oYyk7CiAgICBpZiAoaXRlbSBpbnN0YW5jZW9mIFJlc3BvbnNlKSByZXR1cm4gaXRlbTsKICAgIGF3YWl0IHNldE5ld3NJdGVtU3RhdHVzKGMuZW52LkRCLCBpdGVtLmlkLCAnYXBwcm92ZWQnKTsKICAgIHJldHVybiBjLmpzb24oeyBvazogdHJ1ZSwgaWQ6IGl0ZW0uaWQsIHN0YXR1czogJ2FwcHJvdmVkJyB9KTsKICB9KTsKCiAgYXBwLnBvc3QoJy9hcGkvbmV3cy86aWQvZGlzbWlzcycsIGFzeW5jIChjKSA9PiB7CiAgICBjb25zdCBpdGVtID0gYXdhaXQgcmVxdWlyZUl0ZW0oYyk7CiAgICBpZiAoaXRlbSBpbnN0YW5jZW9mIFJlc3BvbnNlKSByZXR1cm4gaXRlbTsKICAgIGNvbnN0IGJvZHkgPSBhd2FpdCBwYXJzZUpzb25Cb2R5KGMpOwogICAgY29uc3QgcmVhc29uID0gdHlwZW9mIGJvZHkucmVhc29uID09PSAnc3RyaW5nJyA/IGJvZHkucmVhc29uLnNsaWNlKDAsIDUwMCkgOiB1bmRlZmluZWQ7CiAgICBhd2FpdCBzZXROZXdzSXRlbVN0YXR1cyhjLmVudi5EQiwgaXRlbS5pZCwgJ2Rpc21pc3NlZCcsIHJlYXNvbik7CiAgICByZXR1cm4gYy5qc29uKHsgb2s6IHRydWUsIGlkOiBpdGVtLmlkLCBzdGF0dXM6ICdkaXNtaXNzZWQnIH0pOwogIH0pOwoKICBhcHAucG9zdCgnL2FwaS9uZXdzLzppZC9wcm9tb3RlJywgYXN5bmMgKGMpID0+IHsKICAgIGNvbnN0IGl0ZW0gPSBhd2FpdCByZXF1aXJlSXRlbShjKTsKICAgIGlmIChpdGVtIGluc3RhbmNlb2YgUmVzcG9uc2UpIHJldHVybiBpdGVtOwogICAgY29uc3QgYm9keSA9IGF3YWl0IHBhcnNlSnNvbkJvZHkoYyk7CgogICAgY29uc3QgYWRhcHRhdGlvbklkID0gTnVtYmVyKGJvZHkuYWRhcHRhdGlvbl9pZCk7CiAgICBpZiAoIU51bWJlci5pc0ludGVnZXIoYWRhcHRhdGlvbklkKSB8fCBhZGFwdGF0aW9uSWQgPD0gMCkgewogICAgICByZXR1cm4gYy5qc29uKHsgZXJyb3I6ICdhZGFwdGF0aW9uX2lkIChpbnRlZ2VyKSBpcyByZXF1aXJlZCcgfSwgNDAwKTsKICAgIH0KICAgIGNvbnN0IGFkYXB0YXRpb24gPSBhd2FpdCBnZXRBZGFwdGF0aW9uU3VtbWFyeShjLmVudi5EQiwgYWRhcHRhdGlvbklkKTsKICAgIGlmICghYWRhcHRhdGlvbikgewogICAgICByZXR1cm4gYy5qc29uKHsgZXJyb3I6IGBhZGFwdGF0aW9uICR7YWRhcHRhdGlvbklkfSBub3QgZm91bmRgIH0sIDQwNCk7CiAgICB9CgogICAgLy8gUnVtb3ItdGllciBpdGVtcyBuZWVkIGEgbWFudWFsbHkgYXR0YWNoZWQgY29ycm9ib3JhdGluZyBzb3VyY2UuCiAgICAvLyBSZXB1dGFibGUvdHJ1c3RlZCBwcm9tb3Rpb25zIG5lZWQgbm8gY29ycm9ib3JhdGlvbiAob3duZXIgZGVmYXVsdCkuCiAgICBjb25zdCBjb3Jyb2JvcmF0aW5nVXJsID0KICAgICAgdHlwZW9mIGJvZHkuY29ycm9ib3JhdGluZ191cmwgPT09ICdzdHJpbmcnICYmIGJvZHkuY29ycm9ib3JhdGluZ191cmwudHJpbSgpCiAgICAgICAgPyBib2R5LmNvcnJvYm9yYXRpbmdfdXJsLnRyaW0oKS5zbGljZSgwLCAyMDAwKQogICAgICAgIDogbnVsbDsKICAgIGlmIChpdGVtLnRydXN0X3RpZXIgPT09ICdydW1vcicgJiYgIWNvcnJvYm9yYXRpbmdVcmwpIHsKICAgICAgcmV0dXJuIGMuanNvbigKICAgICAgICB7IGVycm9yOiAnY29ycm9ib3JhdGluZ191cmwgaXMgcmVxdWlyZWQgdG8gcHJvbW90ZSBhIHJ1bW9yLXRpZXIgaXRlbScgfSwKICAgICAgICA0MDAsCiAgICAgICk7CiAgICB9CgogICAgbGV0IG5ld1N0YXR1czogc3RyaW5nOwogICAgaWYgKGJvZHkuc3RhdHVzICE9PSB1bmRlZmluZWQpIHsKICAgICAgaWYgKAogICAgICAgIHR5cGVvZiBib2R5LnN0YXR1cyAhPT0gJ3N0cmluZycgfHwKICAgICAgICAhKEFEQVBUQVRJT05fU1RBVFVTRVMgYXMgcmVhZG9ubHkgc3RyaW5nW10pLmluY2x1ZGVzKGJvZHkuc3RhdHVzKQogICAgICApIHsKICAgICAgICByZXR1cm4gYy5qc29uKAogICAgICAgICAgeyBlcnJvcjogYGludmFsaWQgc3RhdHVzOyBtdXN0IGJlIG9uZSBvZjogJHtBREFQVEFUSU9OX1NUQVRVU0VTLmpvaW4oJywgJyl9YCB9LAogICAgICAgICAgNDAwLAogICAgICAgICk7CiAgICAgIH0KICAgICAgbmV3U3RhdHVzID0gYm9keS5zdGF0dXM7CiAgICB9IGVsc2UgewogICAgICBjb25zdCBuZXh0ID0gbmV4dFN0YXR1c0FmdGVyKGFkYXB0YXRpb24uc3RhdHVzKTsKICAgICAgaWYgKCFuZXh0KSB7CiAgICAgICAgcmV0dXJuIGMuanNvbigKICAgICAgICAgIHsKICAgICAgICAgICAgZXJyb3I6IGBhZGFwdGF0aW9uIGlzIGFscmVhZHkgJyR7YWRhcHRhdGlvbi5zdGF0dXN9JyDigJQgbm8gbmV4dCBzdGVwOyBwYXNzIGFuIGV4cGxpY2l0IHN0YXR1c2AsCiAgICAgICAgICB9LAogICAgICAgICAgNDAwLAogICAgICAgICk7CiAgICAgIH0KICAgICAgbmV3U3RhdHVzID0gbmV4dDsKICAgIH0KCiAgICBjb25zdCBzb3VyY2VVcmwgPSBjb3Jyb2JvcmF0aW5nVXJsID8/IGl0ZW0udXJsOwogICAgY29uc3QgeyBvbGRTdGF0dXMgfSA9IGF3YWl0IHByb21vdGVOZXdzSXRlbSgKICAgICAgYy5lbnYuREIsCiAgICAgIGl0ZW0sCiAgICAgIGFkYXB0YXRpb25JZCwKICAgICAgbmV3U3RhdHVzLAogICAgICBzb3VyY2VVcmwsCiAgICAgICdvd25lcicsCiAgICApOwogICAgcmV0dXJuIGMuanNvbih7CiAgICAgIG9rOiB0cnVlLAogICAgICBuZXdzX2l0ZW1faWQ6IGl0ZW0uaWQsCiAgICAgIGFkYXB0YXRpb25faWQ6IGFkYXB0YXRpb25JZCwKICAgICAgb2xkX3N0YXR1czogb2xkU3RhdHVzLAogICAgICBuZXdfc3RhdHVzOiBuZXdTdGF0dXMsCiAgICAgIHNvdXJjZV91cmw6IHNvdXJjZVVybCwKICAgIH0pOwogIH0pOwp9Cgphc3luYyBmdW5jdGlvbiByZXF1aXJlSXRlbTxFIGV4dGVuZHMgQ3VyYXRpb25CaW5kaW5ncz4oCiAgYzogQ29udGV4dDx7IEJpbmRpbmdzOiBFIH0+LAopOiBQcm9taXNlPE5ld3NJdGVtIHwgUmVzcG9uc2U+IHsKICBjb25zdCBpZCA9IE51bWJlcihjLnJlcS5wYXJhbSgnaWQnKSk7CiAgaWYgKCFOdW1iZXIuaXNJbnRlZ2VyKGlkKSB8fCBpZCA8PSAwKSB7CiAgICByZXR1cm4gYy5qc29uKHsgZXJyb3I6ICdpbnZhbGlkIG5ld3MgaXRlbSBpZCcgfSwgNDAwKTsKICB9CiAgY29uc3QgaXRlbSA9IGF3YWl0IGdldE5ld3NJdGVtKGMuZW52LkRCLCBpZCk7CiAgaWYgKCFpdGVtKSByZXR1cm4gYy5qc29uKHsgZXJyb3I6IGBuZXdzIGl0ZW0gJHtpZH0gbm90IGZvdW5kYCB9LCA0MDQpOwogIHJldHVybiBpdGVtOwp9Cg==
+/**
+ * src/news/curation.ts — owner-only curation queue routes (Phase 3).
+ *
+ * Mounted by src/index.tsx:
+ *   GET  /admin/news?status=pending    — server-rendered curation queue
+ *   POST /api/news/:id/approve        — status → approved
+ *   POST /api/news/:id/dismiss        — status → dismissed (+ optional reason)
+ *   POST /api/news/:id/promote        — approve + advance a linked adaptation
+ *
+ * AUTH: every route is gated behind a shared secret. The client sends
+ * `X-Curation-Key` (or `?key=`); the value is compared in constant time
+ * against env CURATION_KEY. Fail closed: if CURATION_KEY is unset, ALL
+ * requests are denied.
+ *
+ * NOTE: a shared secret is a stopgap. Real owner auth (sessions / passkeys)
+ * is a Phase 2 item — see the comment on `curationAuth`.
+ */
+
+import type { Context, Hono, Next } from 'hono';
+import {
+  ADAPTATION_STATUSES,
+  countNewsByStatus,
+  getAdaptationSummary,
+  getNewsItem,
+  listNewsItems,
+  listSources,
+  nextStatusAfter,
+  promoteNewsItem,
+  setNewsItemStatus,
+  type NewsItem,
+  type NewsStatus,
+} from '../db';
+import { NewsQueuePage } from '../ui';
+
+type CurationBindings = {
+  DB: D1Database;
+  /** Set via `wrangler secret put CURATION_KEY`. Absent → all denied. */
+  CURATION_KEY?: string;
+};
+
+const VALID_QUEUE_STATUSES: NewsStatus[] = ['pending', 'approved', 'dismissed'];
+
+/** Constant-time string comparison (length check first; lengths aren't secret). */
+function timingSafeEqual(a: string, b: string): boolean {
+  const ab = new TextEncoder().encode(a);
+  const bb = new TextEncoder().encode(b);
+  if (ab.length !== bb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < ab.length; i++) diff |= ab[i]! ^ bb[i]!;
+  return diff === 0;
+}
+
+/**
+ * Owner gate. PHASE 2 TODO: replace the shared secret with real auth
+ * (session cookie / passkey). The secret-in-URL fallback exists so the
+ * owner can open the queue in a plain browser tab.
+ */
+async function curationAuth<E extends CurationBindings>(
+  c: Context<{ Bindings: E }>,
+  next: Next,
+): Promise<Response | void> {
+  const expected = c.env.CURATION_KEY;
+  const provided =
+    c.req.header('X-Curation-Key') ?? c.req.query('key') ?? '';
+  if (!expected || !provided || !timingSafeEqual(provided, expected)) {
+    return c.text('Forbidden — owner curation key required.', 403);
+  }
+  await next();
+}
+
+async function parseJsonBody(c: Context): Promise<Record<string, unknown>> {
+  try {
+    const b = await c.req.json();
+    return typeof b === 'object' && b !== null ? (b as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function registerCurationRoutes<E extends CurationBindings>(
+  app: Hono<{ Bindings: E }>,
+): void {
+  app.use('/admin/*', curationAuth);
+  app.use('/api/news/*', curationAuth);
+
+  app.get('/admin/news', async (c) => {
+    const raw = c.req.query('status') ?? 'pending';
+    const status: NewsStatus = (
+      VALID_QUEUE_STATUSES as string[]
+    ).includes(raw)
+      ? (raw as NewsStatus)
+      : 'pending';
+    const [items, sources, counts] = await Promise.all([
+      listNewsItems(c.env.DB, status),
+      listSources(c.env.DB),
+      countNewsByStatus(c.env.DB),
+    ]);
+    const key = c.req.query('key') ?? '';
+    return c.html(
+      <NewsQueuePage status={status} items={items} sources={sources} counts={counts} keyParam={key} />,
+    );
+  });
+
+  app.post('/api/news/:id/approve', async (c) => {
+    const item = await requireItem(c);
+    if (item instanceof Response) return item;
+    await setNewsItemStatus(c.env.DB, item.id, 'approved');
+    return c.json({ ok: true, id: item.id, status: 'approved' });
+  });
+
+  app.post('/api/news/:id/dismiss', async (c) => {
+    const item = await requireItem(c);
+    if (item instanceof Response) return item;
+    const body = await parseJsonBody(c);
+    const reason = typeof body.reason === 'string' ? body.reason.slice(0, 500) : undefined;
+    await setNewsItemStatus(c.env.DB, item.id, 'dismissed', reason);
+    return c.json({ ok: true, id: item.id, status: 'dismissed' });
+  });
+
+  app.post('/api/news/:id/promote', async (c) => {
+    const item = await requireItem(c);
+    if (item instanceof Response) return item;
+    const body = await parseJsonBody(c);
+
+    const adaptationId = Number(body.adaptation_id);
+    if (!Number.isInteger(adaptationId) || adaptationId <= 0) {
+      return c.json({ error: 'adaptation_id (integer) is required' }, 400);
+    }
+    const adaptation = await getAdaptationSummary(c.env.DB, adaptationId);
+    if (!adaptation) {
+      return c.json({ error: `adaptation ${adaptationId} not found` }, 404);
+    }
+
+    // Rumor-tier items need a manually attached corroborating source.
+    // Reputable/trusted promotions need no corroboration (owner default).
+    const corroboratingUrl =
+      typeof body.corroborating_url === 'string' && body.corroborating_url.trim()
+        ? body.corroborating_url.trim().slice(0, 2000)
+        : null;
+    if (item.trust_tier === 'rumor' && !corroboratingUrl) {
+      return c.json(
+        { error: 'corroborating_url is required to promote a rumor-tier item' },
+        400,
+      );
+    }
+
+    let newStatus: string;
+    if (body.status !== undefined) {
+      if (
+        typeof body.status !== 'string' ||
+        !(ADAPTATION_STATUSES as readonly string[]).includes(body.status)
+      ) {
+        return c.json(
+          { error: `invalid status; must be one of: ${ADAPTATION_STATUSES.join(', ')}` },
+          400,
+        );
+      }
+      newStatus = body.status;
+    } else {
+      const next = nextStatusAfter(adaptation.status);
+      if (!next) {
+        return c.json(
+          {
+            error: `adaptation is already '${adaptation.status}' — no next step; pass an explicit status`,
+          },
+          400,
+        );
+      }
+      newStatus = next;
+    }
+
+    const sourceUrl = corroboratingUrl ?? item.url;
+    const { oldStatus } = await promoteNewsItem(
+      c.env.DB,
+      item,
+      adaptationId,
+      newStatus,
+      sourceUrl,
+      'owner',
+    );
+    return c.json({
+      ok: true,
+      news_item_id: item.id,
+      adaptation_id: adaptationId,
+      old_status: oldStatus,
+      new_status: newStatus,
+      source_url: sourceUrl,
+    });
+  });
+}
+
+async function requireItem<E extends CurationBindings>(
+  c: Context<{ Bindings: E }>,
+): Promise<NewsItem | Response> {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id <= 0) {
+    return c.json({ error: 'invalid news item id' }, 400);
+  }
+  const item = await getNewsItem(c.env.DB, id);
+  if (!item) return c.json({ error: `news item ${id} not found` }, 404);
+  return item;
+}

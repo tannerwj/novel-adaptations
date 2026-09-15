@@ -1,1 +1,70 @@
-LS0gMDAwM19uZXdzX3BpcGVsaW5lLnNxbCDigJQgbmV3cyBpbmdlc3Rpb24gcGlwZWxpbmUgc2NoZW1hIChQaGFzZSAzKS4KLS0KLS0gUmVidWlsZHMgbmV3c19pdGVtczogdGhlIDAwMDEgc2NoZW1hIHdhcyBhIHN0dWIgKG5vIHVybF9oYXNoLCBzdW1tYXJ5LAotLSBjbGFzc2lmaWNhdGlvbiBjb2x1bW5zLCBhbmQgYSB0cnVzdF90aWVyIENIRUNLIHRoYXQgZXhjbHVkZWQgJ3JlcHV0YWJsZScpLgotLSBUaGUgcGlwZWxpbmUgbmVlZHMgdGhlIGZ1bGwgc2NoZW1hIGJlbG93LiBUaGUgdGFibGUgaXMgZW1wdHkgaW4KLS0gcHJvZHVjdGlvbjsgdGhlIGNvcHkgc3RlcCBwcmVzZXJ2ZXMgYW55IHJvd3MgdGhhdCBleGlzdCAoZS5nLiBsb2NhbCBkZXYpLgotLSBMZWdhY3kgcm93cyBnZXQgYSBwbGFjZWhvbGRlciB1cmxfaGFzaCBzaW5jZSB0aGUgb2xkIHNjaGVtYSBoYWQgbm9uZS4KCkNSRUFURSBUQUJMRSBuZXdzX2l0ZW1zX25ldyAoCiAgaWQgSU5URUdFUiBQUklNQVJZIEtFWSwKICB1cmwgVEVYVCBOT1QgTlVMTCwKICB1cmxfaGFzaCBURVhUIE5PVCBOVUxMIFVOSVFVRSwKICB0aXRsZSBURVhUIE5PVCBOVUxMLAogIHN1bW1hcnkgVEVYVCwKICBzb3VyY2UgVEVYVCBOT1QgTlVMTCwKICB0cnVzdF90aWVyIFRFWFQgTk9UIE5VTEwgQ0hFQ0sgKHRydXN0X3RpZXIgSU4gKCd0cnVzdGVkJywgJ3JlcHV0YWJsZScsICdydW1vcicpKSwKICBwdWJsaXNoZWRfYXQgVEVYVCwKICBzdGF0dXMgVEVYVCBOT1QgTlVMTCBERUZBVUxUICdwZW5kaW5nJwogICAgQ0hFQ0sgKHN0YXR1cyBJTiAoJ3BlbmRpbmcnLCAnYXBwcm92ZWQnLCAnZGlzbWlzc2VkJykpLAogIGlzX2FkYXB0YXRpb25fbmV3cyBJTlRFR0VSIE5PVCBOVUxMIERFRkFVTFQgMCwKICBib29rX3RpdGxlIFRFWFQsCiAgYXV0aG9yIFRFWFQsCiAgc2NyZWVuX2tpbmQgVEVYVCwKICBzdGF0dXNfc2lnbmFsIFRFWFQsCiAgY29uZmlkZW5jZSBSRUFMLAogIGxsbV9tb2RlbCBURVhULAogIG5lZWRzX3JldmlldyBJTlRFR0VSIE5PVCBOVUxMIERFRkFVTFQgMCwKICBkaXNtaXNzX3JlYXNvbiBURVhULAogIGNyZWF0ZWRfYXQgVEVYVCBOT1QgTlVMTCBERUZBVUxUIChkYXRldGltZSgnbm93JykpCik7CgpJTlNFUlQgSU5UTyBuZXdzX2l0ZW1zX25ldwogIChpZCwgdXJsLCB1cmxfaGFzaCwgdGl0bGUsIHNvdXJjZSwgdHJ1c3RfdGllciwgcHVibGlzaGVkX2F0LCBzdGF0dXMsIGNyZWF0ZWRfYXQpClNFTEVDVCBpZCwgdXJsLCAnbGVnYWN5LScgfHwgaWQsIHRpdGxlLCBzb3VyY2UsIHRydXN0X3RpZXIsIHB1Ymxpc2hlZF9hdCwgc3RhdHVzLAogICAgICAgZGF0ZXRpbWUoJ25vdycpCkZST00gbmV3c19pdGVtczsKCkRST1AgVEFCTEUgbmV3c19pdGVtczsKCkFMVEVSIFRBQkxFIG5ld3NfaXRlbXNfbmV3IFJFTkFNRSBUTyBuZXdzX2l0ZW1zOwoKQ1JFQVRFIElOREVYIGlkeF9uZXdzX2l0ZW1zX3N0YXR1cyBPTiBuZXdzX2l0ZW1zIChzdGF0dXMpOwpDUkVBVEUgSU5ERVggaWR4X25ld3NfaXRlbXNfdHJ1c3RfdGllciBPTiBuZXdzX2l0ZW1zICh0cnVzdF90aWVyKTsKQ1JFQVRFIElOREVYIGlkeF9uZXdzX2l0ZW1zX2NyZWF0ZWRfYXQgT04gbmV3c19pdGVtcyAoY3JlYXRlZF9hdCk7CgotLSBGZWVkIHJlZ2lzdHJ5ICsgaGVhbHRoIHRyYWNraW5nICh3cml0dGVuIGJ5IHRoZSBzY2hlZHVsZWQgaW5nZXN0b3IpLgpDUkVBVEUgVEFCTEUgc291cmNlcyAoCiAgbmFtZSBURVhUIFBSSU1BUlkgS0VZLAogIGZlZWRfdXJsIFRFWFQgTk9UIE5VTEwsCiAgdHJ1c3RfdGllciBURVhUIE5PVCBOVUxMIENIRUNLICh0cnVzdF90aWVyIElOICgndHJ1c3RlZCcsICdyZXB1dGFibGUnLCAncnVtb3InKSksCiAgaXNfYWN0aXZlIElOVEVHRVIgTk9UIE5VTEwgREVGQVVMVCAxLAogIGxhc3RfZmV0Y2hlZF9hdCBURVhULAogIGxhc3Rfc3RhdHVzIFRFWFQsCiAgY29uc2VjdXRpdmVfZmFpbHVyZXMgSU5URUdFUiBOT1QgTlVMTCBERUZBVUxUIDAKKTsKCi0tIEF1ZGl0IHRyYWlsIGZvciBhZGFwdGF0aW9uIHN0YXR1cyBjaGFuZ2VzIChvd25lciBwcm9tb3Rpb25zIGZyb20gdGhlCi0tIGN1cmF0aW9uIHF1ZXVlLCBhbmQgYW55IGZ1dHVyZSBwaXBlbGluZS1zdWdnZXN0ZWQgY2hhbmdlcykuCkNSRUFURSBUQUJMRSBhZGFwdGF0aW9uX3N0YXR1c19hdWRpdCAoCiAgaWQgSU5URUdFUiBQUklNQVJZIEtFWSwKICBhZGFwdGF0aW9uX2lkIElOVEVHRVIgTk9UIE5VTEwgUkVGRVJFTkNFUyBhZGFwdGF0aW9ucyAoaWQpLAogIG9sZF9zdGF0dXMgVEVYVCBOT1QgTlVMTCwKICBuZXdfc3RhdHVzIFRFWFQgTk9UIE5VTEwsCiAgc291cmNlX3VybCBURVhULAogIG5ld3NfaXRlbV9pZCBJTlRFR0VSIFJFRkVSRU5DRVMgbmV3c19pdGVtcyAoaWQpLAogIGNoYW5nZWRfYnkgVEVYVCBOT1QgTlVMTCBERUZBVUxUICdvd25lcicsCiAgY3JlYXRlZF9hdCBURVhUIE5PVCBOVUxMIERFRkFVTFQgKGRhdGV0aW1lKCdub3cnKSkKKTsKCkNSRUFURSBJTkRFWCBpZHhfYXVkaXRfYWRhcHRhdGlvbl9pZCBPTiBhZGFwdGF0aW9uX3N0YXR1c19hdWRpdCAoYWRhcHRhdGlvbl9pZCk7Cg==
+-- 0003_news_pipeline.sql — news ingestion pipeline schema (Phase 3).
+--
+-- Rebuilds news_items: the 0001 schema was a stub (no url_hash, summary,
+-- classification columns, and a trust_tier CHECK that excluded 'reputable').
+-- The pipeline needs the full schema below. The table is empty in
+-- production; the copy step preserves any rows that exist (e.g. local dev).
+-- Legacy rows get a placeholder url_hash since the old schema had none.
+
+CREATE TABLE news_items_new (
+  id INTEGER PRIMARY KEY,
+  url TEXT NOT NULL,
+  url_hash TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  summary TEXT,
+  source TEXT NOT NULL,
+  trust_tier TEXT NOT NULL CHECK (trust_tier IN ('trusted', 'reputable', 'rumor')),
+  published_at TEXT,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'approved', 'dismissed')),
+  is_adaptation_news INTEGER NOT NULL DEFAULT 0,
+  book_title TEXT,
+  author TEXT,
+  screen_kind TEXT,
+  status_signal TEXT,
+  confidence REAL,
+  llm_model TEXT,
+  needs_review INTEGER NOT NULL DEFAULT 0,
+  dismiss_reason TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+INSERT INTO news_items_new
+  (id, url, url_hash, title, source, trust_tier, published_at, status, created_at)
+SELECT id, url, 'legacy-' || id, title, source, trust_tier, published_at, status,
+       datetime('now')
+FROM news_items;
+
+DROP TABLE news_items;
+
+ALTER TABLE news_items_new RENAME TO news_items;
+
+CREATE INDEX idx_news_items_status ON news_items (status);
+CREATE INDEX idx_news_items_trust_tier ON news_items (trust_tier);
+CREATE INDEX idx_news_items_created_at ON news_items (created_at);
+
+-- Feed registry + health tracking (written by the scheduled ingestor).
+CREATE TABLE sources (
+  name TEXT PRIMARY KEY,
+  feed_url TEXT NOT NULL,
+  trust_tier TEXT NOT NULL CHECK (trust_tier IN ('trusted', 'reputable', 'rumor')),
+  is_active INTEGER NOT NULL DEFAULT 1,
+  last_fetched_at TEXT,
+  last_status TEXT,
+  consecutive_failures INTEGER NOT NULL DEFAULT 0
+);
+
+-- Audit trail for adaptation status changes (owner promotions from the
+-- curation queue, and any future pipeline-suggested changes).
+CREATE TABLE adaptation_status_audit (
+  id INTEGER PRIMARY KEY,
+  adaptation_id INTEGER NOT NULL REFERENCES adaptations (id),
+  old_status TEXT NOT NULL,
+  new_status TEXT NOT NULL,
+  source_url TEXT,
+  news_item_id INTEGER REFERENCES news_items (id),
+  changed_by TEXT NOT NULL DEFAULT 'owner',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX idx_audit_adaptation_id ON adaptation_status_audit (adaptation_id);

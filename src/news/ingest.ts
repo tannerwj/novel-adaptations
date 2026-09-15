@@ -1,1 +1,382 @@
-LyoqCiAqIHNyYy9uZXdzL2luZ2VzdC50cyDigJQgYXV0b25vbW91cyBuZXdzIGluZ2VzdGlvbiAoUGhhc2UgMykuCiAqCiAqIE1lcmdlZCBmcm9tIHRoZSAvdG1wL25ld3MtcGlwZSBwcm90b3R5cGUuIFNjaGVkdWxlZCBkYWlseSBhdCAwNjowMCBVVEMKICogKCIwIDYgKiAqICoiIGluIHdyYW5nbGVyLnRvbWwpLiBEZXBlbmRlbmN5LWZyZWU6IGhhbmQtcm9sbGVkIFJTUyAyLjAvQXRvbQogKiBwYXJzaW5nLCBXZWIgQ3J5cHRvIGZvciBVUkwgaGFzaGluZy4KICoKICogUGVyIHJ1bjoKICogIDAuIEF1dG8tZGlzbWlzcyBTTEE6IHBlbmRpbmcgaXRlbXMgb2xkZXIgdGhhbiAzMCBkYXlzIGFyZSBkaXNtaXNzZWQuCiAqICAxLiBGZXRjaCBhbGwgOCBmZWVkcyBpbiBwYXJhbGxlbCAoMTVzIHRpbWVvdXQgZWFjaDsgb25lIGZhaWx1cmUgbmV2ZXIKICogICAgIGtpbGxzIHRoZSBydW4pLiBGZWVkIGhlYWx0aCBpcyByZWNvcmRlZCBpbiB0aGUgYHNvdXJjZXNgIHRhYmxlLgogKiAgMi4gUGFyc2Ug4oaSIG5vcm1hbGl6ZSDihpIgZGVkdXBlIChzaGEyNTYgb2YgY2Fub25pY2FsIFVSTDsgVU5JUVVFIGluIEQxKS4KICogIDMuIEtleXdvcmQgcHJlLWZpbHRlciBnYXRlcyB3aGljaCBpdGVtcyByZWFjaCB0aGUgTExNLgogKiAgNC4gQ2xhc3NpZnkgd2l0aCBXb3JrZXJzIEFJIChMbGFtYSAzLjEgOEIgSW5zdHJ1Y3QpIHRocm91Z2ggdGhlCiAqICAgICAibm92ZWwtYWRhcHRhdGlvbnMiIEFJIEdhdGV3YXkuIElmIHRoZSBMTE0gaXMgdW5hdmFpbGFibGUsIGZhbGwgYmFjawogKiAgICAgdG8ga2V5d29yZCBoZXVyaXN0aWNzIGFuZCBmbGFnIG5lZWRzX3Jldmlldz0xLgogKiAgNS4gSW5zZXJ0IHBlbmRpbmcgaXRlbXMgaW50byBEMSBgbmV3c19pdGVtc2AgZm9yIG93bmVyIGN1cmF0aW9uLgogKgogKiBGZWVkIGNvbnRlbnQgaXMgdW50cnVzdGVkIHRoaXJkLXBhcnR5IHRleHQ6IGl0IG9ubHkgZXZlciBnb2VzIGludG8gdGhlCiAqIExMTSdzICp1c2VyKiBtZXNzYWdlLCBvdXRwdXQgaXMgc2NoZW1hLXZhbGlkYXRlZCwgYW5kIGV4dHJhY3RlZCBzdHJpbmdzCiAqIGFyZSBzdG9yZWQgYXMgZGF0YSAoSFRNTC1lc2NhcGVkIG9uIHJlbmRlcikuIE5vIGZlZWQgY29udGVudCBldmVyIGJlY29tZXMKICogYW4gaW5zdHJ1Y3Rpb24gdG8gdGhlIHdvcmtlci4KICovCgpleHBvcnQgaW50ZXJmYWNlIE5ld3NFbnYgewogIERCOiBEMURhdGFiYXNlOwogIC8qKiBQcmVzZW50IGluIHByb2R1Y3Rpb247IG1heSBiZSBhYnNlbnQgaW4gbG9jYWwgZGV2IOKAlCBjb2RlIGRlZ3JhZGVzLiAqLwogIEFJPzogQWk7Cn0KCmludGVyZmFjZSBTb3VyY2UgewogIG5hbWU6IHN0cmluZzsKICBmZWVkX3VybDogc3RyaW5nOwogIHRydXN0X3RpZXI6ICd0cnVzdGVkJyB8ICdyZXB1dGFibGUnIHwgJ3J1bW9yJzsKfQoKLyoqIE93bmVyIGRlZmF1bHQ6IGFsbCA4IGZlZWRzIChzZWUgZG9jcy9ORVdTX1BJUEVMSU5FLm1kIMKnMikuICovCmV4cG9ydCBjb25zdCBTT1VSQ0VTOiBTb3VyY2VbXSA9IFsKICB7IG5hbWU6ICdEZWFkbGluZScsIGZlZWRfdXJsOiAnaHR0cHM6Ly9kZWFkbGluZS5jb20vZmVlZC8nLCB0cnVzdF90aWVyOiAndHJ1c3RlZCcgfSwKICB7IG5hbWU6ICdWYXJpZXR5JywgZmVlZF91cmw6ICdodHRwczovL3ZhcmlldHkuY29tL2ZlZWQvJywgdHJ1c3RfdGllcjogJ3RydXN0ZWQnIH0sCiAgeyBuYW1lOiAnVGhlIEhvbGx5d29vZCBSZXBvcnRlcicsIGZlZWRfdXJsOiAnaHR0cHM6Ly93d3cuaG9sbHl3b29kcmVwb3J0ZXIuY29tL2ZlZWQvJywgdHJ1c3RfdGllcjogJ3RydXN0ZWQnIH0sCiAgeyBuYW1lOiAnQ29sbGlkZXInLCBmZWVkX3VybDogJ2h0dHBzOi8vY29sbGlkZXIuY29tL2ZlZWQvJywgdHJ1c3RfdGllcjogJ3JlcHV0YWJsZScgfSwKICB7IG5hbWU6ICdTY3JlZW5SYW50JywgZmVlZF91cmw6ICdodHRwczovL3NjcmVlbnJhbnQuY29tL2ZlZWQvJywgdHJ1c3RfdGllcjogJ3JlcHV0YWJsZScgfSwKICB7IG5hbWU6ICdCb29rUmlvdCcsIGZlZWRfdXJsOiAnaHR0cHM6Ly9ib29rcmlvdC5jb20vZmVlZC8nLCB0cnVzdF90aWVyOiAncmVwdXRhYmxlJyB9LAogIHsgbmFtZTogJy9GaWxtJywgZmVlZF91cmw6ICdodHRwczovL3d3dy5zbGFzaGZpbG0uY29tL2ZlZWQvJywgdHJ1c3RfdGllcjogJ3JlcHV0YWJsZScgfSwKICB7IG5hbWU6ICdGbGlja2VyaW5nIE15dGgnLCBmZWVkX3VybDogJ2h0dHBzOi8vd3d3LmZsaWNrZXJpbmdteXRoLmNvbS9mZWVkLycsIHRydXN0X3RpZXI6ICdydW1vcicgfSwKXTsKCmNvbnN0IEFEQVBUQVRJT05fVEVSTVMgPSBbJ25vdmVsJywgJ2Jvb2snLCAnYWRhcHRhdGlvbicsICdiYXNlZCBvbicsICdvcHRpb25lZCcsICdyaWdodHMnLCAnYXV0aG9yJ107CmNvbnN0IFNDUkVFTl9URVJNUyA9IFsnZmlsbScsICdtb3ZpZScsICdzZXJpZXMnLCAnc2hvdycsICd0dicsICduZXRmbGl4JywgJ2h1bHUnLCAnYXBwbGUgdHYnLCAnY2FzdGluZycsICdkaXJlY3RvcicsICdzdHJlYW1pbmcnXTsKCmNvbnN0IFNZU1RFTV9QUk9NUFQgPSBgWW91IGFyZSBhIGNsYXNzaWZpZXIgZm9yIE5vdmVsIEFkYXB0YXRpb25zLCBhIHRyYWNrZXIgb2YgYm9va3MgYWRhcHRlZCBpbnRvIGZpbG1zIGFuZCBUViBzZXJpZXMuIEdpdmVuIGEgbmV3cyBoZWFkbGluZSBhbmQgc3VtbWFyeSwgZGVjaWRlIHdoZXRoZXIgaXQgaXMgYWJvdXQgYSBib29rIGJlaW5nIGFkYXB0ZWQgZm9yIHRoZSBzY3JlZW4uCgpSZXNwb25kIHdpdGggT05MWSBhIEpTT04gb2JqZWN0Ogp7ImlzX2FkYXB0YXRpb25fbmV3cyI6IHRydWV8ZmFsc2UsICJib29rX3RpdGxlIjogInRpdGxlIG9yIG51bGwiLCAiYXV0aG9yIjogImF1dGhvciBvciBudWxsIiwgInNjcmVlbl9raW5kIjogImZpbG0ifCJzZXJpZXMifCJ1bmtub3duIiwgInN0YXR1c19zaWduYWwiOiAicnVtb3JlZCJ8Im9wdGlvbmVkInwiaW5fZGV2ZWxvcG1lbnQifCJmaWxtaW5nInwicG9zdF9wcm9kdWN0aW9uInwicmVsZWFzZWQifCJub25lIiwgImNvbmZpZGVuY2UiOiAwLjAtMS4wLCAicmVhc29uIjogIm9uZSBzaG9ydCBzZW50ZW5jZSJ9CgpSdWxlczoKLSAiYmFzZWQgb24gdGhlIG5vdmVsIiwgImFkYXB0YXRpb24gb2YiLCAib3B0aW9uZWQgdGhlIHJpZ2h0cyIgLT4gaXNfYWRhcHRhdGlvbl9uZXdzIHRydWUuCi0gQ2FzdGluZy9zZXF1ZWwgbmV3cyBmb3IgYW4gZXhpc3RpbmcgYWRhcHRhdGlvbiAtPiB0cnVlLCBzdGF0dXNfc2lnbmFsIGZyb20gY29udGV4dC4KLSBCb29rIHJldmlld3MsIGF1dGhvciBpbnRlcnZpZXdzLCBib3gtb2ZmaWNlIHJlcG9ydHMgd2l0aCBubyBhZGFwdGF0aW9uIGFuZ2xlIC0+IGZhbHNlLgotIHN0YXR1c19zaWduYWwgInJ1bW9yZWQiIG9ubHkgd2hlbiB0aGUgdGV4dCBoZWRnZXMgKCJpbiB0YWxrcyIsICJleWVkIiwgInJlcG9ydGVkbHkiLCAiY291bGQiKS4KLSBjb25maWRlbmNlIDwgMC41IHN0YXlzIHBlbmRpbmcgYnV0IHNvcnRzIHRvIHRoZSBib3R0b20gb2YgdGhlIGN1cmF0aW9uIHF1ZXVlLmA7Cgpjb25zdCBNQVhfTExNX0NBTExTX1BFUl9SVU4gPSAxMDA7CmNvbnN0IEdBVEVXQVlfSUQgPSAnbm92ZWwtYWRhcHRhdGlvbnMnOwpjb25zdCBNT0RFTCA9ICdAY2YvbWV0YS9sbGFtYS0zLjEtOGItaW5zdHJ1Y3QnOwovKiogU3BlYyDCpzg6IHBlbmRpbmcgaXRlbXMgb2xkZXIgdGhhbiB0aGlzIGFyZSBhdXRvLWRpc21pc3NlZCBlYWNoIHJ1bi4gKi8KY29uc3QgUEVORElOR19TTEFfREFZUyA9IDMwOwoKaW50ZXJmYWNlIEZlZWRJdGVtIHsKICB0aXRsZTogc3RyaW5nOwogIHVybDogc3RyaW5nOwogIHN1bW1hcnk6IHN0cmluZzsKICBwdWJsaXNoZWRfYXQ6IHN0cmluZyB8IG51bGw7Cn0KCi8vIC0tLSB0aW55IFJTUyAyLjAgLyBBdG9tIHBhcnNlciAobm8gZGVwZW5kZW5jaWVzKSAtLS0KCmZ1bmN0aW9uIGV4dHJhY3RUYWcoeG1sOiBzdHJpbmcsIHRhZzogc3RyaW5nKTogc3RyaW5nIHsKICBjb25zdCBtID0geG1sLm1hdGNoKG5ldyBSZWdFeHAoYDwke3RhZ30oPzpcXHNbXj5dKik/PihbXFxzXFxTXSo/KTwvJHt0YWd9PmAsICdpJykpOwogIGlmICghbSkgcmV0dXJuICcnOwogIHJldHVybiBkZWNvZGVYbWxFbnRpdGllcyhzdHJpcENkYXRhKG1bMV0gPz8gJycpLnRyaW0oKSk7Cn0KCi8qKgogKiBEZWNvZGUgdGhlIFhNTCBlbnRpdGllcyBmZWVkcyBhY3R1YWxseSBlbWl0LiBgJmFtcDtgIGRlY29kZXMgbGFzdCBzbwogKiBgJmFtcDtsdDtgIGJlY29tZXMgYCZsdDtgLCBub3QgYDxgLiBXaXRob3V0IHRoaXMsIFVSTHMgY29udGFpbmluZwogKiBgJmFtcDtgIChlLmcuIGA/dXRtX3NvdXJjZT14JmFtcDt1dG1fbWVkaXVtPXJzc2ApIGNhbm9uaWNhbGl6ZSB3cm9uZwogKiBhbmQgdGhlIFVSTC1oYXNoIGRlZHVwZSBtaXNzZXMuCiAqLwpmdW5jdGlvbiBkZWNvZGVYbWxFbnRpdGllcyhzOiBzdHJpbmcpOiBzdHJpbmcgewogIHJldHVybiBzCiAgICAucmVwbGFjZSgvJmx0Oy9nLCAnPCcpCiAgICAucmVwbGFjZSgvJmd0Oy9nLCAnPicpCiAgICAucmVwbGFjZSgvJnF1b3Q7L2csICciJykKICAgIC5yZXBsYWNlKC8mIzM5O3wmYXBvczsvZywgIiciKQogICAgLnJlcGxhY2UoLyZhbXA7L2csICcmJyk7Cn0KCmZ1bmN0aW9uIHN0cmlwQ2RhdGEoczogc3RyaW5nKTogc3RyaW5nIHsKICByZXR1cm4gcy5yZXBsYWNlKC88IVxbQ0RBVEFcWyhbXHNcU10qPylcXVxdPi9nLCAnJDEnKTsKfQoKZnVuY3Rpb24gc3RyaXBIdG1sKHM6IHN0cmluZyk6IHN0cmluZyB7CiAgcmV0dXJuIHMucmVwbGFjZSgvPFtePl0rPi9nLCAnICcpLnJlcGxhY2UoL1xzKy9nLCAnICcpLnRyaW0oKTsKfQoKZnVuY3Rpb24gcGFyc2VGZWVkKHhtbDogc3RyaW5nKTogRmVlZEl0ZW1bXSB7CiAgY29uc3QgaXRlbXM6IEZlZWRJdGVtW10gPSBbXTsKICAvLyBSU1MgMi4wCiAgY29uc3QgcnNzQmxvY2tzID0geG1sLm1hdGNoKC88aXRlbVtccz5dW1xzXFNdKj88XC9pdGVtPi9naSkgPz8gW107CiAgZm9yIChjb25zdCBiIG9mIHJzc0Jsb2NrcykgewogICAgY29uc3QgbGluayA9IGV4dHJhY3RUYWcoYiwgJ2xpbmsnKSB8fCBleHRyYWN0VGFnKGIsICdndWlkJyk7CiAgICBpZiAoIWxpbmspIGNvbnRpbnVlOwogICAgaXRlbXMucHVzaCh7CiAgICAgIHRpdGxlOiBzdHJpcEh0bWwoZXh0cmFjdFRhZyhiLCAndGl0bGUnKSksCiAgICAgIHVybDogbGluay50cmltKCksCiAgICAgIHN1bW1hcnk6IHN0cmlwSHRtbChleHRyYWN0VGFnKGIsICdkZXNjcmlwdGlvbicpKS5zbGljZSgwLCAxMDAwKSwKICAgICAgcHVibGlzaGVkX2F0OiBleHRyYWN0VGFnKGIsICdwdWJEYXRlJykgfHwgbnVsbCwKICAgIH0pOwogIH0KICAvLyBBdG9tCiAgaWYgKGl0ZW1zLmxlbmd0aCA9PT0gMCkgewogICAgY29uc3QgZW50cnlCbG9ja3MgPSB4bWwubWF0Y2goLzxlbnRyeVtccz5dW1xzXFNdKj88XC9lbnRyeT4vZ2kpID8/IFtdOwogICAgZm9yIChjb25zdCBiIG9mIGVudHJ5QmxvY2tzKSB7CiAgICAgIGNvbnN0IGxpbmtNID0gYi5tYXRjaCgvPGxpbmtbXj5dKmhyZWY9IihbXiJdKykiL2kpOwogICAgICBjb25zdCBsaW5rID0gbGlua00/LlsxXSA/PyAnJzsKICAgICAgaWYgKCFsaW5rKSBjb250aW51ZTsKICAgICAgaXRlbXMucHVzaCh7CiAgICAgICAgdGl0bGU6IHN0cmlwSHRtbChleHRyYWN0VGFnKGIsICd0aXRsZScpKSwKICAgICAgICB1cmw6IGxpbmsudHJpbSgpLAogICAgICAgIHN1bW1hcnk6IHN0cmlwSHRtbChleHRyYWN0VGFnKGIsICdzdW1tYXJ5JykgfHwgZXh0cmFjdFRhZyhiLCAnY29udGVudCcpKS5zbGljZSgwLCAxMDAwKSwKICAgICAgICBwdWJsaXNoZWRfYXQ6IGV4dHJhY3RUYWcoYiwgJ3B1Ymxpc2hlZCcpIHx8IGV4dHJhY3RUYWcoYiwgJ3VwZGF0ZWQnKSB8fCBudWxsLAogICAgICB9KTsKICAgIH0KICB9CiAgcmV0dXJuIGl0ZW1zOwp9CgovLyAtLS0gaGVscGVycyAtLS0KCmFzeW5jIGZ1bmN0aW9uIHNoYTI1NkhleChzOiBzdHJpbmcpOiBQcm9taXNlPHN0cmluZz4gewogIGNvbnN0IGJ1ZiA9IGF3YWl0IGNyeXB0by5zdWJ0bGUuZGlnZXN0KCdTSEEtMjU2JywgbmV3IFRleHRFbmNvZGVyKCkuZW5jb2RlKHMpKTsKICByZXR1cm4gWy4uLm5ldyBVaW50OEFycmF5KGJ1ZildLm1hcCgoYikgPT4gYi50b1N0cmluZygxNikucGFkU3RhcnQoMiwgJzAnKSkuam9pbignJyk7Cn0KCmZ1bmN0aW9uIGNhbm9uaWNhbFVybCh1cmw6IHN0cmluZyk6IHN0cmluZyB7CiAgdHJ5IHsKICAgIGNvbnN0IHUgPSBuZXcgVVJMKHVybCk7CiAgICBmb3IgKGNvbnN0IHAgb2YgWy4uLnUuc2VhcmNoUGFyYW1zLmtleXMoKV0pIHsKICAgICAgaWYgKC9eKHV0bV98ZmJjbGlkfGdjbGlkfG1jXykvaS50ZXN0KHApKSB1LnNlYXJjaFBhcmFtcy5kZWxldGUocCk7CiAgICB9CiAgICByZXR1cm4gdS50b1N0cmluZygpOwogIH0gY2F0Y2ggewogICAgcmV0dXJuIHVybDsKICB9Cn0KCmZ1bmN0aW9uIGtleXdvcmRHYXRlKHRleHQ6IHN0cmluZyk6IGJvb2xlYW4gewogIGNvbnN0IHQgPSB0ZXh0LnRvTG93ZXJDYXNlKCk7CiAgcmV0dXJuIEFEQVBUQVRJT05fVEVSTVMuc29tZSgodykgPT4gdC5pbmNsdWRlcyh3KSkgJiYgU0NSRUVOX1RFUk1TLnNvbWUoKHcpID0+IHQuaW5jbHVkZXModykpOwp9CgovKiogU3BlYyDCpzQuMSBzZWNvbmRhcnkgZGVkdXBlOiBzYW1lIHN0b3J5IHJlLXBvc3RlZCB1bmRlciBhIG5ldyBVUkwuICovCmZ1bmN0aW9uIG5vcm1hbGl6ZVRpdGxlKHQ6IHN0cmluZyk6IHN0cmluZyB7CiAgcmV0dXJuIHQudG9Mb3dlckNhc2UoKS5yZXBsYWNlKC9bXmEtejAtOV0rL2csICcgJykudHJpbSgpOwp9CgpmdW5jdGlvbiBoZXVyaXN0aWNTY29yZSh0ZXh0OiBzdHJpbmcpOiBudW1iZXIgewogIGNvbnN0IHQgPSB0ZXh0LnRvTG93ZXJDYXNlKCk7CiAgbGV0IHNjb3JlID0gMDsKICBmb3IgKGNvbnN0IHAgb2YgWydiYXNlZCBvbiB0aGUgbm92ZWwnLCAnYmFzZWQgb24gdGhlIGJvb2snLCAnYWRhcHRhdGlvbiBvZiddKSBpZiAodC5pbmNsdWRlcyhwKSkgc2NvcmUgKz0gMjsKICBmb3IgKGNvbnN0IHAgb2YgWydvcHRpb25lZCcsICdmaWxtIHJpZ2h0cycsICd0diByaWdodHMnLCAnaW4gZGV2ZWxvcG1lbnQnLCAnY2FzdGluZycsICd0byBkaXJlY3QnLCAnc2hvd3J1bm5lcicsICdsaW1pdGVkIHNlcmllcyddKSBpZiAodC5pbmNsdWRlcyhwKSkgc2NvcmUgKz0gMTsKICBmb3IgKGNvbnN0IHAgb2YgWydyZXZpZXc6JywgJ2ludGVydmlldycsICdib3ggb2ZmaWNlJ10pIGlmICh0LmluY2x1ZGVzKHApKSBzY29yZSAtPSAyOwogIHJldHVybiBzY29yZTsKfQoKaW50ZXJmYWNlIENsYXNzaWZpY2F0aW9uIHsKICBpc19hZGFwdGF0aW9uX25ld3M6IGJvb2xlYW47CiAgYm9va190aXRsZTogc3RyaW5nIHwgbnVsbDsKICBhdXRob3I6IHN0cmluZyB8IG51bGw7CiAgc2NyZWVuX2tpbmQ6IHN0cmluZzsKICBzdGF0dXNfc2lnbmFsOiBzdHJpbmc7CiAgY29uZmlkZW5jZTogbnVtYmVyOwogIHJlYXNvbjogc3RyaW5nOwp9CgpmdW5jdGlvbiB2YWxpZGF0ZUNsYXNzaWZpY2F0aW9uKHJhdzogdW5rbm93bik6IENsYXNzaWZpY2F0aW9uIHwgbnVsbCB7CiAgaWYgKHR5cGVvZiByYXcgIT09ICdvYmplY3QnIHx8IHJhdyA9PT0gbnVsbCkgcmV0dXJuIG51bGw7CiAgY29uc3QgbyA9IHJhdyBhcyBSZWNvcmQ8c3RyaW5nLCB1bmtub3duPjsKICBpZiAodHlwZW9mIG8uaXNfYWRhcHRhdGlvbl9uZXdzICE9PSAnYm9vbGVhbicpIHJldHVybiBudWxsOwogIGNvbnN0IGNvbmYgPSB0eXBlb2Ygby5jb25maWRlbmNlID09PSAnbnVtYmVyJyA/IE1hdGgubWluKDEsIE1hdGgubWF4KDAsIG8uY29uZmlkZW5jZSkpIDogMDsKICBjb25zdCBraW5kcyA9IFsnZmlsbScsICdzZXJpZXMnLCAndW5rbm93biddOwogIGNvbnN0IHNpZ25hbHMgPSBbJ3J1bW9yZWQnLCAnb3B0aW9uZWQnLCAnaW5fZGV2ZWxvcG1lbnQnLCAnZmlsbWluZycsICdwb3N0X3Byb2R1Y3Rpb24nLCAncmVsZWFzZWQnLCAnbm9uZSddOwogIHJldHVybiB7CiAgICBpc19hZGFwdGF0aW9uX25ld3M6IG8uaXNfYWRhcHRhdGlvbl9uZXdzLAogICAgYm9va190aXRsZTogdHlwZW9mIG8uYm9va190aXRsZSA9PT0gJ3N0cmluZycgPyBvLmJvb2tfdGl0bGUuc2xpY2UoMCwgMzAwKSA6IG51bGwsCiAgICBhdXRob3I6IHR5cGVvZiBvLmF1dGhvciA9PT0gJ3N0cmluZycgPyBvLmF1dGhvci5zbGljZSgwLCAzMDApIDogbnVsbCwKICAgIHNjcmVlbl9raW5kOiBraW5kcy5pbmNsdWRlcyhvLnNjcmVlbl9raW5kIGFzIHN0cmluZykgPyAoby5zY3JlZW5fa2luZCBhcyBzdHJpbmcpIDogJ3Vua25vd24nLAogICAgc3RhdHVzX3NpZ25hbDogc2lnbmFscy5pbmNsdWRlcyhvLnN0YXR1c19zaWduYWwgYXMgc3RyaW5nKSA/IChvLnN0YXR1c19zaWduYWwgYXMgc3RyaW5nKSA6ICdub25lJywKICAgIGNvbmZpZGVuY2U6IGNvbmYsCiAgICByZWFzb246IHR5cGVvZiBvLnJlYXNvbiA9PT0gJ3N0cmluZycgPyBvLnJlYXNvbi5zbGljZSgwLCA1MDApIDogJycsCiAgfTsKfQoKYXN5bmMgZnVuY3Rpb24gY2xhc3NpZnlXaXRoTExNKAogIGVudjogTmV3c0VudiwKICB0aXRsZTogc3RyaW5nLAogIHN1bW1hcnk6IHN0cmluZywKKTogUHJvbWlzZTx7IGM6IENsYXNzaWZpY2F0aW9uIHwgbnVsbDsgZmFpbGVkOiBib29sZWFuIH0+IHsKICB0cnkgewogICAgaWYgKCFlbnYuQUkpIHRocm93IG5ldyBFcnJvcignQUkgYmluZGluZyB1bmF2YWlsYWJsZScpOwogICAgY29uc3QgcmVzID0gKGF3YWl0IGVudi5BSS5ydW4oCiAgICAgIE1PREVMLAogICAgICB7CiAgICAgICAgbWVzc2FnZXM6IFsKICAgICAgICAgIHsgcm9sZTogJ3N5c3RlbScsIGNvbnRlbnQ6IFNZU1RFTV9QUk9NUFQgfSwKICAgICAgICAgIHsgcm9sZTogJ3VzZXInLCBjb250ZW50OiBgVElUTEU6ICR7dGl0bGV9XG5TVU1NQVJZOiAke3N1bW1hcnl9YCB9LAogICAgICAgIF0sCiAgICAgICAgbWF4X3Rva2VuczogMzAwLAogICAgICAgIHRlbXBlcmF0dXJlOiAwLAogICAgICB9LAogICAgICB7IGdhdGV3YXk6IHsgaWQ6IEdBVEVXQVlfSUQsIHNraXBDYWNoZTogZmFsc2UgfSB9LAogICAgKSkgYXMgeyByZXNwb25zZT86IHN0cmluZyB9OwogICAgY29uc3QgdGV4dCA9IChyZXMucmVzcG9uc2UgPz8gJycpLnRyaW0oKS5yZXBsYWNlKC9eYGBganNvbj9ccyp8XHMqYGBgJC9nLCAnJyk7CiAgICByZXR1cm4geyBjOiB2YWxpZGF0ZUNsYXNzaWZpY2F0aW9uKEpTT04ucGFyc2UodGV4dCkpLCBmYWlsZWQ6IGZhbHNlIH07CiAgfSBjYXRjaCAoZSkgewogICAgY29uc29sZS5lcnJvcignTExNIGNsYXNzaWZpY2F0aW9uIGZhaWxlZCwgdXNpbmcgaGV1cmlzdGljczonLCAoZSBhcyBFcnJvcikubWVzc2FnZSk7CiAgICByZXR1cm4geyBjOiBudWxsLCBmYWlsZWQ6IHRydWUgfTsKICB9Cn0KCi8qKgogKiBUaGUgc2NoZWR1bGVkIGVudHJ5IHBvaW50LCB3aXJlZCBpbnRvIHNyYy9pbmRleC50c3gncyBkZWZhdWx0IGV4cG9ydC4KICogSWRlbXBvdGVudDogcmUtcnVubmluZyB0aGUgc2FtZSBkYXkgaW5zZXJ0cyBub3RoaW5nIG5ldy4KICovCmV4cG9ydCBhc3luYyBmdW5jdGlvbiBzY2hlZHVsZWROZXdzUnVuKGVudjogTmV3c0Vudik6IFByb21pc2U8dm9pZD4gewogIC8vIFN0ZXAgMCDigJQgU0xBOiBhdXRvLWRpc21pc3MgcGVuZGluZyBpdGVtcyBvbGRlciB0aGFuIDMwIGRheXMgKHNwZWMgwqc4KS4KICBjb25zdCBzbGEgPSBhd2FpdCBlbnYuREIucHJlcGFyZSgKICAgIGBVUERBVEUgbmV3c19pdGVtcyBTRVQgc3RhdHVzID0gJ2Rpc21pc3NlZCcsIGRpc21pc3NfcmVhc29uID0gJ2F1dG8tZGlzbWlzc2VkOiBwZW5kaW5nID4gMzAgZGF5cycKICAgICBXSEVSRSBzdGF0dXMgPSAncGVuZGluZycgQU5EIGNyZWF0ZWRfYXQgPCBkYXRldGltZSgnbm93JywgPzEpYCwKICApCiAgICAuYmluZChgLSR7UEVORElOR19TTEFfREFZU30gZGF5c2ApCiAgICAucnVuKCk7CiAgaWYgKChzbGEubWV0YT8uY2hhbmdlcyA/PyAwKSA+IDApIHsKICAgIGNvbnNvbGUubG9nKGBTTEEgYXV0by1kaXNtaXNzZWQgJHtzbGEubWV0YS5jaGFuZ2VzfSBzdGFsZSBwZW5kaW5nIGl0ZW1zYCk7CiAgfQoKICBsZXQgbGxtQ2FsbHMgPSAwOwogIGxldCBpbnNlcnRlZCA9IDA7CgogIC8vIFNlY29uZGFyeSBkZWR1cGUgKHNwZWMgwqc0LjEpOiBub3JtYWxpemVkIHRpdGxlcyBzZWVuIGluIHRoZSBsYXN0IDcgZGF5cy4KICBjb25zdCByZWNlbnRSb3dzID0gYXdhaXQgZW52LkRCLnByZXBhcmUoCiAgICBgU0VMRUNUIHRpdGxlIEZST00gbmV3c19pdGVtcyBXSEVSRSBjcmVhdGVkX2F0ID4gZGF0ZXRpbWUoJ25vdycsICctNyBkYXlzJylgLAogICkuYWxsPHsgdGl0bGU6IHN0cmluZyB9PigpOwogIGNvbnN0IHJlY2VudFRpdGxlcyA9IG5ldyBTZXQoKHJlY2VudFJvd3MucmVzdWx0cyA/PyBbXSkubWFwKChyKSA9PiBub3JtYWxpemVUaXRsZShyLnRpdGxlKSkpOwoKICBjb25zdCByZXN1bHRzID0gYXdhaXQgUHJvbWlzZS5hbGxTZXR0bGVkKAogICAgU09VUkNFUy5tYXAoYXN5bmMgKHNyYykgPT4gewogICAgICBjb25zdCBjdHJsID0gbmV3IEFib3J0Q29udHJvbGxlcigpOwogICAgICBjb25zdCB0ID0gc2V0VGltZW91dCgoKSA9PiBjdHJsLmFib3J0KCksIDE1MDAwKTsKICAgICAgdHJ5IHsKICAgICAgICBjb25zdCByZXNwID0gYXdhaXQgZmV0Y2goc3JjLmZlZWRfdXJsLCB7CiAgICAgICAgICBzaWduYWw6IGN0cmwuc2lnbmFsLAogICAgICAgICAgaGVhZGVyczogeyAnVXNlci1BZ2VudCc6ICdOb3ZlbEFkYXB0YXRpb25zQm90LzEuMCAoK2h0dHBzOi8vbm92ZWxhZGFwdGF0aW9ucy5jb20pJyB9LAogICAgICAgIH0pOwogICAgICAgIGlmICghcmVzcC5vaykgdGhyb3cgbmV3IEVycm9yKGBIVFRQICR7cmVzcC5zdGF0dXN9YCk7CiAgICAgICAgY29uc3QgeG1sID0gYXdhaXQgcmVzcC50ZXh0KCk7CiAgICAgICAgY29uc3QgaXRlbXMgPSBwYXJzZUZlZWQoeG1sKTsKICAgICAgICBhd2FpdCBlbnYuREIucHJlcGFyZSgKICAgICAgICAgIGBJTlNFUlQgSU5UTyBzb3VyY2VzIChuYW1lLCBmZWVkX3VybCwgdHJ1c3RfdGllciwgbGFzdF9mZXRjaGVkX2F0LCBsYXN0X3N0YXR1cywgY29uc2VjdXRpdmVfZmFpbHVyZXMpCiAgICAgICAgICAgVkFMVUVTICg/LCA/LCA/LCBkYXRldGltZSgnbm93JyksICdvaycsIDApCiAgICAgICAgICAgT04gQ09ORkxJQ1QobmFtZSkgRE8gVVBEQVRFIFNFVCBsYXN0X2ZldGNoZWRfYXQ9ZGF0ZXRpbWUoJ25vdycpLCBsYXN0X3N0YXR1cz0nb2snLCBjb25zZWN1dGl2ZV9mYWlsdXJlcz0wYCwKICAgICAgICApCiAgICAgICAgICAuYmluZChzcmMubmFtZSwgc3JjLmZlZWRfdXJsLCBzcmMudHJ1c3RfdGllcikKICAgICAgICAgIC5ydW4oKTsKICAgICAgICByZXR1cm4geyBzcmMsIGl0ZW1zIH07CiAgICAgIH0gY2F0Y2ggKGUpIHsKICAgICAgICBhd2FpdCBlbnYuREIucHJlcGFyZSgKICAgICAgICAgIGBJTlNFUlQgSU5UTyBzb3VyY2VzIChuYW1lLCBmZWVkX3VybCwgdHJ1c3RfdGllciwgbGFzdF9zdGF0dXMsIGNvbnNlY3V0aXZlX2ZhaWx1cmVzKQogICAgICAgICAgIFZBTFVFUyAoPywgPywgPywgJ2Vycm9yJywgMSkKICAgICAgICAgICBPTiBDT05GTElDVChuYW1lKSBETyBVUERBVEUgU0VUIGxhc3Rfc3RhdHVzPSdlcnJvcicsCiAgICAgICAgICAgICBjb25zZWN1dGl2ZV9mYWlsdXJlcyA9IGNvbnNlY3V0aXZlX2ZhaWx1cmVzICsgMSwKICAgICAgICAgICAgIGlzX2FjdGl2ZSA9IENBU0UgV0hFTiBjb25zZWN1dGl2ZV9mYWlsdXJlcyArIDEgPj0gNSBUSEVOIDAgRUxTRSBpc19hY3RpdmUgRU5EYCwKICAgICAgICApCiAgICAgICAgICAuYmluZChzcmMubmFtZSwgc3JjLmZlZWRfdXJsLCBzcmMudHJ1c3RfdGllcikKICAgICAgICAgIC5ydW4oKTsKICAgICAgICBjb25zb2xlLmVycm9yKGBGZWVkIGZhaWxlZDogJHtzcmMubmFtZX06YCwgKGUgYXMgRXJyb3IpLm1lc3NhZ2UpOwogICAgICAgIHJldHVybiB7IHNyYywgaXRlbXM6IFtdIGFzIEZlZWRJdGVtW10gfTsKICAgICAgfSBmaW5hbGx5IHsKICAgICAgICBjbGVhclRpbWVvdXQodCk7CiAgICAgIH0KICAgIH0pLAogICk7CgogIGZvciAoY29uc3QgciBvZiByZXN1bHRzKSB7CiAgICBpZiAoci5zdGF0dXMgIT09ICdmdWxmaWxsZWQnKSBjb250aW51ZTsKICAgIGNvbnN0IHsgc3JjLCBpdGVtcyB9ID0gci52YWx1ZTsKICAgIGZvciAoY29uc3QgaXRlbSBvZiBpdGVtcykgewogICAgICBpZiAoIWl0ZW0udGl0bGUgfHwgIWl0ZW0udXJsKSBjb250aW51ZTsKICAgICAgY29uc3QgdXJsID0gY2Fub25pY2FsVXJsKGl0ZW0udXJsKTsKICAgICAgY29uc3QgdXJsSGFzaCA9IGF3YWl0IHNoYTI1NkhleCh1cmwpOwogICAgICBjb25zdCBzZWVuID0gYXdhaXQgZW52LkRCLnByZXBhcmUoJ1NFTEVDVCAxIEZST00gbmV3c19pdGVtcyBXSEVSRSB1cmxfaGFzaCA9ID8nKS5iaW5kKHVybEhhc2gpLmZpcnN0KCk7CiAgICAgIGlmIChzZWVuKSBjb250aW51ZTsgLy8gZGVkdXBlOiBwcmltYXJ5IGtleSBpcyB0aGUgVVJMIGhhc2gKICAgICAgY29uc3QgdGl0bGVOb3JtID0gbm9ybWFsaXplVGl0bGUoaXRlbS50aXRsZSk7CiAgICAgIGlmIChyZWNlbnRUaXRsZXMuaGFzKHRpdGxlTm9ybSkpIGNvbnRpbnVlOyAvLyBkZWR1cGU6IHNhbWUgdGl0bGUsIG5ldyBVUkwKCiAgICAgIGNvbnN0IHRleHQgPSBgJHtpdGVtLnRpdGxlfSAke2l0ZW0uc3VtbWFyeX1gOwogICAgICBjb25zdCBwYXNzZXNHYXRlID0ga2V5d29yZEdhdGUodGV4dCk7CgogICAgICBsZXQgY2xzOiBDbGFzc2lmaWNhdGlvbjsKICAgICAgbGV0IGxsbU1vZGVsID0gJ25vbmUnOwogICAgICBsZXQgbmVlZHNSZXZpZXcgPSAwOwoKICAgICAgaWYgKHBhc3Nlc0dhdGUgJiYgbGxtQ2FsbHMgPCBNQVhfTExNX0NBTExTX1BFUl9SVU4pIHsKICAgICAgICBsbG1DYWxscysrOwogICAgICAgIGNvbnN0IHsgYywgZmFpbGVkIH0gPSBhd2FpdCBjbGFzc2lmeVdpdGhMTE0oZW52LCBpdGVtLnRpdGxlLCBpdGVtLnN1bW1hcnkpOwogICAgICAgIGlmICghZmFpbGVkICYmIGMpIHsKICAgICAgICAgIGNscyA9IGM7CiAgICAgICAgICBsbG1Nb2RlbCA9IE1PREVMOwogICAgICAgIH0gZWxzZSB7CiAgICAgICAgICAvLyBGYWxsYmFjazoga2V5d29yZCBoZXVyaXN0aWNzCiAgICAgICAgICBjb25zdCBzID0gaGV1cmlzdGljU2NvcmUodGV4dCk7CiAgICAgICAgICBjbHMgPSB7CiAgICAgICAgICAgIGlzX2FkYXB0YXRpb25fbmV3czogcyA+PSAyLAogICAgICAgICAgICBib29rX3RpdGxlOiBudWxsLAogICAgICAgICAgICBhdXRob3I6IG51bGwsCiAgICAgICAgICAgIHNjcmVlbl9raW5kOiAndW5rbm93bicsCiAgICAgICAgICAgIHN0YXR1c19zaWduYWw6ICdub25lJywKICAgICAgICAgICAgY29uZmlkZW5jZTogMC4zLAogICAgICAgICAgICByZWFzb246ICdoZXVyaXN0aWMgZmFsbGJhY2sgKExMTSB1bmF2YWlsYWJsZSknLAogICAgICAgICAgfTsKICAgICAgICAgIGxsbU1vZGVsID0gJ2hldXJpc3RpYyc7CiAgICAgICAgICBuZWVkc1JldmlldyA9IDE7CiAgICAgICAgfQogICAgICB9IGVsc2UgewogICAgICAgIC8vIEJlbG93IHRoZSBrZXl3b3JkIGdhdGUgKG9yIG92ZXIgdGhlIHBlci1ydW4gTExNIGNhcCk6IHJlY29yZCBhcwogICAgICAgIC8vIG5vbi1hZGFwdGF0aW9uIHdpdGhvdXQgc3BlbmRpbmcgaW5mZXJlbmNlLgogICAgICAgIGNscyA9IHsKICAgICAgICAgIGlzX2FkYXB0YXRpb25fbmV3czogZmFsc2UsCiAgICAgICAgICBib29rX3RpdGxlOiBudWxsLAogICAgICAgICAgYXV0aG9yOiBudWxsLAogICAgICAgICAgc2NyZWVuX2tpbmQ6ICd1bmtub3duJywKICAgICAgICAgIHN0YXR1c19zaWduYWw6ICdub25lJywKICAgICAgICAgIGNvbmZpZGVuY2U6IDAuOSwKICAgICAgICAgIHJlYXNvbjogcGFzc2VzR2F0ZSA/ICdkZWZlcnJlZDogcGVyLXJ1biBMTE0gY2FwIHJlYWNoZWQnIDogJ2JlbG93IGtleXdvcmQgZ2F0ZScsCiAgICAgICAgfTsKICAgICAgICBsbG1Nb2RlbCA9ICdwcmVmaWx0ZXInOwogICAgICB9CgogICAgICBhd2FpdCBlbnYuREIucHJlcGFyZSgKICAgICAgICBgSU5TRVJUIE9SIElHTk9SRSBJTlRPIG5ld3NfaXRlbXMKICAgICAgICAgICAodXJsLCB1cmxfaGFzaCwgdGl0bGUsIHN1bW1hcnksIHNvdXJjZSwgdHJ1c3RfdGllciwgcHVibGlzaGVkX2F0LAogICAgICAgICAgICBzdGF0dXMsIGlzX2FkYXB0YXRpb25fbmV3cywgYm9va190aXRsZSwgYXV0aG9yLCBzY3JlZW5fa2luZCwKICAgICAgICAgICAgc3RhdHVzX3NpZ25hbCwgY29uZmlkZW5jZSwgbGxtX21vZGVsLCBuZWVkc19yZXZpZXcpCiAgICAgICAgIFZBTFVFUyAoPywgPywgPywgPywgPywgPywgPywgJ3BlbmRpbmcnLCA/LCA/LCA/LCA/LCA/LCA/LCA/LCA/KWAsCiAgICAgICkKICAgICAgICAuYmluZCgKICAgICAgICAgIHVybCwKICAgICAgICAgIHVybEhhc2gsCiAgICAgICAgICBpdGVtLnRpdGxlLnNsaWNlKDAsIDUwMCksCiAgICAgICAgICBpdGVtLnN1bW1hcnksCiAgICAgICAgICBzcmMubmFtZSwKICAgICAgICAgIHNyYy50cnVzdF90aWVyLAogICAgICAgICAgaXRlbS5wdWJsaXNoZWRfYXQsCiAgICAgICAgICBjbHMuaXNfYWRhcHRhdGlvbl9uZXdzID8gMSA6IDAsCiAgICAgICAgICBjbHMuYm9va190aXRsZSwKICAgICAgICAgIGNscy5hdXRob3IsCiAgICAgICAgICBjbHMuc2NyZWVuX2tpbmQsCiAgICAgICAgICBjbHMuc3RhdHVzX3NpZ25hbCwKICAgICAgICAgIGNscy5jb25maWRlbmNlLAogICAgICAgICAgbGxtTW9kZWwsCiAgICAgICAgICBuZWVkc1JldmlldywKICAgICAgICApCiAgICAgICAgLnJ1bigpOwogICAgICByZWNlbnRUaXRsZXMuYWRkKHRpdGxlTm9ybSk7CiAgICAgIGluc2VydGVkKys7CiAgICB9CiAgfQoKICBjb25zb2xlLmxvZyhgbmV3cyBydW4gY29tcGxldGU6ICR7aW5zZXJ0ZWR9IGl0ZW1zIGluc2VydGVkLCAke2xsbUNhbGxzfSBMTE0gY2FsbHNgKTsKfQo=
+/**
+ * src/news/ingest.ts — autonomous news ingestion (Phase 3).
+ *
+ * Merged from the /tmp/news-pipe prototype. Scheduled daily at 06:00 UTC
+ * ("0 6 * * *" in wrangler.toml). Dependency-free: hand-rolled RSS 2.0/Atom
+ * parsing, Web Crypto for URL hashing.
+ *
+ * Per run:
+ *  0. Auto-dismiss SLA: pending items older than 30 days are dismissed.
+ *  1. Fetch all 8 feeds in parallel (15s timeout each; one failure never
+ *     kills the run). Feed health is recorded in the `sources` table.
+ *  2. Parse → normalize → dedupe (sha256 of canonical URL; UNIQUE in D1).
+ *  3. Keyword pre-filter gates which items reach the LLM.
+ *  4. Classify with Workers AI (Llama 3.1 8B Instruct) through the
+ *     "novel-adaptations" AI Gateway. If the LLM is unavailable, fall back
+ *     to keyword heuristics and flag needs_review=1.
+ *  5. Insert pending items into D1 `news_items` for owner curation.
+ *
+ * Feed content is untrusted third-party text: it only ever goes into the
+ * LLM's *user* message, output is schema-validated, and extracted strings
+ * are stored as data (HTML-escaped on render). No feed content ever becomes
+ * an instruction to the worker.
+ */
+
+export interface NewsEnv {
+  DB: D1Database;
+  /** Present in production; may be absent in local dev — code degrades. */
+  AI?: Ai;
+}
+
+interface Source {
+  name: string;
+  feed_url: string;
+  trust_tier: 'trusted' | 'reputable' | 'rumor';
+}
+
+/** Owner default: all 8 feeds (see docs/NEWS_PIPELINE.md §2). */
+export const SOURCES: Source[] = [
+  { name: 'Deadline', feed_url: 'https://deadline.com/feed/', trust_tier: 'trusted' },
+  { name: 'Variety', feed_url: 'https://variety.com/feed/', trust_tier: 'trusted' },
+  { name: 'The Hollywood Reporter', feed_url: 'https://www.hollywoodreporter.com/feed/', trust_tier: 'trusted' },
+  { name: 'Collider', feed_url: 'https://collider.com/feed/', trust_tier: 'reputable' },
+  { name: 'ScreenRant', feed_url: 'https://screenrant.com/feed/', trust_tier: 'reputable' },
+  { name: 'BookRiot', feed_url: 'https://bookriot.com/feed/', trust_tier: 'reputable' },
+  { name: '/Film', feed_url: 'https://www.slashfilm.com/feed/', trust_tier: 'reputable' },
+  { name: 'Flickering Myth', feed_url: 'https://www.flickeringmyth.com/feed/', trust_tier: 'rumor' },
+];
+
+const ADAPTATION_TERMS = ['novel', 'book', 'adaptation', 'based on', 'optioned', 'rights', 'author'];
+const SCREEN_TERMS = ['film', 'movie', 'series', 'show', 'tv', 'netflix', 'hulu', 'apple tv', 'casting', 'director', 'streaming'];
+
+const SYSTEM_PROMPT = `You are a classifier for Novel Adaptations, a tracker of books adapted into films and TV series. Given a news headline and summary, decide whether it is about a book being adapted for the screen.
+
+Respond with ONLY a JSON object:
+{"is_adaptation_news": true|false, "book_title": "title or null", "author": "author or null", "screen_kind": "film"|"series"|"unknown", "status_signal": "rumored"|"optioned"|"in_development"|"filming"|"post_production"|"released"|"none", "confidence": 0.0-1.0, "reason": "one short sentence"}
+
+Rules:
+- "based on the novel", "adaptation of", "optioned the rights" -> is_adaptation_news true.
+- Casting/sequel news for an existing adaptation -> true, status_signal from context.
+- Book reviews, author interviews, box-office reports with no adaptation angle -> false.
+- status_signal "rumored" only when the text hedges ("in talks", "eyed", "reportedly", "could").
+- confidence < 0.5 stays pending but sorts to the bottom of the curation queue.`;
+
+const MAX_LLM_CALLS_PER_RUN = 100;
+const GATEWAY_ID = 'novel-adaptations';
+const MODEL = '@cf/meta/llama-3.1-8b-instruct';
+/** Spec §8: pending items older than this are auto-dismissed each run. */
+const PENDING_SLA_DAYS = 30;
+
+interface FeedItem {
+  title: string;
+  url: string;
+  summary: string;
+  published_at: string | null;
+}
+
+// --- tiny RSS 2.0 / Atom parser (no dependencies) ---
+
+function extractTag(xml: string, tag: string): string {
+  const m = xml.match(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, 'i'));
+  if (!m) return '';
+  return decodeXmlEntities(stripCdata(m[1] ?? '').trim());
+}
+
+/**
+ * Decode the XML entities feeds actually emit. `&amp;` decodes last so
+ * `&amp;lt;` becomes `&lt;`, not `<`. Without this, URLs containing
+ * `&amp;` (e.g. `?utm_source=x&amp;utm_medium=rss`) canonicalize wrong
+ * and the URL-hash dedupe misses.
+ */
+function decodeXmlEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+function stripCdata(s: string): string {
+  return s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
+}
+
+function stripHtml(s: string): string {
+  return s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function parseFeed(xml: string): FeedItem[] {
+  const items: FeedItem[] = [];
+  // RSS 2.0
+  const rssBlocks = xml.match(/<item[\s>][\s\S]*?<\/item>/gi) ?? [];
+  for (const b of rssBlocks) {
+    const link = extractTag(b, 'link') || extractTag(b, 'guid');
+    if (!link) continue;
+    items.push({
+      title: stripHtml(extractTag(b, 'title')),
+      url: link.trim(),
+      summary: stripHtml(extractTag(b, 'description')).slice(0, 1000),
+      published_at: extractTag(b, 'pubDate') || null,
+    });
+  }
+  // Atom
+  if (items.length === 0) {
+    const entryBlocks = xml.match(/<entry[\s>][\s\S]*?<\/entry>/gi) ?? [];
+    for (const b of entryBlocks) {
+      const linkM = b.match(/<link[^>]*href="([^"]+)"/i);
+      const link = linkM?.[1] ?? '';
+      if (!link) continue;
+      items.push({
+        title: stripHtml(extractTag(b, 'title')),
+        url: link.trim(),
+        summary: stripHtml(extractTag(b, 'summary') || extractTag(b, 'content')).slice(0, 1000),
+        published_at: extractTag(b, 'published') || extractTag(b, 'updated') || null,
+      });
+    }
+  }
+  return items;
+}
+
+// --- helpers ---
+
+async function sha256Hex(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function canonicalUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    for (const p of [...u.searchParams.keys()]) {
+      if (/^(utm_|fbclid|gclid|mc_)/i.test(p)) u.searchParams.delete(p);
+    }
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+function keywordGate(text: string): boolean {
+  const t = text.toLowerCase();
+  return ADAPTATION_TERMS.some((w) => t.includes(w)) && SCREEN_TERMS.some((w) => t.includes(w));
+}
+
+/** Spec §4.1 secondary dedupe: same story re-posted under a new URL. */
+function normalizeTitle(t: string): string {
+  return t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function heuristicScore(text: string): number {
+  const t = text.toLowerCase();
+  let score = 0;
+  for (const p of ['based on the novel', 'based on the book', 'adaptation of']) if (t.includes(p)) score += 2;
+  for (const p of ['optioned', 'film rights', 'tv rights', 'in development', 'casting', 'to direct', 'showrunner', 'limited series']) if (t.includes(p)) score += 1;
+  for (const p of ['review:', 'interview', 'box office']) if (t.includes(p)) score -= 2;
+  return score;
+}
+
+interface Classification {
+  is_adaptation_news: boolean;
+  book_title: string | null;
+  author: string | null;
+  screen_kind: string;
+  status_signal: string;
+  confidence: number;
+  reason: string;
+}
+
+function validateClassification(raw: unknown): Classification | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.is_adaptation_news !== 'boolean') return null;
+  const conf = typeof o.confidence === 'number' ? Math.min(1, Math.max(0, o.confidence)) : 0;
+  const kinds = ['film', 'series', 'unknown'];
+  const signals = ['rumored', 'optioned', 'in_development', 'filming', 'post_production', 'released', 'none'];
+  return {
+    is_adaptation_news: o.is_adaptation_news,
+    book_title: typeof o.book_title === 'string' ? o.book_title.slice(0, 300) : null,
+    author: typeof o.author === 'string' ? o.author.slice(0, 300) : null,
+    screen_kind: kinds.includes(o.screen_kind as string) ? (o.screen_kind as string) : 'unknown',
+    status_signal: signals.includes(o.status_signal as string) ? (o.status_signal as string) : 'none',
+    confidence: conf,
+    reason: typeof o.reason === 'string' ? o.reason.slice(0, 500) : '',
+  };
+}
+
+async function classifyWithLLM(
+  env: NewsEnv,
+  title: string,
+  summary: string,
+): Promise<{ c: Classification | null; failed: boolean }> {
+  try {
+    if (!env.AI) throw new Error('AI binding unavailable');
+    const res = (await env.AI.run(
+      MODEL,
+      {
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: `TITLE: ${title}\nSUMMARY: ${summary}` },
+        ],
+        max_tokens: 300,
+        temperature: 0,
+      },
+      { gateway: { id: GATEWAY_ID, skipCache: false } },
+    )) as { response?: string };
+    const text = (res.response ?? '').trim().replace(/^```json?\s*|\s*```$/g, '');
+    return { c: validateClassification(JSON.parse(text)), failed: false };
+  } catch (e) {
+    console.error('LLM classification failed, using heuristics:', (e as Error).message);
+    return { c: null, failed: true };
+  }
+}
+
+/**
+ * The scheduled entry point, wired into src/index.tsx's default export.
+ * Idempotent: re-running the same day inserts nothing new.
+ */
+export async function scheduledNewsRun(env: NewsEnv): Promise<void> {
+  // Step 0 — SLA: auto-dismiss pending items older than 30 days (spec §8).
+  const sla = await env.DB.prepare(
+    `UPDATE news_items SET status = 'dismissed', dismiss_reason = 'auto-dismissed: pending > 30 days'
+     WHERE status = 'pending' AND created_at < datetime('now', ?1)`,
+  )
+    .bind(`-${PENDING_SLA_DAYS} days`)
+    .run();
+  if ((sla.meta?.changes ?? 0) > 0) {
+    console.log(`SLA auto-dismissed ${sla.meta.changes} stale pending items`);
+  }
+
+  let llmCalls = 0;
+  let inserted = 0;
+
+  // Secondary dedupe (spec §4.1): normalized titles seen in the last 7 days.
+  const recentRows = await env.DB.prepare(
+    `SELECT title FROM news_items WHERE created_at > datetime('now', '-7 days')`,
+  ).all<{ title: string }>();
+  const recentTitles = new Set((recentRows.results ?? []).map((r) => normalizeTitle(r.title)));
+
+  const results = await Promise.allSettled(
+    SOURCES.map(async (src) => {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 15000);
+      try {
+        const resp = await fetch(src.feed_url, {
+          signal: ctrl.signal,
+          headers: { 'User-Agent': 'NovelAdaptationsBot/1.0 (+https://noveladaptations.com)' },
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const xml = await resp.text();
+        const items = parseFeed(xml);
+        await env.DB.prepare(
+          `INSERT INTO sources (name, feed_url, trust_tier, last_fetched_at, last_status, consecutive_failures)
+           VALUES (?, ?, ?, datetime('now'), 'ok', 0)
+           ON CONFLICT(name) DO UPDATE SET last_fetched_at=datetime('now'), last_status='ok', consecutive_failures=0`,
+        )
+          .bind(src.name, src.feed_url, src.trust_tier)
+          .run();
+        return { src, items };
+      } catch (e) {
+        await env.DB.prepare(
+          `INSERT INTO sources (name, feed_url, trust_tier, last_status, consecutive_failures)
+           VALUES (?, ?, ?, 'error', 1)
+           ON CONFLICT(name) DO UPDATE SET last_status='error',
+             consecutive_failures = consecutive_failures + 1,
+             is_active = CASE WHEN consecutive_failures + 1 >= 5 THEN 0 ELSE is_active END`,
+        )
+          .bind(src.name, src.feed_url, src.trust_tier)
+          .run();
+        console.error(`Feed failed: ${src.name}:`, (e as Error).message);
+        return { src, items: [] as FeedItem[] };
+      } finally {
+        clearTimeout(t);
+      }
+    }),
+  );
+
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue;
+    const { src, items } = r.value;
+    for (const item of items) {
+      if (!item.title || !item.url) continue;
+      const url = canonicalUrl(item.url);
+      const urlHash = await sha256Hex(url);
+      const seen = await env.DB.prepare('SELECT 1 FROM news_items WHERE url_hash = ?').bind(urlHash).first();
+      if (seen) continue; // dedupe: primary key is the URL hash
+      const titleNorm = normalizeTitle(item.title);
+      if (recentTitles.has(titleNorm)) continue; // dedupe: same title, new URL
+
+      const text = `${item.title} ${item.summary}`;
+      const passesGate = keywordGate(text);
+
+      let cls: Classification;
+      let llmModel = 'none';
+      let needsReview = 0;
+
+      if (passesGate && llmCalls < MAX_LLM_CALLS_PER_RUN) {
+        llmCalls++;
+        const { c, failed } = await classifyWithLLM(env, item.title, item.summary);
+        if (!failed && c) {
+          cls = c;
+          llmModel = MODEL;
+        } else {
+          // Fallback: keyword heuristics
+          const s = heuristicScore(text);
+          cls = {
+            is_adaptation_news: s >= 2,
+            book_title: null,
+            author: null,
+            screen_kind: 'unknown',
+            status_signal: 'none',
+            confidence: 0.3,
+            reason: 'heuristic fallback (LLM unavailable)',
+          };
+          llmModel = 'heuristic';
+          needsReview = 1;
+        }
+      } else {
+        // Below the keyword gate (or over the per-run LLM cap): record as
+        // non-adaptation without spending inference.
+        cls = {
+          is_adaptation_news: false,
+          book_title: null,
+          author: null,
+          screen_kind: 'unknown',
+          status_signal: 'none',
+          confidence: 0.9,
+          reason: passesGate ? 'deferred: per-run LLM cap reached' : 'below keyword gate',
+        };
+        llmModel = 'prefilter';
+      }
+
+      await env.DB.prepare(
+        `INSERT OR IGNORE INTO news_items
+           (url, url_hash, title, summary, source, trust_tier, published_at,
+            status, is_adaptation_news, book_title, author, screen_kind,
+            status_signal, confidence, llm_model, needs_review)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+        .bind(
+          url,
+          urlHash,
+          item.title.slice(0, 500),
+          item.summary,
+          src.name,
+          src.trust_tier,
+          item.published_at,
+          cls.is_adaptation_news ? 1 : 0,
+          cls.book_title,
+          cls.author,
+          cls.screen_kind,
+          cls.status_signal,
+          cls.confidence,
+          llmModel,
+          needsReview,
+        )
+        .run();
+      recentTitles.add(titleNorm);
+      inserted++;
+    }
+  }
+
+  console.log(`news run complete: ${inserted} items inserted, ${llmCalls} LLM calls`);
+}
