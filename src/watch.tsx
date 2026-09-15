@@ -13,7 +13,7 @@
  * nothing is faked. Affiliate/purchase links (purchase_url_screen) are stored
  * in the schema but NOT rendered yet (needs disclosure compliance first).
  */
-import type { AuthUser } from './ui';
+import type { AuthUser, ThemeName } from './ui';
 import { Layout, PosterArt, StatusBadge, TrustBadge } from './ui';
 // Round 3: where-to-watch providers (TMDB, 7-day D1 cache).
 import { WhereToWatch, type WatchProviders } from './watch_providers';
@@ -47,6 +47,7 @@ export function ScreenWorkPage({
   origin,
   canonicalPath,
   user,
+  theme,
   ratingSummary,
   userRating,
   reviews,
@@ -60,6 +61,7 @@ export function ScreenWorkPage({
   origin?: string;
   canonicalPath?: string;
   user?: AuthUser;
+  theme?: ThemeName;
   ratingSummary?: RatingSummary;
   userRating?: number | null;
   reviews?: ReviewView[];
@@ -76,6 +78,7 @@ export function ScreenWorkPage({
       user={user}
       origin={origin}
       canonicalPath={canonicalPath}
+      theme={theme}
       description={work.synopsis?.trim() || undefined}
       image={work.backdrop_url ?? work.poster_url ?? undefined}
     >

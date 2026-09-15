@@ -13,7 +13,7 @@
 
 import type { Context, Hono } from 'hono';
 import { getAdaptationSummary, getBook } from '../db';
-import { MostWantedPage, ShelvesPage } from '../ui';
+import { MostWantedPage, ShelvesPage, themeOf } from '../ui';
 import { getUser, requireUser, type SessionUser } from '../auth/session';
 import {
   castVote,
@@ -70,6 +70,7 @@ export function mountVotes<E extends { DB: D1Database }>(
         })),
         user: user ? { email: user.email, isAdmin: user.isAdmin } : null,
         origin: new URL(c.req.url).origin,
+        theme: themeOf(c),
       }),
     );
   });
@@ -142,6 +143,7 @@ export function mountVotes<E extends { DB: D1Database }>(
           shelf: s.shelf,
         })),
         user: { email: user.email, isAdmin: user.isAdmin },
+        theme: themeOf(c),
       }),
     );
   });

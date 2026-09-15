@@ -15,6 +15,7 @@
 
 import type { Context, Hono } from 'hono';
 import { ListDetailPage, ListsPage } from './ui';
+import { themeOf } from '../ui';
 import { getUser, requireUser, type SessionUser } from '../auth/session';
 import {
   addItem,
@@ -82,6 +83,7 @@ export function mountLists<E extends { DB: D1Database }>(
           createdAt: l.created_at,
         })),
         user: { email: user.email, isAdmin: user.isAdmin },
+        theme: themeOf(c),
       }),
     );
   });
@@ -132,6 +134,7 @@ export function mountLists<E extends { DB: D1Database }>(
         canonicalPath: `/lists/${list.slug}`,
         ogDescription: description,
         ogImage,
+        theme: themeOf(c),
       }),
     );
   });

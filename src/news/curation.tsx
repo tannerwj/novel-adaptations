@@ -36,7 +36,7 @@ import { listPipelineRuns } from './ingest';
 import { NewsQueuePage, PipelineRunsPage } from '../ui';
 // Layout for the release-dates admin page (Track 1, Round 3); screen works
 // have no other edit surface, so curation.tsx owns this admin table too.
-import { Layout, type AuthUser } from '../ui';
+import { Layout, themeOf, type AuthUser, type ThemeName } from '../ui';
 
 type CurationBindings = {
   DB: D1Database;
@@ -107,6 +107,7 @@ export function registerCurationRoutes<E extends CurationBindings>(
           items={ordered}
           sources={sources}
           counts={counts}
+          theme={themeOf(c)}
         />
       </>,
     );
@@ -138,6 +139,7 @@ export function registerCurationRoutes<E extends CurationBindings>(
           errors: r.errors,
         }))}
         sources={sources}
+        theme={themeOf(c)}
       />,
     );
   });
@@ -158,7 +160,7 @@ export function registerCurationRoutes<E extends CurationBindings>(
     const user: AuthUser = sessionUser
       ? { email: sessionUser.email, isAdmin: sessionUser.isAdmin }
       : null;
-    return c.html(<ScreenWorksAdminPage works={results} user={user} />);
+    return c.html(<ScreenWorksAdminPage works={results} user={user} theme={themeOf(c)} />);
   });
 
   // Owner-only: set or clear a screen work's release_date. Empty/absent body
@@ -369,12 +371,14 @@ document.querySelectorAll('form.release-date-form').forEach((form) => {
 function ScreenWorksAdminPage({
   works,
   user,
+  theme,
 }: {
   works: ReleaseDateRow[];
   user: AuthUser;
+  theme?: ThemeName;
 }) {
   return (
-    <Layout title="Screen work release dates" user={user}>
+    <Layout title="Screen work release dates" user={user} theme={theme}>
       <nav class="tabs" aria-label="admin">
         <a href="/admin/news">News queue</a>
         <a class="active">Release dates</a>

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
-import { AdaptationPage, BookPage, HomePage, Layout } from './ui';
+import { setCookie } from 'hono/cookie';
+import { AdaptationPage, BookPage, HomePage, Layout, THEME_COOKIE, themeOf } from './ui';
 import { ScreenWorkPage } from './watch';
 import {
   getAdaptationSummary,
@@ -70,18 +71,45 @@ app.get('/', async (c) => {
       adaptations={adaptations}
       user={toAuthUser(user)}
       origin={new URL(c.req.url).origin}
+      theme={themeOf(c)}
     />,
   );
+});
+
+// Track A: theme toggle (no-JS friendly). Accepts form fields `theme` and
+// `next`; sets the 1-year `theme` cookie, then 303s back to `next`.
+// `next` is validated as a local path to avoid open redirects.
+app.post('/api/theme', async (c) => {
+  let rawTheme: string | null = null;
+  let rawNext: string | null = null;
+  try {
+    const body = await c.req.parseBody();
+    const t = body['theme'];
+    const n = body['next'];
+    rawTheme = typeof t === 'string' ? t : null;
+    rawNext = typeof n === 'string' ? n : null;
+  } catch {
+    // fall through with defaults
+  }
+  const theme = rawTheme === 'dark' || rawTheme === 'light' ? rawTheme : 'light';
+  const next =
+    rawNext && /^\/[^/\\]/.test(rawNext) && !rawNext.includes('://') ? rawNext : '/';
+  setCookie(c, THEME_COOKIE, theme, {
+    path: '/',
+    maxAge: 31536000,
+    sameSite: 'Lax',
+  });
+  return c.redirect(next, 303);
 });
 
 app.get('/adaptations/:id', async (c) => {
   const id = Number(c.req.param('id'));
   if (!Number.isInteger(id)) {
-    return c.html(<Layout title="Not found">404 — adaptation not found.</Layout>, 404);
+    return c.html(<Layout title="Not found" theme={themeOf(c)}>404 — adaptation not found.</Layout>, 404);
   }
   const adaptation = await getAdaptationSummary(c.env.DB, id);
   if (!adaptation) {
-    return c.html(<Layout title="Not found">404 — adaptation not found.</Layout>, 404);
+    return c.html(<Layout title="Not found" theme={themeOf(c)}>404 — adaptation not found.</Layout>, 404);
   }
   const user = await getUser(c);
   const timeline = await getAdaptationTimeline(c.env.DB, id);
@@ -100,6 +128,7 @@ app.get('/adaptations/:id', async (c) => {
       user={toAuthUser(user)}
       origin={new URL(c.req.url).origin}
       canonicalPath={c.req.path}
+      theme={themeOf(c)}
     />,
   );
 });
@@ -107,11 +136,11 @@ app.get('/adaptations/:id', async (c) => {
 app.get('/books/:id', async (c) => {
   const id = Number(c.req.param('id'));
   if (!Number.isInteger(id)) {
-    return c.html(<Layout title="Not found">404 — book not found.</Layout>, 404);
+    return c.html(<Layout title="Not found" theme={themeOf(c)}>404 — book not found.</Layout>, 404);
   }
   const book = await getBook(c.env.DB, id);
   if (!book) {
-    return c.html(<Layout title="Not found">404 — book not found.</Layout>, 404);
+    return c.html(<Layout title="Not found" theme={themeOf(c)}>404 — book not found.</Layout>, 404);
   }
   const adaptations = await getBookAdaptations(c.env.DB, id);
   const user = await getUser(c);
@@ -137,6 +166,7 @@ app.get('/books/:id', async (c) => {
       user={toAuthUser(user)}
       origin={new URL(c.req.url).origin}
       canonicalPath={c.req.path}
+      theme={themeOf(c)}
     />,
   );
 });
@@ -157,11 +187,11 @@ app.get('/apple-touch-icon.png', () => serveFavicon());
 app.get('/watch/:id', async (c) => {
   const id = Number(c.req.param('id'));
   if (!Number.isInteger(id)) {
-    return c.html(<Layout title="Not found">404 — screen work not found.</Layout>, 404);
+    return c.html(<Layout title="Not found" theme={themeOf(c)}>404 — screen work not found.</Layout>, 404);
   }
   const work = await getScreenWork(c.env.DB, id);
   if (!work) {
-    return c.html(<Layout title="Not found">404 — screen work not found.</Layout>, 404);
+    return c.html(<Layout title="Not found" theme={themeOf(c)}>404 — screen work not found.</Layout>, 404);
   }
   const news = await getScreenWorkNews(
     c.env.DB,
@@ -194,6 +224,7 @@ app.get('/watch/:id', async (c) => {
       origin={origin}
       canonicalPath={c.req.path}
       user={toAuthUser(user)}
+      theme={themeOf(c)}
       ratingSummary={ratingSummary}
       userRating={userRating}
       reviews={reviews}
@@ -230,7 +261,7 @@ registerSearchRoutes(app);
 registerSeoRoutes(app);
 registerEnrichmentRoutes(app);
 
-app.notFound((c) => c.html(<Layout title="Not found">404 — page not found.</Layout>, 404));
+app.notFound((c) => c.html(<Layout title="Not found" theme={themeOf(c)}>404 — page not found.</Layout>, 404));
 
 export default {
   // Hono's fetch is an arrow-function property, so it can be re-homed safely.

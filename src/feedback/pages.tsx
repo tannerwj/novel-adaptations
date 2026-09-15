@@ -5,7 +5,7 @@
 // entered, or a "signed in" badge from feedback.user_id). It never joins
 // against users, so other users' account emails can never leak here.
 
-import { Layout } from '../ui';
+import { Layout, type ThemeName } from '../ui';
 import type { FeedbackRow, FeedbackStatus, FeedbackType } from './db';
 import { FEEDBACK_STATUSES, FEEDBACK_TYPES } from './db';
 
@@ -41,12 +41,14 @@ export function FeedbackPage({
   prefillSubject,
   error,
   values,
+  theme,
 }: {
   user?: AuthUserView | null;
   prefillType?: FeedbackType;
   prefillSubject?: string;
   error?: string;
   values?: FeedbackFormValues;
+  theme?: ThemeName;
 }) {
   const type = values?.type ?? prefillType ?? 'feature';
   const subject = values?.subject ?? prefillSubject ?? '';
@@ -54,7 +56,7 @@ export function FeedbackPage({
   const proofUrl = values?.proofUrl ?? '';
   const email = values?.email ?? '';
   return (
-    <Layout title="Send feedback" user={user ?? undefined}>
+    <Layout title="Send feedback" user={user ?? undefined} theme={theme}>
       <div class="feedback-card">
         <p class="kicker">We read everything</p>
         <h1>Send feedback</h1>
@@ -132,9 +134,9 @@ export function FeedbackPage({
   );
 }
 
-export function FeedbackThanksPage({ user }: { user?: AuthUserView | null }) {
+export function FeedbackThanksPage({ user, theme }: { user?: AuthUserView | null; theme?: ThemeName }) {
   return (
-    <Layout title="Thanks!" user={user ?? undefined}>
+    <Layout title="Thanks!" user={user ?? undefined} theme={theme}>
       <div class="feedback-card">
         <p class="kicker">Received</p>
         <h1>Thanks for the feedback! 🎬</h1>
@@ -155,15 +157,17 @@ export function AdminFeedbackPage({
   type,
   status,
   counts,
+  theme,
 }: {
   items: FeedbackRow[];
   type?: FeedbackType;
   status?: FeedbackStatus;
   counts: Record<FeedbackStatus, number>;
+  theme?: ThemeName;
 }) {
   const typeQuery = type ? `&type=${type}` : '';
   return (
-    <Layout title="Feedback triage">
+    <Layout title="Feedback triage" theme={theme}>
       <p class="kicker">Owner console</p>
       <h1 class="display-title">Feedback</h1>
       <p class="lede">

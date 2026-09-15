@@ -7,7 +7,7 @@
  * vote/shelf inline-script pattern in src/ui.tsx.
  */
 import type { Child } from 'hono/jsx';
-import { Layout, PosterArt, type AuthUser } from '../ui';
+import { Layout, PosterArt, type AuthUser, type ThemeName } from '../ui';
 import type { ListTargetType } from './db';
 
 // ---------------------------------------------------------------------------
@@ -255,12 +255,14 @@ export interface ListItemViewProps {
 export function ListsPage({
   lists,
   user,
+  theme,
 }: {
   lists: UserListView[];
   user: { email: string; isAdmin?: boolean };
+  theme?: ThemeName;
 }) {
   return (
-    <Layout title="My lists" user={user} canonicalPath="/lists">
+    <Layout title="My lists" user={user} canonicalPath="/lists" theme={theme}>
       <style>{LIST_CSS}</style>
       <p class="kicker">Your collection</p>
       <h1 class="display-title">My Lists</h1>
@@ -352,6 +354,7 @@ export function ListDetailPage({
   canonicalPath,
   ogDescription,
   ogImage,
+  theme,
 }: {
   list: { id: number; title: string; description: string | null; isPublic: boolean; slug: string; createdAt: string | null };
   items: ListItemViewProps[];
@@ -361,6 +364,7 @@ export function ListDetailPage({
   canonicalPath?: string;
   ogDescription?: string;
   ogImage?: string;
+  theme?: ThemeName;
 }) {
   return (
     <Layout
@@ -370,6 +374,7 @@ export function ListDetailPage({
       canonicalPath={canonicalPath}
       description={ogDescription}
       image={ogImage}
+      theme={theme}
     >
       <style>{LIST_CSS}</style>
       <a class="back-link" href={isOwner ? '/lists' : '/'}>← {isOwner ? 'My lists' : 'Browse'}</a>

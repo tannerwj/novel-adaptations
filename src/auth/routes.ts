@@ -13,7 +13,7 @@
 import type { Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { Env } from '../index';
-import { AuthErrorPage, LoginPage, MagicLinkSentPage } from '../ui';
+import { AuthErrorPage, LoginPage, MagicLinkSentPage, themeOf } from '../ui';
 import { newToken, sha256Hex } from './crypto';
 import { sendMagicLink } from './email';
 import { SESSION_COOKIE } from './session';
@@ -108,7 +108,7 @@ async function promoteAdmin(
 
 export function mountAuth<E extends AuthBindings>(app: Hono<{ Bindings: E }>): void {
   app.get('/auth/login', (c) => {
-    return c.html(LoginPage({}));
+    return c.html(LoginPage({ theme: themeOf(c) }));
   });
 
   app.post('/auth/magic-link', async (c) => {
@@ -121,12 +121,12 @@ export function mountAuth<E extends AuthBindings>(app: Hono<{ Bindings: E }>): v
       email = '';
     }
     if (!EMAIL_RE.test(email)) {
-      return c.html(LoginPage({ error: 'Enter a valid email address.' }), 400);
+      return c.html(LoginPage({ error: 'Enter a valid email address.', theme: themeOf(c) }), 400);
     }
 
     if (!(await checkMagicLinkRate(c.env.DB, email))) {
       return c.html(
-        LoginPage({ error: 'Too many sign-in emails — try again in an hour.' }),
+        LoginPage({ error: 'Too many sign-in emails — try again in an hour.', theme: themeOf(c) }),
         429,
       );
     }
@@ -146,19 +146,20 @@ export function mountAuth<E extends AuthBindings>(app: Hono<{ Bindings: E }>): v
     const { sent } = await sendMagicLink(c.env, email, link);
 
     if (sent) {
-      return c.html(MagicLinkSentPage({ email }));
+      return c.html(MagicLinkSentPage({ email, theme: themeOf(c) }));
     }
     // Fail closed: the on-screen link is a local-dev convenience ONLY, shown
     // when ENVIRONMENT is explicitly non-production. In production (or when
     // unset) an unconfigured mailer is a hard error, never a leaked link.
     const devMode = c.env.ENVIRONMENT === 'development' || c.env.ENVIRONMENT === 'preview';
     if (devMode) {
-      return c.html(MagicLinkSentPage({ email, devLink: link }));
+      return c.html(MagicLinkSentPage({ email, devLink: link, theme: themeOf(c) }));
     }
     return c.html(
       AuthErrorPage({
         message:
           'Sign-in email is not configured yet. Ask the site owner to onboard a sending domain in Email Service.',
+        theme: themeOf(c),
       }),
       503,
     );
@@ -168,7 +169,7 @@ export function mountAuth<E extends AuthBindings>(app: Hono<{ Bindings: E }>): v
     const token = c.req.query('token') ?? '';
     if (!token) {
       return c.html(
-        AuthErrorPage({ message: 'This sign-in link is invalid or expired.' }),
+        AuthErrorPage({ message: 'This sign-in link is invalid or expired.', theme: themeOf(c) }),
         400,
       );
     }
@@ -186,6 +187,7 @@ export function mountAuth<E extends AuthBindings>(app: Hono<{ Bindings: E }>): v
       return c.html(
         AuthErrorPage({
           message: 'This sign-in link is invalid, expired, or already used.',
+          theme: themeOf(c),
         }),
         400,
       );

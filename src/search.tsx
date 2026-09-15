@@ -15,7 +15,7 @@
 // literally.
 
 import type { Hono } from 'hono';
-import { Layout, PosterArt, StatusBadge, type AuthUser } from './ui';
+import { Layout, PosterArt, StatusBadge, themeOf, type AuthUser, type ThemeName } from './ui';
 import { getUser } from './auth/session';
 
 const QUERY_MAX_LEN = 100;
@@ -224,6 +224,7 @@ function SearchPage({
   works,
   stories,
   popular,
+  theme,
 }: {
   q: string;
   user: AuthUser;
@@ -231,10 +232,11 @@ function SearchPage({
   works: ScreenWorkHit[];
   stories: AdaptationHit[];
   popular: PopularBook[];
+  theme?: ThemeName;
 }) {
   const total = books.length + works.length + stories.length;
   return (
-    <Layout title={q ? `Results for “${q}”` : 'Search'} user={user}>
+    <Layout title={q ? `Results for “${q}”` : 'Search'} user={user} theme={theme}>
       <p class="kicker">Search</p>
       <h1 class="display-title">
         {q ? (
@@ -359,7 +361,7 @@ export function registerSearchRoutes<E extends { DB: D1Database }>(
 
     if (!q) {
       const popular = await getPopularBooks(c.env.DB);
-      return c.html(<SearchPage q="" user={user} books={[]} works={[]} stories={[]} popular={popular} />);
+      return c.html(<SearchPage q="" user={user} books={[]} works={[]} stories={[]} popular={popular} theme={themeOf(c)} />);
     }
 
     // One query per result group, run in parallel.
@@ -376,7 +378,7 @@ export function registerSearchRoutes<E extends { DB: D1Database }>(
         : [];
 
     return c.html(
-      <SearchPage q={q} user={user} books={books} works={works} stories={stories} popular={popular} />,
+      <SearchPage q={q} user={user} books={books} works={works} stories={stories} popular={popular} theme={themeOf(c)} />,
     );
   });
 }

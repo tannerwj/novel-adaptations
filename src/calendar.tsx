@@ -14,7 +14,7 @@
  */
 
 import type { Hono } from 'hono';
-import { Layout, PosterArt, type AuthUser } from './ui';
+import { Layout, PosterArt, themeOf, type AuthUser, type ThemeName } from './ui';
 import { getUser } from './auth/session';
 
 type CalendarBindings = { DB: D1Database };
@@ -208,17 +208,19 @@ export function CalendarPage({
   works,
   today,
   user,
+  theme,
 }: {
   works: CalendarWork[];
   today: string;
   user: AuthUser;
+  theme?: ThemeName;
 }) {
   const windowStart = new Date(Date.parse(`${today}T00:00:00Z`) - RECENT_WINDOW_DAYS * DAY_MS)
     .toISOString()
     .slice(0, 10);
   const { comingSoon, recentlyReleased, tba } = bucketWorks(works, today, windowStart);
   return (
-    <Layout title="Release calendar" user={user}>
+    <Layout title="Release calendar" user={user} theme={theme}>
       <p class="kicker">Release calendar</p>
       <h1 style="font-family:var(--serif);font-size:2rem;margin:.25rem 0 .5rem">
         When books hit the screen
@@ -274,6 +276,6 @@ export function registerCalendarRoutes<E extends CalendarBindings>(
       ? { email: sessionUser.email, isAdmin: sessionUser.isAdmin }
       : null;
     const today = new Date().toISOString().slice(0, 10);
-    return c.html(<CalendarPage works={works} today={today} user={user} />);
+    return c.html(<CalendarPage works={works} today={today} user={user} theme={themeOf(c)} />);
   });
 }

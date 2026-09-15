@@ -12,6 +12,7 @@
 
 import type { Hono } from 'hono';
 import type { Env } from '../index';
+import { themeOf } from '../ui';
 import { getUser, requireAdminApi, requireAdminPage } from '../auth/session';
 import {
   checkFeedbackRate,
@@ -67,7 +68,7 @@ export function mountFeedback<E extends Env>(app: Hono<{ Bindings: E }>): void {
     const prefillType = isFeedbackType(rawType) ? rawType : undefined;
     const prefillSubject = c.req.query('subject') ?? undefined;
     return c.html(
-      FeedbackPage({ user, prefillType, prefillSubject }),
+      FeedbackPage({ user, prefillType, prefillSubject, theme: themeOf(c) }),
     );
   });
 
@@ -93,7 +94,7 @@ export function mountFeedback<E extends Env>(app: Hono<{ Bindings: E }>): void {
     const user = toAuthUser(sessionUser);
 
     const invalid = (message: string, status: 400 | 422 | 429 = 422) =>
-      c.html(FeedbackPage({ user, error: message, values }), status);
+      c.html(FeedbackPage({ user, error: message, values, theme: themeOf(c) }), status);
 
     if (!isFeedbackType(values.type)) {
       return invalid(
@@ -130,7 +131,7 @@ export function mountFeedback<E extends Env>(app: Hono<{ Bindings: E }>): void {
       body: values.body,
       proofUrl: values.proofUrl || null,
     });
-    return c.html(FeedbackThanksPage({ user }));
+    return c.html(FeedbackThanksPage({ user, theme: themeOf(c) }));
   });
 
   app.get('/admin/feedback', requireAdminPage, async (c) => {
@@ -147,7 +148,7 @@ export function mountFeedback<E extends Env>(app: Hono<{ Bindings: E }>): void {
       countFeedbackByStatus(c.env.DB),
     ]);
     return c.html(
-      AdminFeedbackPage({ items, type, status, counts }),
+      AdminFeedbackPage({ items, type, status, counts, theme: themeOf(c) }),
     );
   });
 
