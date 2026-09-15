@@ -793,7 +793,7 @@ function ShelfPicker({
 function AdaptationCard({ a }: { a: AdaptationWithPoster }) {
   return (
     <article class="poster-card">
-      <a class="poster-link" href={`/adaptations/${a.id}`} aria-label={`${a.book_title} adaptation`}>
+      <a class="poster-link" href={`/watch/${a.screen_work_id}`} aria-label={`${a.screen_title} — the screen work`}>
         <PosterArt
           src={a.screen_poster_url ?? a.book_cover_url}
           title={a.screen_title}
@@ -933,6 +933,10 @@ export function AdaptationPage({
             <dt>Release</dt>
             <dd>{adaptation.screen_release_date ?? 'TBA'}</dd>
           </dl>
+          <p class="meta" style="margin-top:0.75rem">
+            <a href={`/watch/${adaptation.screen_work_id}`}>View the screen work →</a>
+            {' '}the film/series page, with synopsis, cast, and related news.
+          </p>
         </section>
       </div>
 

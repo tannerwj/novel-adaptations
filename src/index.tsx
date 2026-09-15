@@ -1,6 +1,14 @@
 import { Hono } from 'hono';
 import { AdaptationPage, BookPage, HomePage, Layout } from './ui';
-import { getAdaptationSummary, getBook, getBookAdaptations, listAdaptations } from './db';
+import { ScreenWorkPage } from './watch';
+import {
+  getAdaptationSummary,
+  getBook,
+  getBookAdaptations,
+  getScreenWork,
+  getScreenWorkNews,
+  listAdaptations,
+} from './db';
 import { registerCurationRoutes } from './news/curation';
 import { scheduledNewsRun } from './news/ingest';
 import { getUser, type SessionUser } from './auth/session';
@@ -95,6 +103,27 @@ app.get('/books/:id', async (c) => {
 app.get('/api/adaptations', async (c) => {
   const adaptations = await listAdaptations(c.env.DB);
   return c.json(adaptations);
+});
+
+// /watch/:id = the screen work itself (film/series), NOT the adaptation story.
+// /adaptations/:id remains "the adaptation story" (book→screen journey + timeline).
+app.get('/watch/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id)) {
+    return c.html(<Layout title="Not found">404 — screen work not found.</Layout>, 404);
+  }
+  const work = await getScreenWork(c.env.DB, id);
+  if (!work) {
+    return c.html(<Layout title="Not found">404 — screen work not found.</Layout>, 404);
+  }
+  const news = await getScreenWorkNews(
+    c.env.DB,
+    work.books.map((b) => b.title),
+  );
+  const user = await getUser(c);
+  return c.html(
+    <ScreenWorkPage work={work} news={news} user={toAuthUser(user)} />,
+  );
 });
 
 // Track A: embedded favicon (src/favicon.ts — no [assets] static dir).

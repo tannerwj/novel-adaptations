@@ -20,6 +20,10 @@ export interface ScreenWork {
   /** Added in migration 0006 (TMDB enrichment backfill). */
   backdrop_url: string | null;
   release_date: string | null;
+  /** Added in migration 0009; populated by future TMDB enrichment. */
+  synopsis: string | null;
+  /** Added in migration 0009; stored, NOT rendered yet (affiliate UI is future). */
+  purchase_url_screen: string | null;
 }
 
 export interface Adaptation {
@@ -95,6 +99,71 @@ export async function getBookAdaptations(
     .prepare(`${SELECT_ADAPTATION_SUMMARY} WHERE a.book_id = ?1 ORDER BY a.id ASC`)
     .bind(bookId)
     .all<AdaptationSummary>();
+  return results ?? [];
+}
+
+// --- Screen works (/watch/:id) ------------------------------------------------
+
+/** A screen work plus its linked adaptations and linked books (one page load). */
+export interface ScreenWorkDetail extends ScreenWork {
+  adaptations: { id: number; title: string; status: string }[];
+  books: { id: number; title: string; authors: string }[];
+}
+
+/** Null when no screen_works row has that id (route turns it into a 404). */
+export async function getScreenWork(
+  db: D1Database,
+  id: number,
+): Promise<ScreenWorkDetail | null> {
+  const row = await db
+    .prepare('SELECT * FROM screen_works WHERE id = ?1')
+    .bind(id)
+    .first<ScreenWork>();
+  if (!row) return null;
+  const { results: adaptations } = await db
+    .prepare(
+      `SELECT a.id, b.title AS title, a.status
+       FROM adaptations a
+       JOIN books b ON b.id = a.book_id
+       WHERE a.screen_work_id = ?1
+       ORDER BY a.id ASC`,
+    )
+    .bind(id)
+    .all<{ id: number; title: string; status: string }>();
+  const { results: books } = await db
+    .prepare(
+      `SELECT DISTINCT b.id, b.title, b.authors
+       FROM adaptations a
+       JOIN books b ON b.id = a.book_id
+       WHERE a.screen_work_id = ?1
+       ORDER BY b.id ASC`,
+    )
+    .bind(id)
+    .all<{ id: number; title: string; authors: string }>();
+  return { ...row, adaptations: adaptations ?? [], books: books ?? [] };
+}
+
+/**
+ * News related to a screen work: items whose book_title matches (case-insensitively)
+ * any linked book's title, with status approved or pending, newest first.
+ */
+export async function getScreenWorkNews(
+  db: D1Database,
+  bookTitles: string[],
+): Promise<NewsItem[]> {
+  const titles = bookTitles.map((t) => t.toLowerCase());
+  if (titles.length === 0) return [];
+  const placeholders = titles.map((_, i) => `?${i + 1}`).join(', ');
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM news_items
+       WHERE book_title IS NOT NULL
+         AND LOWER(book_title) IN (${placeholders})
+         AND status IN ('approved', 'pending')
+       ORDER BY published_at DESC NULLS LAST, id DESC`,
+    )
+    .bind(...titles)
+    .all<NewsItem>();
   return results ?? [];
 }
 

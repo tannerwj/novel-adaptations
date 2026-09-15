@@ -65,6 +65,13 @@ adaptation news as rumors or trusted items for human curation.
   challenges ("12 adaptations in 12 months").
 - Newsletter: "This week in adaptations."
 - Spoiler-safe ratings/reviews (spoiler-blur toggles).
+- Affiliate monetization (Phase 4/5): book purchase links (Amazon Associates
+  etc. — schema: `books.purchase_url_book`, migration 0009) and
+  where-to-watch/purchase links for screen works
+  (`screen_works.purchase_url_screen`, migration 0009). Requires explicit,
+  compliant affiliate disclosure on every page that renders them (FTC
+  disclosure, clear "we may earn a commission" labeling); legal/ethics review
+  before enabling. No affiliate UI ships until disclosure is in place.
 
 ## 4. Tech stack
 
