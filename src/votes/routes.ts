@@ -68,7 +68,7 @@ export function mountVotes<E extends { DB: D1Database }>(
           votes: r.votes,
           userVoted: r.userVoted,
         })),
-        user: user ? { email: user.email } : null,
+        user: user ? { email: user.email, isAdmin: user.isAdmin } : null,
       }),
     );
   });
@@ -140,7 +140,7 @@ export function mountVotes<E extends { DB: D1Database }>(
           title: s.title,
           shelf: s.shelf,
         })),
-        user: { email: user.email },
+        user: { email: user.email, isAdmin: user.isAdmin },
       }),
     );
   });

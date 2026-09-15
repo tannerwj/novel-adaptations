@@ -65,28 +65,31 @@ pre-filters, classifies with Workers AI (Llama 3.1 8B via the
 `novel-adaptations` AI Gateway; keyword-heuristic fallback if the LLM is
 unavailable), and fills the owner curation queue at `/admin/news`.
 
-**Owner curation key:** all `/admin/*` and `/api/news/*` routes are gated
-behind a shared secret (constant-time compare, fail closed — real auth is a
-Phase 2 item). Set it with:
+**Admin access:** all `/admin/*` and `/api/news/*` routes require an admin
+session (magic-link sign-in, fail closed — logged-out users are redirected to
+`/auth/login`, non-admins get 403). Admin status is granted solely by the
+`ADMIN_EMAILS` allow-list:
 
 ```sh
-npx wrangler secret put CURATION_KEY
+npx wrangler secret put ADMIN_EMAILS
+# paste a comma-separated list of owner emails, e.g.
+# you@example.com,co-owner@example.com
 ```
 
-Then open `https://noveladaptations.com/admin/news?key=<secret>` (or send
-`X-Curation-Key: <secret>`). Queue actions: **approve**, **dismiss**,
-**promote** (advances a linked adaptation's status one step — e.g.
-`rumored → optioned` — writes an `adaptation_status_audit` row; rumor-tier
-items require a `corroborating_url`). Pending items older than 30 days are
-auto-dismissed at the start of each scheduled run.
+Then sign in via magic link at `/auth/login`; an **Admin** badge appears in
+the header linking to `/admin/news`. Admin emails live only in the secret —
+never in code — and the allow-list is checked on *every* successful sign-in,
+so adding an email later promotes that user on their next login.
 
-> Note: the shared-secret gate is a stopgap. A future step will replace it
-> with real auth + admin roles; **no new routes will be built on the
-> `CURATION_KEY` gate.** (TMDB poster enrichment, for example, runs as a
-> deploy-time script — see `docs/TMDB_BACKFILL.md` — not an admin route.)
+> Documented limitation: there is no demotion path. Removing an email from
+> `ADMIN_EMAILS` does **not** revoke existing admins; revoke manually with
+> `UPDATE users SET is_admin = 0 WHERE email = '…';` on the D1 database.
 
-**Admin auth:** the `/admin` curation UI is pending a real auth + admin-roles
-implementation (future step, not this wave).
+Queue actions: **approve**, **dismiss**, **promote** (advances a linked
+adaptation's status one step — e.g. `rumored → optioned` — writes an
+`adaptation_status_audit` row; rumor-tier items require a
+`corroborating_url`). Pending items older than 30 days are auto-dismissed
+at the start of each scheduled run.
 
 ## Email (Cloudflare Email Service)
 
@@ -125,7 +128,7 @@ dev to send real emails through your Cloudflare account instead.
 
 | Secret / var | How to set | What happens when unset |
 |---|---|---|
-| `CURATION_KEY` | `npx wrangler secret put CURATION_KEY` | `/admin/*` and `/api/news/*` deny everything (fail closed) |
+| `ADMIN_EMAILS` | `npx wrangler secret put ADMIN_EMAILS` | `/admin/*` and `/api/news/*` deny all non-admin sessions (fail closed); only verified sign-ins whose email is on the list become admins |
 | `EMAIL` send binding (`[[send_email]]`) | `wrangler.toml` + owner onboards `noveladaptations.com` for Email Sending (see above) | Magic links are logged to the console; with `ENVIRONMENT=development` they're also shown on-screen; otherwise sign-in shows "not configured" |
 | `TMDB_API_KEY` | operator's shell env when running the backfill script (never committed) | `src/tmdb.ts` enrichment no-ops without a key; see `docs/TMDB_BACKFILL.md` |
 | `ENVIRONMENT` (`[vars]`) | `ENVIRONMENT = "development"` in `.dev.vars` (gitignored) | Defaults to fail-closed production behavior |

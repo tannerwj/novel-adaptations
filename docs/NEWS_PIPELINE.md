@@ -294,7 +294,7 @@ Suggested routes on the main Hono app (owner-only, behind auth):
 Until the pipeline is tested and trusted, it runs under strict boundaries.
 Every scheduled run — whether it ran, was disabled, or errored — writes a
 row to `pipeline_runs` (migration 0004), viewable by the owner at
-`GET /admin/news/runs` (gated by `CURATION_KEY`, same as the curation
+`GET /admin/news/runs` (gated by admin session, same as the curation
 queue). The pipeline never publishes, never changes adaptation statuses,
 and never sends anything: it only writes `pending` rows for owner curation.
 

@@ -43,7 +43,7 @@ export interface PipelineRun {
   errors: string | null;
 }
 
-export type AuthUser = { email: string } | null;
+export type AuthUser = { email: string; isAdmin?: boolean } | null;
 
 // ---------------------------------------------------------------------------
 // Small helpers (labels)
@@ -170,6 +170,7 @@ a:hover { text-decoration: underline; }
 .main-nav a.nav-link.active { color: #fff; background: var(--surface-2); }
 .header-user { margin-left: auto; display: flex; align-items: center; gap: .75rem; }
 .header-user .email { color: var(--muted); font-size: .85rem; max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-badge { display: inline-block; padding: .15rem .5rem; font-size: .7rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #0a0b0f; background: var(--gold); border-radius: 999px; text-decoration: none; }
 .logout-form { display: inline; }
 .btn {
   font: inherit; font-size: .88rem; font-weight: 600; cursor: pointer;
@@ -467,7 +468,7 @@ export function Layout({
 }: {
   title: string;
   children: Child;
-  user?: { email: string } | null;
+  user?: AuthUser;
 }) {
   return (
     <html lang="en">
@@ -494,6 +495,9 @@ export function Layout({
               {user?.email ? (
                 <>
                   <span class="email" title={user.email}>{user.email}</span>
+                  {user.isAdmin && (
+                    <a class="admin-badge" href="/admin/news" title="Admin curation console">Admin</a>
+                  )}
                   <form class="logout-form" action="/auth/logout" method="post">
                     <button class="btn btn-sm" type="submit">Log out</button>
                   </form>
@@ -1136,7 +1140,7 @@ export function ShelvesPage({
     title: string;
     shelf: string;
   }[];
-  user: { email: string };
+  user: { email: string; isAdmin?: boolean };
 }) {
   const grouped = new Map<string, typeof shelves>();
   for (const s of shelves) {
@@ -1256,19 +1260,19 @@ const PROMOTE_STATUSES = [
 ];
 
 /**
- * QUEUE_SCRIPT — interaction contract (unchanged behavior):
- *  - buttons with [data-act] POST JSON to their data-path with
- *    X-Curation-Key taken from ?key= (plus optional { reason } from the
- *    enclosing form), then reload the page;
+ * QUEUE_SCRIPT — interaction contract:
+ *  - buttons with [data-act] POST JSON to their data-path (plus optional
+ *    { reason } from the enclosing form), then reload the page;
  *  - forms.promote-form POST { adaptation_id, status?, corroborating_url? }
  *    on submit, then reload.
+ * Auth rides the httpOnly session cookie (same-origin fetch) — no key
+ * parameter is threaded through links or sent in headers.
  */
 const QUEUE_SCRIPT = `
-const KEY = new URLSearchParams(location.search).get('key') || '';
 async function callApi(path, body) {
   const res = await fetch(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Curation-Key': KEY },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body || {}),
   });
   let data = {};
@@ -1345,27 +1349,23 @@ export function NewsQueuePage({
   items,
   sources,
   counts,
-  keyParam,
 }: {
   status: NewsStatus;
   items: NewsItem[];
   sources: SourceRow[];
   counts: Record<NewsStatus, number>;
-  keyParam: string;
 }) {
-  const withKey = (href: string) =>
-    keyParam ? `${href}${href.includes('?') ? '&' : '?'}key=${encodeURIComponent(keyParam)}` : href;
   return (
     <Layout title="News curation">
       <p class="kicker">Owner console</p>
       <h1 class="display-title">News curation</h1>
       <p class="lede">
         The news pipeline proposes; you dispose. Sorted by trust tier, then
-        confidence. <a href={withKey('/admin/news/runs')}>View pipeline runs →</a>
+        confidence. <a href="/admin/news/runs">View pipeline runs →</a>
       </p>
       <nav class="tabs" aria-label="Queue status">
         {QUEUE_STATUSES.map((s) => (
-          <a href={withKey(`/admin/news?status=${s}`)} class={s === status ? 'active' : ''} key={s}>
+          <a href={`/admin/news?status=${s}`} class={s === status ? 'active' : ''} key={s}>
             {s} ({counts[s] ?? 0})
           </a>
         ))}
