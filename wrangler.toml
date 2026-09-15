@@ -3,9 +3,13 @@ main = "src/index.tsx"
 compatibility_date = "2026-09-01"
 workers_dev = true
 
-# Production route: apex domain (managed via API; declared here so deploys keep it)
+# Production routes: apex + www (managed via API; declared here so deploys keep them)
 [[routes]]
 pattern = "noveladaptations.com/*"
+zone_name = "noveladaptations.com"
+
+[[routes]]
+pattern = "www.noveladaptations.com/*"
 zone_name = "noveladaptations.com"
 
 [[d1_databases]]
