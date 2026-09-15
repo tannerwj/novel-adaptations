@@ -453,6 +453,7 @@ table.data tr.ok td:first-child { color: var(--text); }
   color: var(--faint); font-size: .85rem;
   display: flex; gap: 1rem; flex-wrap: wrap; justify-content: space-between; align-items: baseline;
 }
+.tmdb-attribution a { color: inherit; text-decoration: underline; }
 `;
 
 // ---------------------------------------------------------------------------
@@ -507,6 +508,10 @@ export function Layout({
         <footer class="site-footer">
           <div class="site-footer-inner">
             <span>Novel Adaptations — tracking every book's journey to the screen.</span>
+            <span class="tmdb-attribution">
+              This product uses the TMDB API but is not endorsed or certified by TMDB.
+              Data and images via <a href="https://www.themoviedb.org/">The Movie Database</a>.
+            </span>
             <span>
               <a href="/docs/DESIGN.md">Design doc</a>
             </span>

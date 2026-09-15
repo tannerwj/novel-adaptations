@@ -1,15 +1,13 @@
 /**
- * src/tmdb.ts — TMDB enrichment for screen works (STUB).
+ * src/tmdb.ts — TMDB enrichment for screen works.
  *
- * Purpose: given a TMDB id (screen_works.tmdb_id), fetch poster/backdrop/
- * release metadata from the TMDB API and return the values we persist on
- * screen_works (poster_url, etc.).
+ * Given a screen work's title (+ release year when known), search TMDB and
+ * return the poster/backdrop image URLs and TMDB id we persist on
+ * screen_works (poster_url, backdrop_url, tmdb_id).
  *
- * This file is intentionally a stub: it performs NO network calls when the
- * API key is absent, and returns null. The coordinator wires
- * `TMDB_API_KEY?: string` onto the worker Env (wrangler secret); Track A/B
- * pass the full `Env` here — this stub accepts any env with an optional
- * TMDB_API_KEY so it stays decoupled.
+ * Graceful by design: with no TMDB_API_KEY everything is a no-op returning
+ * null. The network boundary is the injected `fetcher`, so the lookup logic
+ * is pure and unit-testable without a real key.
  */
 
 export interface TmdbEnv {
@@ -17,34 +15,147 @@ export interface TmdbEnv {
   TMDB_API_KEY?: string;
 }
 
+export interface TmdbEnrichment {
+  tmdbId: number;
+  /** `https://image.tmdb.org/t/p/w500…` — always set when we return a result. */
+  posterUrl: string;
+  /** `https://image.tmdb.org/t/p/w1280…` — may be null when TMDB has none. */
+  backdropUrl: string | null;
+}
+
+export interface TmdbSearchInput {
+  title: string;
+  kind: 'film' | 'series';
+  /** Release year, when we have one (from screen_works.release_date). */
+  year?: number | null;
+}
+
+/** Network boundary for TMDB calls — inject a fake in tests. */
+export type TmdbFetcher = (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) => Promise<Response>;
+
+const TMDB_API = 'https://api.themoviedb.org/3';
+const POSTER_SIZE = 'w500';
+const BACKDROP_SIZE = 'w1280';
+
+/** Normalize for title matching: lowercase, strip punctuation/whitespace. */
+function normalizeTitle(t: string): string {
+  return t
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+interface TmdbSearchResult {
+  id: number;
+  title?: string;
+  name?: string;
+  original_title?: string;
+  original_name?: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+}
+
 /**
- * Enrich a screen work via TMDB. Returns null when enrichment is unavailable
- * (no key, invalid id, or — for now — always; see TODO).
+ * Search TMDB for a title. Uses the kind-specific endpoint — /search/movie
+ * for films, /search/tv for series — rather than /search/multi, so a film
+ * can never match a TV series of the same name (or a person/collection).
+ * The year is passed as a search filter (year / first_air_date_year) when
+ * known, which is the standard way to disambiguate remakes.
  *
- * TODO (future, when TMDB_API_KEY is set):
- *   1. Widen the return type to `Promise<TmdbEnrichment | null>`.
- *   2. Detect kind: try `/3/tv/{tmdbId}` and `/3/movie/{tmdbId}`
- *      (append_to_response=credits). The canonical stored kind
- *      (film | series) disambiguates which endpoint to trust.
- *   3. Map fields:
- *        poster_path  → `https://image.tmdb.org/t/p/w500{poster_path}`  (screen_works.poster_url)
- *        backdrop_path → `https://image.tmdb.org/t/p/w1280{backdrop_path}` (hero backdrops)
- *        release_date / first_air_date → release_date
- *        overview → synopsis (new column if we want it)
- *   4. Cache aggressively (KV or D1): ~40 req/10s on the free tier.
- *      Respect rate limits; never call without a key.
- *   5. Attribution: TMDB requires "This product uses the TMDB API" credit —
- *      the Layout footer is the natural home for it.
+ * Picks the first result carrying a poster, preferring one whose normalized
+ * title matches the query; returns null when nothing suitable is found.
  */
-export async function enrichScreenWork(env: TmdbEnv, tmdbId: number): Promise<null> {
-  if (!env.TMDB_API_KEY) {
+export async function searchTmdb(
+  apiKey: string,
+  input: TmdbSearchInput,
+  fetcher: TmdbFetcher = fetch,
+): Promise<TmdbEnrichment | null> {
+  const title = input.title.trim();
+  if (!apiKey || !title) return null;
+
+  const endpoint = input.kind === 'series' ? 'search/tv' : 'search/movie';
+  const params = new URLSearchParams({
+    api_key: apiKey,
+    query: title,
+    language: 'en-US',
+    page: '1',
+    include_adult: 'false',
+  });
+  if (input.year && Number.isInteger(input.year) && input.year > 1800) {
+    params.set(input.kind === 'series' ? 'first_air_date_year' : 'year', String(input.year));
+  }
+
+  let res: Response;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    try {
+      res = await fetcher(`${TMDB_API}/${endpoint}?${params}`, {
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch {
+    return null; // Network failure → no enrichment; the caller counts it.
+  }
+  if (!res.ok) return null;
+
+  let payload: { results?: TmdbSearchResult[] };
+  try {
+    payload = (await res.json()) as { results?: TmdbSearchResult[] };
+  } catch {
+    return null;
+  }
+  const results = Array.isArray(payload.results) ? payload.results : [];
+  // Only results with a poster are useful to us (the backfill selects exactly
+  // the poster-less rows). Scan a few candidates so one poster-less top hit
+  // doesn't block a good match ranked just below it.
+  const candidates = results.filter(
+    (r) => r && Number.isInteger(r.id) && r.id > 0 && r.poster_path,
+  );
+  if (candidates.length === 0) return null;
+
+  const wanted = normalizeTitle(title);
+  const match =
+    candidates.find((r) =>
+      [r.title, r.name, r.original_title, r.original_name]
+        .filter(Boolean)
+        .some((t) => normalizeTitle(t as string) === wanted),
+    ) ?? candidates[0]!;
+
+  return {
+    tmdbId: match.id,
+    posterUrl: `https://image.tmdb.org/t/p/${POSTER_SIZE}${match.poster_path}`,
+    backdropUrl: match.backdrop_path
+      ? `https://image.tmdb.org/t/p/${BACKDROP_SIZE}${match.backdrop_path}`
+      : null,
+  };
+}
+
+/**
+ * Enrich a screen work via TMDB title search. Returns null when enrichment
+ * is unavailable (no key, blank title, no match, network/API failure).
+ */
+export async function enrichScreenWork(
+  apiKey: string | undefined,
+  input: TmdbSearchInput,
+  fetcher: TmdbFetcher = fetch,
+): Promise<TmdbEnrichment | null> {
+  if (!apiKey) {
     // No key → no network, no cost, no failure. Graceful by design.
     return null;
   }
-  if (!Number.isInteger(tmdbId) || tmdbId <= 0) {
-    return null;
-  }
-  // Stub: even with a key, enrichment is not implemented yet.
-  // Implement the TODO above to go live.
-  return null;
+  return searchTmdb(apiKey, input, fetcher);
+}
+
+/** Env-shaped convenience wrapper (accepts the worker's Env). */
+export async function enrichScreenWorkFromEnv(
+  env: TmdbEnv,
+  input: TmdbSearchInput,
+  fetcher: TmdbFetcher = fetch,
+): Promise<TmdbEnrichment | null> {
+  return enrichScreenWork(env.TMDB_API_KEY, input, fetcher);
 }

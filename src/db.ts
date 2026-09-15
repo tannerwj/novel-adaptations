@@ -17,6 +17,8 @@ export interface ScreenWork {
   title: string;
   kind: 'film' | 'series';
   poster_url: string | null;
+  /** Added in migration 0006 (TMDB enrichment backfill). */
+  backdrop_url: string | null;
   release_date: string | null;
 }
 
@@ -45,6 +47,8 @@ export interface AdaptationSummary extends Adaptation {
   screen_release_date: string | null;
   /** Populated from screen_works.poster_url when TMDB enrichment has run. */
   screen_poster_url: string | null;
+  /** Populated from screen_works.backdrop_url (migration 0006). */
+  screen_backdrop_url: string | null;
 }
 
 const SELECT_ADAPTATION_SUMMARY = `
@@ -53,7 +57,8 @@ const SELECT_ADAPTATION_SUMMARY = `
          b.cover_url AS book_cover_url,
          s.title AS screen_title, s.kind AS screen_kind,
          s.release_date AS screen_release_date,
-         s.poster_url AS screen_poster_url
+         s.poster_url AS screen_poster_url,
+         s.backdrop_url AS screen_backdrop_url
   FROM adaptations a
   JOIN books b ON b.id = a.book_id
   JOIN screen_works s ON s.id = a.screen_work_id
