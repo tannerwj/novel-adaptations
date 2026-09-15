@@ -43,6 +43,8 @@ export interface AdaptationSummary extends Adaptation {
   screen_title: string;
   screen_kind: 'film' | 'series';
   screen_release_date: string | null;
+  /** Populated from screen_works.poster_url when TMDB enrichment has run. */
+  screen_poster_url: string | null;
 }
 
 const SELECT_ADAPTATION_SUMMARY = `
@@ -50,7 +52,8 @@ const SELECT_ADAPTATION_SUMMARY = `
          b.title AS book_title, b.authors AS book_authors,
          b.cover_url AS book_cover_url,
          s.title AS screen_title, s.kind AS screen_kind,
-         s.release_date AS screen_release_date
+         s.release_date AS screen_release_date,
+         s.poster_url AS screen_poster_url
   FROM adaptations a
   JOIN books b ON b.id = a.book_id
   JOIN screen_works s ON s.id = a.screen_work_id

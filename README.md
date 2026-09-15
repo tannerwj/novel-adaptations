@@ -80,5 +80,14 @@ Then open `https://noveladaptations.com/admin/news?key=<secret>` (or send
 items require a `corroborating_url`). Pending items older than 30 days are
 auto-dismissed at the start of each scheduled run.
 
+## Secrets & environment
+
+| Secret / var | How to set | What happens when unset |
+|---|---|---|
+| `CURATION_KEY` | `npx wrangler secret put CURATION_KEY` | `/admin/*` and `/api/news/*` deny everything (fail closed) |
+| `RESEND_API_KEY` | `npx wrangler secret put RESEND_API_KEY` | Magic links are logged to the console; with `ENVIRONMENT=development` they're also shown on-screen; otherwise sign-in shows "not configured" |
+| `TMDB_API_KEY` | `npx wrangler secret put TMDB_API_KEY` | `src/tmdb.ts` enrichment stub no-ops (TODO) |
+| `ENVIRONMENT` (`[vars]`) | `ENVIRONMENT = "development"` in `.dev.vars` (gitignored) | Defaults to fail-closed production behavior |
+
 **Production deploy needs owner approval.** Don't run `wrangler deploy` or
 touch the remote D1 without it.
