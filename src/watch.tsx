@@ -15,6 +15,8 @@
  */
 import type { AuthUser } from './ui';
 import { Layout, PosterArt, StatusBadge, TrustBadge } from './ui';
+// Round 3: where-to-watch providers (TMDB, 7-day D1 cache).
+import { WhereToWatch, type WatchProviders } from './watch_providers';
 import type { NewsItem, ScreenWorkDetail } from './db';
 
 function kindLabel(kind: string): string {
@@ -35,15 +37,28 @@ function tmdbUrl(kind: string, tmdbId: number): string {
 export function ScreenWorkPage({
   work,
   news,
+  providers,
+  origin,
+  canonicalPath,
   user,
 }: {
   work: ScreenWorkDetail;
   news: NewsItem[];
+  providers?: WatchProviders | null;
+  origin?: string;
+  canonicalPath?: string;
   user?: AuthUser;
 }) {
   const year = releaseYear(work.release_date);
   return (
-    <Layout title={work.title} user={user}>
+    <Layout
+      title={work.title}
+      user={user}
+      origin={origin}
+      canonicalPath={canonicalPath}
+      description={work.synopsis?.trim() || undefined}
+      image={work.backdrop_url ?? work.poster_url ?? undefined}
+    >
       <a class="back-link" href="/">← All adaptations</a>
       <div class="hero">
         <PosterArt
@@ -98,6 +113,8 @@ export function ScreenWorkPage({
           </p>
         )}
       </section>
+
+      {providers && <WhereToWatch data={providers} />}
 
       <div class="detail-grid two" style="margin-top:1.5rem">
         <section class="panel">

@@ -11,6 +11,8 @@
  */
 import type { Child } from 'hono/jsx';
 import type { AdaptationSummary, Book, NewsItem, NewsStatus, SourceRow } from './db';
+// Round 3 (SEO): per-page meta/OG/Twitter tags; no-op when origin is absent.
+import { seoHead } from './seo';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -179,6 +181,15 @@ a:hover { text-decoration: underline; }
 }
 .main-nav a.nav-link:hover { color: #fff; text-decoration: none; background: var(--surface-2); }
 .main-nav a.nav-link.active { color: #fff; background: var(--surface-2); }
+/* Round 3: header search (Track 3) — inline, collapses gracefully on mobile. */
+.header-search { display: flex; gap: .4rem; align-items: center; }
+.header-search input[type="search"] {
+  width: 11rem; padding: .45rem .8rem; font-size: .88rem;
+  color: var(--text); background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 999px;
+}
+.header-search input[type="search"]::placeholder { color: var(--muted); }
+@media (max-width: 720px) { .header-search input[type="search"] { width: 8rem; } }
 .header-user { margin-left: auto; display: flex; align-items: center; gap: .75rem; }
 .header-user .email { color: var(--muted); font-size: .85rem; max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-badge { display: inline-block; padding: .15rem .5rem; font-size: .7rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #0a0b0f; background: var(--gold); border-radius: 999px; text-decoration: none; }
@@ -495,10 +506,20 @@ export function Layout({
   title,
   children,
   user,
+  origin,
+  description,
+  image,
+  canonicalPath,
 }: {
   title: string;
   children: Child;
   user?: AuthUser;
+  /** Request origin (`new URL(c.req.url).origin`) — enables SEO meta/OG tags. Absent → no SEO fragment. */
+  origin?: string;
+  description?: string;
+  image?: string;
+  /** Defaults to '/'; pass the request path for canonical URLs. */
+  canonicalPath?: string;
 }) {
   return (
     <html lang="en">
@@ -506,6 +527,9 @@ export function Layout({
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{title} — Novel Adaptations</title>
+        {origin
+          ? seoHead(origin, { title, description, image, path: canonicalPath ?? '/' })
+          : null}
         <meta name="theme-color" content="#0a0b0f" />
         <link rel="icon" type="image/png" href="/favicon.png" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -530,8 +554,21 @@ export function Layout({
               <a class="nav-link" href="/">Browse</a>
               <a class="nav-link" href="/most-wanted">Most Wanted</a>
               <a class="nav-link" href="/shelves">Shelves</a>
+              <a class="nav-link" href="/calendar">Calendar</a>
               <a class="nav-link" href="/admin/news">News curation</a>
             </nav>
+            <form class="header-search" action="/search" method="get" role="search">
+              <input
+                type="search"
+                name="q"
+                placeholder="Search books, movies, shows…"
+                aria-label="Search books, movies, and shows"
+                maxlength={100}
+              />
+              <button class="btn btn-sm" type="submit">
+                Search
+              </button>
+            </form>
             <div class="header-user">
               {user?.email ? (
                 <>
@@ -845,12 +882,14 @@ function AdaptationCard({ a }: { a: AdaptationWithPoster }) {
 export function HomePage({
   adaptations,
   user,
+  origin,
 }: {
   adaptations: AdaptationSummary[];
   user?: AuthUser;
+  origin?: string;
 }) {
   return (
-    <Layout title="Browse" user={user}>
+    <Layout title="Browse" user={user} origin={origin} canonicalPath="/">
       <p class="kicker">The adaptation tracker</p>
       <h1 class="display-title">Every book's journey to the screen.</h1>
       <p class="lede">
@@ -881,6 +920,8 @@ export function AdaptationPage({
   userShelf,
   user,
   news,
+  origin,
+  canonicalPath,
 }: {
   adaptation: AdaptationWithPoster;
   timeline?: TimelineEvent[];
@@ -888,11 +929,20 @@ export function AdaptationPage({
   userShelf?: string | null;
   user?: AuthUser;
   news?: NewsItem[];
+  origin?: string;
+  canonicalPath?: string;
 }) {
   const authed = !!user?.email;
   const targetType = 'adaptation' as const;
   return (
-    <Layout title={adaptation.screen_title} user={user}>
+    <Layout
+      title={adaptation.screen_title}
+      user={user}
+      origin={origin}
+      canonicalPath={canonicalPath}
+      description={`Follow ${adaptation.book_title} by ${adaptation.book_authors} from page to screen — adaptation status, timeline, and news.`}
+      image={adaptation.screen_poster_url ?? adaptation.book_cover_url ?? undefined}
+    >
       <a class="back-link" href="/">← All adaptations</a>
       <div class="hero">
         <PosterArt
@@ -1030,17 +1080,28 @@ export function BookPage({
   userVoted,
   userShelf,
   user,
+  origin,
+  canonicalPath,
 }: {
   book: Book;
   adaptations: AdaptationSummary[];
   userVoted?: boolean;
   userShelf?: string | null;
   user?: AuthUser;
+  origin?: string;
+  canonicalPath?: string;
 }) {
   const authed = !!user?.email;
   const correctionHref = `/feedback?type=correction&subject=${encodeURIComponent(book.title)}`;
   return (
-    <Layout title={book.title} user={user}>
+    <Layout
+      title={book.title}
+      user={user}
+      origin={origin}
+      canonicalPath={canonicalPath}
+      description={`Follow ${book.title} by ${book.authors} from page to screen — adaptation status, release dates, and news.`}
+      image={book.cover_url ?? undefined}
+    >
       <a class="back-link" href="/">← All adaptations</a>
       <div class="hero">
         <PosterArt src={book.cover_url} title={book.title} subtitle={book.authors} />
@@ -1113,6 +1174,7 @@ export function BookPage({
 export function MostWantedPage({
   items,
   user,
+  origin,
 }: {
   items: {
     book: { id: number; title: string; authors: string; coverUrl: string | null };
@@ -1120,10 +1182,11 @@ export function MostWantedPage({
     userVoted: boolean;
   }[];
   user: AuthUser;
+  origin?: string;
 }) {
   const authed = !!user?.email;
   return (
-    <Layout title="Most Wanted" user={user}>
+    <Layout title="Most Wanted" user={user} origin={origin} canonicalPath="/most-wanted">
       <p class="kicker">Community leaderboard</p>
       <h1 class="display-title">Most Wanted Adaptations</h1>
       <p class="lede">

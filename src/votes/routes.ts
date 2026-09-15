@@ -69,6 +69,7 @@ export function mountVotes<E extends { DB: D1Database }>(
           userVoted: r.userVoted,
         })),
         user: user ? { email: user.email, isAdmin: user.isAdmin } : null,
+        origin: new URL(c.req.url).origin,
       }),
     );
   });

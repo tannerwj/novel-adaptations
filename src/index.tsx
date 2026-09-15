@@ -18,6 +18,12 @@ import { mountFeedback } from './feedback/routes';
 import { getAdaptationTimeline, getBookVoteState } from './votes/detail';
 import { getShelf } from './votes/db';
 import { serveFavicon } from './favicon';
+// Round 3: release calendar, site search, SEO, in-worker TMDB enrichment.
+import { registerCalendarRoutes } from './calendar';
+import { getWatchProviders } from './watch_providers';
+import { registerSearchRoutes } from './search';
+import { registerSeoRoutes } from './seo';
+import { registerEnrichmentRoutes } from './enrichment';
 
 export interface Env {
   DB: D1Database;
@@ -49,7 +55,11 @@ app.get('/', async (c) => {
   const adaptations = await listAdaptations(c.env.DB);
   const user = await getUser(c);
   return c.html(
-    <HomePage adaptations={adaptations} user={toAuthUser(user)} />,
+    <HomePage
+      adaptations={adaptations}
+      user={toAuthUser(user)}
+      origin={new URL(c.req.url).origin}
+    />,
   );
 });
 
@@ -73,6 +83,8 @@ app.get('/adaptations/:id', async (c) => {
       userVoted={userVoted}
       userShelf={userShelf}
       user={toAuthUser(user)}
+      origin={new URL(c.req.url).origin}
+      canonicalPath={c.req.path}
     />,
   );
 });
@@ -97,6 +109,8 @@ app.get('/books/:id', async (c) => {
       userVoted={userVoted}
       userShelf={userShelf}
       user={toAuthUser(user)}
+      origin={new URL(c.req.url).origin}
+      canonicalPath={c.req.path}
     />,
   );
 });
@@ -127,9 +141,24 @@ app.get('/watch/:id', async (c) => {
     c.env.DB,
     work.books.map((b) => b.title),
   );
+  // Round 3: where-to-watch providers (7-day D1 cache; never throws, never
+  // blocks render beyond a cold-miss fetch) + SEO origin for canonical/OG tags.
+  const providers = await getWatchProviders(c.env.DB, c.executionCtx, c.env, {
+    id: work.id,
+    tmdb_id: work.tmdb_id,
+    kind: work.kind,
+  });
   const user = await getUser(c);
+  const origin = new URL(c.req.url).origin;
   return c.html(
-    <ScreenWorkPage work={work} news={news} user={toAuthUser(user)} />,
+    <ScreenWorkPage
+      work={work}
+      news={news}
+      providers={providers}
+      origin={origin}
+      canonicalPath={c.req.path}
+      user={toAuthUser(user)}
+    />,
   );
 });
 
@@ -143,6 +172,13 @@ mountFeedback(app);
 // Owner-only news curation queue + API (gated by admin sessions; see
 // src/auth/session.ts requireAdminPage / requireAdminApi).
 registerCurationRoutes(app);
+
+// Round 3: release calendar, site search, SEO (sitemap/robots), and
+// in-worker TMDB enrichment (self-gated admin endpoint).
+registerCalendarRoutes(app);
+registerSearchRoutes(app);
+registerSeoRoutes(app);
+registerEnrichmentRoutes(app);
 
 app.notFound((c) => c.html(<Layout title="Not found">404 — page not found.</Layout>, 404));
 
