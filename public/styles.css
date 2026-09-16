@@ -275,24 +275,29 @@ a.menu-item:hover, button.menu-item:hover { background: var(--surface-2); text-d
 body.sheet-open { overflow: hidden; }
 
 @media (max-width: 719px) {
-  /* Slim one-row header: brand · search icon · theme + avatar/Log in. */
-  .site-header-inner { flex-wrap: nowrap; gap: .6rem; padding: .55rem 1rem; }
+  /* Slim one-row header: brand · search icon · theme + avatar/Log in.
+   * At 360px the row is over-constrained (brand 177 + toggle 44 + actions
+   * 115 + gaps/padding > 360), which flex-shrunk the search toggle to 20px.
+   * Tighten gaps/padding, pin flex:none, and shrink the wordmark so every
+   * control keeps its full 44px. */
+  .site-header-inner { flex-wrap: nowrap; gap: .4rem; padding: .55rem .75rem; }
   .main-nav { display: none; }
+  .brand { flex: none; display: inline-flex; align-items: center; min-height: 44px; font-size: 1.05rem; }
   .mobile-search-toggle {
-    display: inline-flex; align-items: center; justify-content: center;
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
     width: 44px; height: 44px; margin-left: auto; padding: 0; cursor: pointer;
     color: var(--muted); background: transparent; border: 0; border-radius: 999px;
   }
   .mobile-search-toggle:hover { color: var(--text); background: var(--surface-2); }
   .mobile-search-toggle svg { width: 1.25rem; height: 1.25rem; }
-  .header-actions { margin-left: 0; gap: .35rem; }
+  .header-actions { flex: none; margin-left: 0; gap: .35rem; }
   .site-header .theme-toggle, .site-header .avatar-btn { width: 44px; height: 44px; }
   .site-header .theme-toggle svg { width: 1.2rem; height: 1.2rem; }
   /* Expanding search: hidden until the icon toggles .search-open on the header,
    * then it takes a full second row of the header. */
   .header-search { display: none; }
   .site-header.search-open .site-header-inner { flex-wrap: wrap; }
-  .site-header.search-open .header-search { display: flex; flex: 1 1 100%; }
+  .site-header.search-open .header-search { display: flex; flex: 1 1 100%; order: 10; }
   .site-header.search-open .header-search input[type="search"] { flex: 1; width: auto; height: 44px; }
   .site-header.search-open .header-search .btn { min-height: 44px; }
 
@@ -378,7 +383,15 @@ body.sheet-open { overflow: hidden; }
     display: inline-flex; align-items: center; justify-content: center;
   }
   /* Footer links stack as full 44px rows. */
-  .footer-links a { display: inline-block; padding: .65rem 0; }
+  .footer-links a { display: inline-block; padding: .7rem 0; }
+  /* Pre-render reservation: while #app holds only the boot spinner, reserve
+   * ~a viewport so the footer starts below the fold. When the SPA renders,
+   * the selector stops matching and #app falls back to 60vh — so the footer
+   * never visibly jumps when content loads (the mobile CLS regression), and
+   * short pages keep no extra whitespace after render. */
+  #app:has(> .boot:only-child), #app:has(> .view-loading:only-child) { min-height: calc(100vh - 40px); min-height: calc(100svh - 40px); }
+  /* Anonymous "Sign in to rate" link: 44px hit area. */
+  .rating-login { display: inline-block; padding: .7rem 0; }
   /* Where-to-watch rows: roomy 44px rows on touch. */
   .wtw-provider { min-height: 44px; }
 }
@@ -784,9 +797,9 @@ table.data tr.ok td:first-child { color: var(--text); }
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 1.4rem; margin-bottom: 1.1rem;
 }
-.news-review-card h3 { margin: 0 0 .5rem; font-size: 1.12rem; line-height: 1.35; }
-.news-review-card h3 a { color: var(--text); }
-.news-review-card h3 a:hover { color: var(--accent-deep); }
+.news-review-card h2.news-title { margin: 0 0 .5rem; font-size: 1.12rem; line-height: 1.35; }
+.news-review-card h2.news-title a { color: var(--text); }
+.news-review-card h2.news-title a:hover { color: var(--accent-deep); }
 .news-review-card .meta { margin: .35rem 0; }
 .news-review-card > p { margin: .6rem 0; }
 /* ---- pipeline runs table (was unstyled, headers clipped) ---- */
@@ -824,7 +837,7 @@ table.admin-table th {
 }
 .feedback-row .grow { flex: 1; min-width: 0; }
 .feedback-row .meta { margin: 0; }
-.feedback-row h3 { margin: .3rem 0 .4rem; font-size: 1.05rem; line-height: 1.35; }
+.feedback-row h2.feedback-subject { margin: .3rem 0 .4rem; font-size: 1.05rem; line-height: 1.35; }
 .feedback-row .row-actions { display: flex; gap: .45rem; flex-wrap: wrap; flex: none; }
 .feedback-row a { overflow-wrap: anywhere; }
 @media (max-width: 719px) {
@@ -894,9 +907,9 @@ table.admin-table th {
 .list-card { display: flex; gap: 1.1rem; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.1rem 1.3rem; margin-bottom: .8rem; transition: border-color .2s; }
 .list-card:hover { border-color: var(--border-strong); }
 .list-card .grow { flex: 1; min-width: 0; }
-.list-card h3 { margin: 0 0 .3rem; font-size: 1.12rem; line-height: 1.3; }
-.list-card h3 a { color: var(--text); }
-.list-card h3 a:hover { color: var(--accent-deep); text-decoration: none; }
+.list-card h2.work-title { margin: 0 0 .3rem; font-size: 1.12rem; line-height: 1.3; }
+.list-card h2.work-title a { color: var(--text); }
+.list-card h2.work-title a:hover { color: var(--accent-deep); text-decoration: none; }
 .list-card .desc { color: var(--muted); font-size: .9rem; margin: .25rem 0 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .list-card .row-actions, .list-item .row-actions { display: flex; gap: .45rem; flex-wrap: wrap; align-items: center; flex: none; }
 .list-item { display: flex; gap: 1rem; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .85rem 1.1rem; margin-bottom: .7rem; }

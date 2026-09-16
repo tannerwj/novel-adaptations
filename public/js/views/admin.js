@@ -61,7 +61,7 @@ function newsCardHtml(it) {
   return (
     `<article class="news-review-card" data-news-id="${it.id}">` +
       `<p class="meta">#${it.id} · ${esc(it.source)} · trust: ${esc(it.trust_tier)}${it.published_at ? ` · published ${esc(it.published_at.slice(0, 10))}` : ''}</p>` +
-      `<h3>${link ? `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer">${esc(it.title)}</a>` : esc(it.title)}</h3>` +
+      `<h2 class="news-title">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer">${esc(it.title)}</a>` : esc(it.title)}</h2>` +
       (it.summary ? `<p>${esc(it.summary)}</p>` : '') +
       ((it.book_title || it.author || it.status_signal)
         ? `<p class="meta">→ ${esc(it.book_title ?? 'unknown book')}${it.author ? ` by ${esc(it.author)}` : ''}${it.screen_kind ? ` · ${esc(it.screen_kind)}` : ''}${it.status_signal ? ` · signal: ${esc(it.status_signal)}` : ''}${it.confidence != null ? ` · confidence ${it.confidence}` : ''}</p>`
@@ -237,7 +237,7 @@ function workCardHtml(w) {
   return (
     `<div class="list-card" data-work-id="${w.id}">` +
       `<div class="grow">` +
-        `<h3><a href="/watch/${w.id}">${esc(w.title)}</a></h3>` +
+        `<h2 class="work-title"><a href="/watch/${w.id}">${esc(w.title)}</a></h2>` +
         `<p class="meta">#${w.id} · ${esc(w.kind)}${w.tmdb_id ? ` · TMDB ${w.tmdb_id}` : ' · no TMDB id'}</p>` +
         `<form data-release-date style="display:flex;gap:.5rem;align-items:center;margin-top:.5rem;flex-wrap:wrap">` +
           `<label class="meta" for="rd-${w.id}">Release date</label>` +
@@ -320,7 +320,7 @@ function feedbackRowHtml(fb) {
     `<div class="feedback-row" data-feedback-id="${fb.id}">` +
       `<div class="grow">` +
         `<div class="meta">#${fb.id} · ${esc(FB_TYPE_LABELS[fb.type] ?? fb.type)} · ${esc(FB_STATUS_LABELS[fb.status] ?? fb.status)} · ${esc(fb.created_at.slice(0, 10))}${fb.email ? ` · ${esc(fb.email)}` : ''}</div>` +
-        `<h3>${esc(fb.subject)}</h3>` +
+        `<h2 class="feedback-subject">${esc(fb.subject)}</h2>` +
         `<p>${esc(fb.body.length > 300 ? fb.body.slice(0, 300) + '…' : fb.body)}</p>` +
         (link ? `<p class="meta">Proof: <a href="${esc(link)}" target="_blank" rel="noopener noreferrer">${esc(fb.proof_url)}</a></p>` : '') +
       `</div>` +

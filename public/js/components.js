@@ -521,6 +521,25 @@ function wireChrome() {
   });
 
   document.addEventListener('keydown', (e) => {
+    // The More sheet is aria-modal: keep Tab/Shift+Tab cycling inside it
+    // while open so keyboard users can't wander behind the scrim.
+    if (e.key === 'Tab') {
+      const sheet = document.querySelector('[data-more-sheet]');
+      if (sheet && !sheet.hidden) {
+        const items = [...sheet.querySelectorAll('a[href], button:not([disabled])')]
+          .filter((el) => el.offsetParent !== null);
+        if (items.length > 0) {
+          const first = items[0];
+          const last = items[items.length - 1];
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault(); last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault(); first.focus();
+          }
+        }
+      }
+      return;
+    }
     if (e.key === 'Escape') {
       const menu = document.querySelector('[data-user-menu]');
       if (menu && !menu.hidden) {
