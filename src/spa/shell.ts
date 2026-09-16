@@ -66,6 +66,12 @@ export function spaShell(
     `<link rel="apple-touch-icon" href="/apple-touch-icon.png">` +
     `<script>${THEME_SCRIPT}</script>` +
     `<style>${CRITICAL_CSS}</style>` +
+    // Preconnect to the poster/cover image hosts: the LCP element on every
+    // baseline page is a poster image whose URL is only known after the view
+    // API responds, so an early connection shaves the TLS+TCP handshake off
+    // the critical image request. No visual change.
+    `<link rel="preconnect" href="https://covers.openlibrary.org">` +
+    `<link rel="preconnect" href="https://image.tmdb.org">` +
     `<link rel="stylesheet" href="/styles.css">` +
     `</head>` +
     `<body>` +
