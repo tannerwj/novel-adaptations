@@ -468,13 +468,35 @@ export function mountChrome() {
   wireChrome();
 }
 
+/** Pathname the chrome was last rendered for (see refreshChrome). */
+let lastChromePath = null;
+
 export function refreshChrome() {
-  // A navigation re-renders the chrome wholesale: drop any open More sheet
-  // state first, otherwise a sheet link could leave the body scroll-locked.
-  document.body.classList.remove('sheet-open');
+  // A real navigation re-renders the chrome wholesale: drop any open More
+  // sheet state first, otherwise a sheet link could leave the body
+  // scroll-locked. A refresh that ISN'T a navigation (the initial render
+  // completing after boot, a session refresh) must preserve a just-opened
+  // sheet: without this, a tap landing between spaBooted and the initial
+  // render's chrome rewrite is silently swallowed.
   const pathname = window.location.pathname;
+  const navigated = lastChromePath !== null && lastChromePath !== pathname;
+  lastChromePath = pathname;
+  const wasOpen = !document.querySelector('[data-more-sheet]')?.hidden;
   document.getElementById('chrome-header').innerHTML = headerHtml(pathname);
   document.getElementById('chrome-footer').innerHTML = footerHtml();
+  if (wasOpen && !navigated) {
+    const sheet = document.querySelector('[data-more-sheet]');
+    const scrim = document.querySelector('[data-more-scrim]');
+    const btn = document.querySelector('[data-more-btn]');
+    if (sheet && scrim && btn) {
+      sheet.hidden = false;
+      scrim.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      document.body.classList.add('sheet-open');
+    }
+  } else {
+    document.body.classList.remove('sheet-open');
+  }
 }
 
 /** One-time wiring for chrome interactions: dropdown, theme toggle, search, logout,
