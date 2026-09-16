@@ -78,6 +78,11 @@ def first_author(authors):
     return first or None
 
 
+def cap(base, limit=90):
+    """Keep a combined base short enough for collision suffixes (-2, -3, ...)."""
+    return base[:limit].rstrip("-") or "untitled"
+
+
 def dedupe(pairs):
     """pairs: [(id, base_slug)] in id order → ({id: unique_slug}, suffix_count)."""
     used = set()
@@ -107,14 +112,14 @@ def build_slugs():
     def screen_base(title, release_date):
         base = slugify(title)
         year = year_of(release_date)
-        return f"{base}-{year}" if year else base
+        return cap(f"{base}-{year}") if year else base
 
     work_pairs = [(w["id"], screen_base(w["title"], w["release_date"])) for w in works]
 
     def book_base(title, authors):
         base = slugify(title)
         fa = first_author(authors)
-        return f"{base}-{slugify(fa)}" if fa else base
+        return cap(f"{base}-{slugify(fa)}") if fa else base
 
     book_pairs = [(b["id"], book_base(b["title"], b["authors"])) for b in books]
     adap_pairs = [(a["id"], screen_base(a["title"], a["release_date"])) for a in adaps]
