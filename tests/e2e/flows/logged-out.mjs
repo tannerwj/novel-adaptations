@@ -95,7 +95,10 @@ export const tests = [
   test('calendar: API buckets and client year groupings', async () => {
     const r = await apiGet('/api/v1/calendar');
     eq(r.status, 200, 'GET /api/v1/calendar status');
-    eq(r.data.earlier_releases.length, 37, 'calendar has 37 earlier releases');
+    assert(
+      r.data.earlier_releases.length >= 900,
+      `calendar has the full earlier-releases catalog (got ${r.data.earlier_releases.length})`,
+    );
     eq(r.data.tba.length, 3, 'calendar has exactly 3 TBA titles');
     const tbaTitles = r.data.tba.map((w) => w.title).sort();
     eq(
