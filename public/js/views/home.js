@@ -172,9 +172,11 @@ export async function calendarView() {
       `<section class="shelf-group"><h2>Earlier releases</h2>` +
         (yearGroups.length === 0
           ? `<p class="empty">No earlier releases.</p>`
-          : yearGroups.map((g) =>
-              `<div class="cal-group"><h3 class="cal-month">${esc(g.year)}</h3>` +
-              `<ul class="shelf-list">${g.works.map((w) => calendarItem(w, today)).join('')}</ul></div>`
+          : yearGroups.map((g, i) =>
+              `<details class="cal-year"${i === 0 ? ' open' : ''}>` +
+              `<summary><span>${esc(g.year)}</span>` +
+              `<span class="meta">${g.works.length} ${g.works.length === 1 ? 'title' : 'titles'}</span></summary>` +
+              `<ul class="shelf-list">${g.works.map((w) => calendarItem(w, today)).join('')}</ul></details>`
             ).join('')) +
       `</section>` +
       `<section class="shelf-group"><h2>TBA</h2>` +
