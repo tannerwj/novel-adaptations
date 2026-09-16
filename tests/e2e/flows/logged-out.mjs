@@ -102,7 +102,7 @@ export const tests = [
     // Ranked: the exact title match for "dune" outranks prefix/substring hits.
     const ranked = await apiGet('/api/v1/search', { query: { q: 'dune' } });
     eq(ranked.status, 200, 'GET /api/v1/search?q=dune status');
-    const bookHits = ranked.data.books ?? [];
+    const bookHits = ranked.data.books?.data ?? [];
     assert(bookHits.length > 0, 'dune search returns book hits');
     eq(bookHits[0].title, 'Dune', 'exact title match ranks first for "dune"');
 
@@ -127,7 +127,7 @@ export const tests = [
 
     const empty = await home.searchView({ query: { q: 'zzqxplork' } });
     contains(empty.html, 'No results for', 'nonsense query renders the clean empty state');
-    contains(empty.html, "Can't find it? Suggest an adaptation", 'empty state offers the adaptation suggestion CTA');
+    contains(empty.html, "Can\u2019t find it? Suggest an adaptation", 'empty state offers the adaptation suggestion CTA');
     contains(empty.html, '/feedback?type=adaptation_tip', 'suggestion CTA opens the adaptation-tip feedback flow');
     contains(empty.html, 'Popular right now', 'empty state suggests popular titles');
 
@@ -140,15 +140,15 @@ export const tests = [
     // accepted), then exercise the slug page routes and the 301s.
     const bookApi = await apiGet('/api/v1/books/38');
     eq(bookApi.status, 200, 'GET /api/v1/books/38 status');
-    const bookSlug = bookApi.data.slug;
+    const bookSlug = bookApi.data.book?.slug;
     assert(typeof bookSlug === 'string' && bookSlug.length > 0, 'book API exposes a slug');
     const watchApi = await apiGet('/api/v1/watch/38');
     eq(watchApi.status, 200, 'GET /api/v1/watch/38 status');
-    const watchSlug = watchApi.data.slug;
+    const watchSlug = watchApi.data.work?.slug;
     assert(typeof watchSlug === 'string' && watchSlug.length > 0, 'watch API exposes a slug');
     const adaptApi = await apiGet('/api/v1/adaptations/38');
     eq(adaptApi.status, 200, 'GET /api/v1/adaptations/38 status');
-    const adaptSlug = adaptApi.data.slug;
+    const adaptSlug = adaptApi.data.adaptation?.adaptation_slug;
     assert(typeof adaptSlug === 'string' && adaptSlug.length > 0, 'adaptation API exposes a slug');
 
     for (const [path, slug] of [['/books', bookSlug], ['/watch', watchSlug], ['/adaptations', adaptSlug]]) {
@@ -283,7 +283,7 @@ export const tests = [
 
   test('bot prerender: crawler gets OG metadata and slug canonical, users get the shell', async () => {
     const watchApi = await apiGet('/api/v1/watch/1');
-    const watchSlug = watchApi.data.slug;
+    const watchSlug = watchApi.data.work?.slug;
     assert(typeof watchSlug === 'string' && watchSlug.length > 0, 'watch API exposes a slug for id 1');
 
     const bot = await getPage(`/watch/${watchSlug}`, { ua: GOOGLEBOT_UA });
