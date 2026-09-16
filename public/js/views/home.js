@@ -12,7 +12,14 @@ import { adaptationCard, statusBadge, kindPill, voteButton, wireUserControls } f
 export async function homeView() {
   const r = await api('/api/v1/home', { loginRedirect: false });
   if (!r.ok) throw new Error(errMsg(r));
-  const items = r.data.adaptations.data;
+  // /api/v1/home returns a paged list ({data, page, per_page, total}); the
+  // grid starts with page 1 and a "Load more" button pages through the rest
+  // via the same endpoint — instant, no reload, router-safe.
+  const list = r.data.adaptations;
+  const items = list.data;
+  const total = list.total;
+  const perPage = list.per_page;
+  const remaining = total - items.length;
   return {
     title: 'Browse',
     html:
@@ -21,9 +28,58 @@ export async function homeView() {
       `<p class="lede">From whispered rumors to opening night — follow novels as they're optioned, filmed, and released as movies and series.</p>` +
       (items.length === 0
         ? `<p class="empty">No adaptations tracked yet. Check back soon.</p>`
-        : `<div class="poster-grid">${items.map((a, i) => adaptationCard(a, { eager: i < 2 })).join('')}</div>`),
-    after(root) { wireUserControls(root); },
+        : `<div class="poster-grid" data-home-grid>${items.map((a, i) => adaptationCard(a, { eager: i < 2 })).join('')}</div>` +
+          (remaining > 0
+            ? `<div class="load-more-wrap"><button type="button" class="btn" data-load-more ` +
+              `data-next-page="${list.page + 1}" data-per-page="${perPage}" data-total="${total}">` +
+              `Load more <span class="meta" data-remaining>(${remaining} of ${total} remaining)</span></button></div>`
+            : '')),
+    after(root) { wireUserControls(root); wireLoadMore(root); },
   };
+}
+
+/**
+ * "Load more" for the home grid: appends the next /api/v1/home page to the
+ * grid in place. Appended cards are lazy (only the first two cards of the
+ * initial page are eager), so below-fold images never regress LCP.
+ */
+function wireLoadMore(root) {
+  const btn = root.querySelector('[data-load-more]');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    const label = btn.innerHTML;
+    btn.textContent = 'Loading…';
+    const nextPage = Number(btn.dataset.nextPage);
+    const perPage = Number(btn.dataset.perPage);
+    const total = Number(btn.dataset.total);
+    const pr = await api(`/api/v1/home?page=${nextPage}&per_page=${perPage}`, { loginRedirect: false });
+    if (!pr.ok) {
+      btn.disabled = false;
+      btn.innerHTML = label;
+      btn.insertAdjacentHTML('afterend', `<p class="inline-error" role="alert">${esc(errMsg(pr))}</p>`);
+      return;
+    }
+    const page = pr.data.adaptations;
+    const grid = root.querySelector('[data-home-grid]');
+    if (grid) {
+      // Below-fold cards stay lazy — same as the initial page's tail.
+      grid.insertAdjacentHTML('beforeend', page.data.map((a) => adaptationCard(a)).join(''));
+      wireUserControls(grid);
+    }
+    const shown = grid ? grid.querySelectorAll('.poster-card').length : 0;
+    const left = total - shown;
+    const err = btn.parentElement.querySelector('.inline-error');
+    if (err) err.remove();
+    if (left > 0 && page.data.length > 0) {
+      btn.dataset.nextPage = String(nextPage + 1);
+      btn.disabled = false;
+      btn.innerHTML = `Load more <span class="meta" data-remaining>(${left} of ${total} remaining)</span>`;
+    } else {
+      btn.closest('.load-more-wrap')?.remove();
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -73,6 +129,9 @@ export async function calendarView() {
   const r = await api('/api/v1/calendar', { loginRedirect: false });
   if (!r.ok) throw new Error(errMsg(r));
   const { today, coming_soon, recently_released, tba } = r.data;
+  // Dated releases older than the 120-day window get their own section so no
+  // dated work ever vanishes from the calendar.
+  const earlier = r.data.earlier_releases || [];
 
   const groups = [];
   for (const w of coming_soon) {
@@ -82,12 +141,21 @@ export async function calendarView() {
     else groups.push({ key, heading: monthHeading(cleanDate(w) || ''), works: [w] });
   }
 
+  // earlier_releases arrives newest-first; group by release year, descending.
+  const yearGroups = [];
+  for (const w of earlier) {
+    const year = (cleanDate(w) || '').slice(0, 4);
+    const last = yearGroups[yearGroups.length - 1];
+    if (last && last.year === year) last.works.push(w);
+    else yearGroups.push({ year, works: [w] });
+  }
+
   return {
     title: 'Release calendar',
     html:
       `<p class="kicker">Release calendar</p>` +
       `<h1 style="font-family:var(--serif);font-size:2rem;margin:.25rem 0 .5rem">When books hit the screen</h1>` +
-      `<p class="meta" style="margin-bottom:2rem">Every dated adaptation, arranged by release — upcoming first, then the last 120 days, then the ones still waiting on a date.</p>` +
+      `<p class="meta" style="margin-bottom:2rem">Every dated adaptation, arranged by release — upcoming first, then the last 120 days, then earlier releases, then the ones still waiting on a date.</p>` +
       `<section class="shelf-group"><h2>Coming soon</h2>` +
         (groups.length === 0
           ? `<p class="empty">Nothing dated in the pipeline yet.</p>`
@@ -100,6 +168,14 @@ export async function calendarView() {
         (recently_released.length === 0
           ? `<p class="empty">Nothing released in the last 120 days.</p>`
           : `<ul class="shelf-list">${recently_released.map((w) => calendarItem(w, today)).join('')}</ul>`) +
+      `</section>` +
+      `<section class="shelf-group"><h2>Earlier releases</h2>` +
+        (yearGroups.length === 0
+          ? `<p class="empty">Nothing older on the calendar.</p>`
+          : yearGroups.map((g) =>
+              `<div class="cal-group"><h3 class="cal-month">${esc(g.year)}</h3>` +
+              `<ul class="shelf-list">${g.works.map((w) => calendarItem(w, today)).join('')}</ul></div>`
+            ).join('')) +
       `</section>` +
       `<section class="shelf-group"><h2>TBA</h2>` +
         (tba.length === 0

@@ -4026,7 +4026,7 @@
           "Calendar"
         ],
         "summary": "Release calendar feed",
-        "description": "Screen works bucketed by release date: `coming_soon` (today or later),\n`recently_released` (trailing 120 days), and `tba` (no usable date).\n",
+        "description": "Screen works bucketed by release date: `coming_soon` (today or later),\n`recently_released` (trailing 120 days), `earlier_releases` (dated but\nolder than the window, newest first), and `tba` (no usable date).\n",
         "responses": {
           "200": {
             "description": "Calendar feed.",
@@ -4038,6 +4038,7 @@
                     "today",
                     "coming_soon",
                     "recently_released",
+                    "earlier_releases",
                     "tba"
                   ],
                   "properties": {
@@ -4053,6 +4054,12 @@
                       }
                     },
                     "recently_released": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CalendarWork"
+                      }
+                    },
+                    "earlier_releases": {
                       "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/CalendarWork"

@@ -69,6 +69,8 @@ function cleanDate(w: CalendarWork): string | null {
 export interface CalendarBuckets {
   comingSoon: CalendarWork[];
   recentlyReleased: CalendarWork[];
+  /** Dated works that released before the recent window, newest first. */
+  earlierReleases: CalendarWork[];
   tba: CalendarWork[];
 }
 
@@ -79,6 +81,7 @@ function bucketWorks(
 ): CalendarBuckets {
   const comingSoon: CalendarWork[] = [];
   const recentlyReleased: CalendarWork[] = [];
+  const earlierReleases: CalendarWork[] = [];
   const tba: CalendarWork[] = [];
   for (const w of works) {
     const d = cleanDate(w);
@@ -88,9 +91,11 @@ function bucketWorks(
       comingSoon.push(w);
     } else if (d >= windowStart) {
       recentlyReleased.push(w);
+    } else {
+      // Dated works older than the window get their own section rather than
+      // vanishing from the calendar; they stay reachable via Browse too.
+      earlierReleases.push(w);
     }
-    // Dated works older than the window stay off the calendar; they remain
-    // reachable through Browse and /watch/:id.
   }
   const byDateAsc = (a: CalendarWork, b: CalendarWork) =>
     (cleanDate(a) ?? '').localeCompare(cleanDate(b) ?? '') ||
@@ -98,8 +103,9 @@ function bucketWorks(
   const byDateDesc = (a: CalendarWork, b: CalendarWork) => -byDateAsc(a, b);
   comingSoon.sort(byDateAsc);
   recentlyReleased.sort(byDateDesc);
+  earlierReleases.sort(byDateDesc);
   tba.sort((a, b) => a.title.localeCompare(b.title));
-  return { comingSoon, recentlyReleased, tba };
+  return { comingSoon, recentlyReleased, earlierReleases, tba };
 }
 
 function monthHeading(iso: string): string {
@@ -216,7 +222,7 @@ export function CalendarPage({
   const windowStart = new Date(Date.parse(`${today}T00:00:00Z`) - RECENT_WINDOW_DAYS * DAY_MS)
     .toISOString()
     .slice(0, 10);
-  const { comingSoon, recentlyReleased, tba } = bucketWorks(works, today, windowStart);
+  const { comingSoon, recentlyReleased, earlierReleases, tba } = bucketWorks(works, today, windowStart);
   return (
     <Layout title="Release calendar" user={user} theme={theme}>
       <p class="kicker">Release calendar</p>
@@ -225,7 +231,8 @@ export function CalendarPage({
       </h1>
       <p class="meta" style="margin-bottom:2rem">
         Every dated adaptation, arranged by release — upcoming first, then the
-        last {RECENT_WINDOW_DAYS} days, then the ones still waiting on a date.
+        last {RECENT_WINDOW_DAYS} days, then earlier releases, then the ones
+        still waiting on a date.
       </p>
 
       <section class="shelf-group">
@@ -240,6 +247,19 @@ export function CalendarPage({
         ) : (
           <ul class="shelf-list">
             {recentlyReleased.map((w) => (
+              <CalendarItem key={w.id} work={w} today={today} />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section class="shelf-group">
+        <h2>Earlier releases</h2>
+        {earlierReleases.length === 0 ? (
+          <p class="empty">Nothing older on the calendar.</p>
+        ) : (
+          <ul class="shelf-list">
+            {earlierReleases.map((w) => (
               <CalendarItem key={w.id} work={w} today={today} />
             ))}
           </ul>

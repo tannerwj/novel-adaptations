@@ -3,7 +3,7 @@
 import { esc, safeUrl, kindLabel, posterArt, releaseYear, tmdbUrl, HERO_SIZES } from '../utils.js';
 import { api, errMsg } from '../api.js';
 import { renderNotFound } from '../router.js';
-import { store } from '../store.js';
+import { isAuthedResolved } from '../store.js';
 import {
   adaptationCard, statusBadge, kindPill, statusTimeline,
   newsList, voteButton, shelfPicker, wireUserControls,
@@ -23,7 +23,7 @@ export async function adaptationView({ params }) {
     throw new Error(errMsg(r));
   }
   const { adaptation: a, timeline, user_voted, user_shelf, poll } = r.data;
-  const authed = !!store.user;
+  const authed = isAuthedResolved();
   const correctionHref = `/feedback?type=correction&subject=${encodeURIComponent(a.screen_title)}`;
 
   return {
@@ -90,7 +90,7 @@ export async function bookView({ params }) {
     throw new Error(errMsg(r));
   }
   const b = r.data.book;
-  const authed = !!store.user;
+  const authed = isAuthedResolved();
   const correctionHref = `/feedback?type=correction&subject=${encodeURIComponent(b.title)}`;
 
   return {
@@ -173,7 +173,7 @@ export async function watchView({ params }) {
     throw new Error(errMsg(r));
   }
   const w = r.data.work;
-  const authed = !!store.user;
+  const authed = isAuthedResolved();
   const year = releaseYear(w.release_date);
   const adaptLink = w.adaptations.length === 1
     ? `<a href="/adaptations/${w.adaptations[0].id}">adaptation page →</a>`

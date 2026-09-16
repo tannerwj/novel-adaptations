@@ -1548,7 +1548,8 @@ paths:
       summary: Release calendar feed
       description: |
         Screen works bucketed by release date: `coming_soon` (today or later),
-        `recently_released` (trailing 120 days), and `tba` (no usable date).
+        `recently_released` (trailing 120 days), `earlier_releases` (dated but
+        older than the window, newest first), and `tba` (no usable date).
       responses:
         '200':
           description: Calendar feed.
@@ -1556,13 +1557,16 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [today, coming_soon, recently_released, tba]
+                required: [today, coming_soon, recently_released, earlier_releases, tba]
                 properties:
                   today: { type: string, format: date, example: '2026-09-15' }
                   coming_soon:
                     type: array
                     items: { $ref: '#/components/schemas/CalendarWork' }
                   recently_released:
+                    type: array
+                    items: { $ref: '#/components/schemas/CalendarWork' }
+                  earlier_releases:
                     type: array
                     items: { $ref: '#/components/schemas/CalendarWork' }
                   tba:

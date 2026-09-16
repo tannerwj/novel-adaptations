@@ -1451,6 +1451,7 @@ v1.get('/calendar', async (c) => {
       today,
       coming_soon: buckets.comingSoon,
       recently_released: buckets.recentlyReleased,
+      earlier_releases: buckets.earlierReleases,
       tba: buckets.tba,
     });
   });

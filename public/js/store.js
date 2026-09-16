@@ -85,6 +85,18 @@ export function isAuthed() {
   return !!store.user;
 }
 
+/**
+ * Auth gate for rendering interactive auth-gated markup (rating stars, hype
+ * segments, review forms, …). The SPA resolves the session before the first
+ * render, so in practice this equals isAuthed() — but requiring
+ * sessionLoaded too makes logged-out rendering deterministic: a view can
+ * never flash the signed-in variant of a widget before the session is
+ * actually known.
+ */
+export function isAuthedResolved() {
+  return store.sessionLoaded && !!store.user;
+}
+
 export function isAdmin() {
   return !!store.user && !!store.user.is_admin;
 }

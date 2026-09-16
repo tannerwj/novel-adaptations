@@ -430,6 +430,10 @@ body.sheet-open { overflow: hidden; }
 }
 @media (min-width: 640px) { .poster-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 960px) { .poster-grid { grid-template-columns: repeat(4, 1fr); } }
+/* ---- home "load more" ---- */
+.load-more-wrap { display: flex; justify-content: center; margin: 2.25rem 0 1rem; }
+.load-more-wrap .btn { min-height: 44px; padding: .7rem 1.75rem; font-size: 1rem; }
+.load-more-wrap .meta { font-weight: 400; }
 .poster-card { position: relative; }
 .poster-card a.poster-link { display: block; border-radius: var(--radius); }
 .poster {
