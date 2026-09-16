@@ -82,34 +82,46 @@ export async function toggleVote(
   return castVote(db, userId, bookId);
 }
 
-/** Books ranked by vote count, DESC (Listopia-style Most Wanted). */
-export async function getMostWanted(
+/** Raw row shape of the Most Wanted leaderboard query. */
+export interface MostWantedRawRow {
+  bookId: number;
+  title: string;
+  authors: string;
+  coverUrl: string | null;
+  votes: number;
+  userVoted: number | null;
+}
+
+/**
+ * The Most Wanted leaderboard as prepared statements — [rows, exact total] —
+ * so callers can run both in one D1 round trip via db.batch().
+ */
+export function mostWantedStatements(
   db: D1Database,
   userId: number | null,
-  limit = 100,
-): Promise<MostWantedRow[]> {
-  const { results } = await db
-    .prepare(
-      `SELECT b.id AS bookId, b.title AS title, b.authors AS authors,
-              b.cover_url AS coverUrl, COUNT(v.id) AS votes,
-              MAX(CASE WHEN v.user_id = ?1 THEN 1 ELSE 0 END) AS userVoted
-         FROM books b
-         LEFT JOIN votes v ON v.book_id = b.id
-        GROUP BY b.id
-       HAVING votes > 0
-        ORDER BY votes DESC, b.title ASC
-        LIMIT ?2`,
-    )
-    .bind(userId, limit)
-    .all<{
-      bookId: number;
-      title: string;
-      authors: string;
-      coverUrl: string | null;
-      votes: number;
-      userVoted: number | null;
-    }>();
-  return (results ?? []).map((r) => ({
+  limit: number,
+): [D1PreparedStatement, D1PreparedStatement] {
+  return [
+    db
+      .prepare(
+        `SELECT b.id AS bookId, b.title AS title, b.authors AS authors,
+                b.cover_url AS coverUrl, COUNT(v.id) AS votes,
+                MAX(CASE WHEN v.user_id = ?1 THEN 1 ELSE 0 END) AS userVoted
+           FROM books b
+           LEFT JOIN votes v ON v.book_id = b.id
+          GROUP BY b.id
+         HAVING votes > 0
+          ORDER BY votes DESC, b.title ASC
+          LIMIT ?2`,
+      )
+      .bind(userId, limit),
+    db.prepare('SELECT COUNT(DISTINCT book_id) AS n FROM votes'),
+  ];
+}
+
+/** Project raw leaderboard rows into MostWantedRow (shared by batch callers). */
+export function mostWantedFromRows(results: MostWantedRawRow[]): MostWantedRow[] {
+  return results.map((r) => ({
     bookId: r.bookId,
     title: r.title,
     authors: r.authors,
@@ -117,6 +129,16 @@ export async function getMostWanted(
     votes: r.votes,
     userVoted: r.userVoted === 1,
   }));
+}
+
+/** Books ranked by vote count, DESC (Listopia-style Most Wanted). */
+export async function getMostWanted(
+  db: D1Database,
+  userId: number | null,
+  limit = 100,
+): Promise<MostWantedRow[]> {
+  const { results } = await mostWantedStatements(db, userId, limit)[0].all<MostWantedRawRow>();
+  return mostWantedFromRows(results ?? []);
 }
 
 // --- vote rate limiting (20/day) --------------------------------------------
@@ -174,6 +196,20 @@ export async function removeShelf(
     .run();
 }
 
+/** The shelf lookup as a prepared statement, for db.batch() callers. */
+export function shelfStatement(
+  db: D1Database,
+  userId: number,
+  targetType: ShelfTargetType,
+  targetId: number,
+): D1PreparedStatement {
+  return db
+    .prepare(
+      'SELECT shelf FROM shelf_items WHERE user_id = ?1 AND target_type = ?2 AND target_id = ?3',
+    )
+    .bind(userId, targetType, targetId);
+}
+
 /** The shelf a user has a single target on, or null. */
 export async function getShelf(
   db: D1Database,
@@ -181,12 +217,9 @@ export async function getShelf(
   targetType: ShelfTargetType,
   targetId: number,
 ): Promise<ShelfName | null> {
-  const row = await db
-    .prepare(
-      'SELECT shelf FROM shelf_items WHERE user_id = ?1 AND target_type = ?2 AND target_id = ?3',
-    )
-    .bind(userId, targetType, targetId)
-    .first<{ shelf: ShelfName }>();
+  const row = await shelfStatement(db, userId, targetType, targetId).first<{
+    shelf: ShelfName;
+  }>();
   return row?.shelf ?? null;
 }
 

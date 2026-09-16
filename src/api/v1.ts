@@ -38,23 +38,33 @@ import {
   listNewsItems,
   nextStatusAfter,
   promoteNewsItem,
+  SELECT_ADAPTATION_SUMMARY,
   setNewsItemStatus,
+  type AdaptationSummary,
   type NewsItem,
   type NewsStatus,
 } from '../db';
-import { getAdaptationTimeline, getBookVoteState } from '../votes/detail';
+import {
+  adaptationTimelineStatement,
+  bookVoteStateStatement,
+  getBookVoteState,
+  type TimelineEvent,
+} from '../votes/detail';
 import {
   castVote,
   checkVoteRate,
-  getMostWanted,
   getShelf,
   hasVoted,
   listShelves,
+  mostWantedFromRows,
+  mostWantedStatements,
   removeShelf,
+  shelfStatement,
   SHELF_TARGET_TYPES,
   SHELVES,
   upsertShelf,
   withdrawVote,
+  type MostWantedRawRow,
   type ShelfName,
   type ShelfTargetType,
 } from '../votes/db';
@@ -87,8 +97,12 @@ import {
   getUserChoice,
   MAX_POLLS_PER_HOUR,
   POLL_CHOICES,
+  pollResultsFromRows,
+  pollResultsStatement,
   setPollVote,
+  userChoiceStatement,
   type PollChoice,
+  type PollRow,
 } from '../polls/db';
 import {
   checkHypeRate,
@@ -139,9 +153,10 @@ import { countRemaining, parseBatchSize, runEnrichmentBatch } from '../enrichmen
 import {
   getPopularBooks,
   RESULT_LIMIT,
-  searchAdaptations,
-  searchBooks,
-  searchScreenWorks,
+  searchStatements,
+  type AdaptationHit,
+  type BookHit,
+  type ScreenWorkHit,
 } from '../search';
 import { getCalendarFeed } from '../calendar';
 import { getWatchProviders } from '../watch_providers';
@@ -226,6 +241,33 @@ async function v1User(c: V1Context): Promise<V1User | null> {
 /** Normalize the D1 0/1 is_admin into a real boolean. */
 function toV1User(id: number, email: string, isAdmin: unknown): V1User {
   return { id, email, is_admin: isAdmin === 1 || isAdmin === true };
+}
+
+/**
+ * Short-TTL edge caching for anonymous, non-personalized GETs (home,
+ * calendar, search). Responses carry `public, s-maxage=60` so Cloudflare's
+ * edge serves repeat hits without a D1 round trip.
+ *
+ * Deliberately NOT applied to /most-wanted or /adaptations/:id: those carry
+ * user_voted / user_shelf / user_choice fields when a session cookie is
+ * present, and the edge cache key does not vary on cookies — caching them
+ * would leak one user's personalized state to another visitor. Correctness
+ * over speed there (they still get the D1 batching below).
+ */
+function publicCache(res: Response): Response {
+  res.headers.set('Cache-Control', 'public, s-maxage=60, max-age=30');
+  return res;
+}
+
+/**
+ * db.batch() resolves exactly one D1Result per statement, in order.
+ * noUncheckedIndexedAccess flags every array destructure, so call sites use
+ * this instead of `const [a, b] = ...`.
+ */
+function batched(results: D1Result[], i: number): D1Result {
+  const r = results[i];
+  if (!r) throw new Error(`D1 batch result ${i} missing`);
+  return r;
 }
 
 // --- row → JSON projections (snake_case) -------------------------------------
@@ -388,14 +430,6 @@ v1.post('/auth/logout', async (c) => {
 
 // --- home / adaptations ------------------------------------------------------
 
-async function countRows(db: D1Database, table: string): Promise<number> {
-  // Table names are fixed literals at the call sites — never user input.
-  const row = await db
-    .prepare(`SELECT COUNT(*) AS n FROM ${table}`)
-    .first<{ n: number }>();
-  return row?.n ?? 0;
-}
-
 /** Shared query parsing for the adaptation list endpoints. */
 function parseAdaptationListQuery(
   c: V1Context,
@@ -425,22 +459,37 @@ async function adaptationListData(c: V1Context) {
 }
 
 v1.get('/home', async (c) => {
-  const data = await adaptationListData(c);
-  if (!data.ok) return data.response;
-  const [total_adaptations, total_books, total_screen_works, approved_news] =
-    await Promise.all([
-      countRows(c.env.DB, 'adaptations'),
-      countRows(c.env.DB, 'books'),
-      countRows(c.env.DB, 'screen_works'),
-      c.env.DB
-        .prepare("SELECT COUNT(*) AS n FROM news_items WHERE status = 'approved'")
-        .first<{ n: number }>()
-        .then((r) => r?.n ?? 0),
-    ]);
-  return c.json({
-    adaptations: data.list,
-    stats: { total_adaptations, total_books, total_screen_works, approved_news },
-  });
+  const q = parseAdaptationListQuery(c);
+  if (!q.ok) return q.response;
+  // One D1 round trip: the full adaptation list + the four stat counts.
+  // (The Promise.all version issued five separate D1 HTTP requests.)
+  const homeBatch = await c.env.DB.batch([
+    c.env.DB.prepare(`${SELECT_ADAPTATION_SUMMARY} ORDER BY a.id ASC`),
+    c.env.DB.prepare('SELECT COUNT(*) AS n FROM adaptations'),
+    c.env.DB.prepare('SELECT COUNT(*) AS n FROM books'),
+    c.env.DB.prepare('SELECT COUNT(*) AS n FROM screen_works'),
+    c.env.DB.prepare("SELECT COUNT(*) AS n FROM news_items WHERE status = 'approved'"),
+  ]);
+  const listRes = batched(homeBatch, 0);
+  const adaptationsRes = batched(homeBatch, 1);
+  const booksRes = batched(homeBatch, 2);
+  const worksRes = batched(homeBatch, 3);
+  const newsRes = batched(homeBatch, 4);
+  const count = (r: D1Result) => (r.results?.[0] as { n: number } | undefined)?.n ?? 0;
+  const adaptations = ((listRes.results ?? []) as AdaptationSummary[]).filter(
+    (a) => !q.status || a.status === q.status,
+  );
+  return publicCache(
+    c.json({
+      adaptations: paginate(adaptations, q.page, q.per_page),
+      stats: {
+        total_adaptations: count(adaptationsRes),
+        total_books: count(booksRes),
+        total_screen_works: count(worksRes),
+        approved_news: count(newsRes),
+      },
+    }),
+  );
 });
 
 v1.get('/adaptations', async (c) => {
@@ -454,27 +503,54 @@ v1.get('/adaptations/:id', async (c) => {
   if (id === null || id < 1) {
     return validationError(c, 'Adaptation id must be a positive integer.');
   }
-  const adaptation = await getAdaptationSummary(c.env.DB, id);
+  // One D1 round trip for the three anonymous queries (was: 1 + 2 more).
+  const detailBatch = await c.env.DB.batch([
+    c.env.DB.prepare(`${SELECT_ADAPTATION_SUMMARY} WHERE a.id = ?1`).bind(id),
+    adaptationTimelineStatement(c.env.DB, id),
+    pollResultsStatement(c.env.DB, id),
+  ]);
+  const summaryRes = batched(detailBatch, 0);
+  const timelineRes = batched(detailBatch, 1);
+  const pollRes = batched(detailBatch, 2);
+  const adaptation = (summaryRes.results?.[0] ?? null) as AdaptationSummary | null;
   if (!adaptation) return apiError(c, 404, 'not_found', 'Adaptation not found.');
   const user = await v1User(c);
-  const [timeline, pollResults] = await Promise.all([
-    getAdaptationTimeline(c.env.DB, id),
-    getPollResults(c.env.DB, id),
-  ]);
+  // Preserve getAdaptationTimeline's legacy-seed fallback (no audit rows →
+  // synthesize one event from the current status); the extra lookup it used
+  // to do is redundant now that we already hold the summary row.
+  let timeline = ((timelineRes.results ?? []) as TimelineEvent[]).map((t) => ({
+    status: t.status,
+    at: t.at,
+    source_url: t.sourceUrl,
+  }));
+  if (timeline.length === 0) {
+    timeline = [{ status: adaptation.status, at: null, source_url: adaptation.source_url }];
+  }
+  const pollResults = pollResultsFromRows((pollRes.results ?? []) as PollRow[]);
   const [userVoted, userShelf, userChoice] = user
-    ? await Promise.all([
-        getBookVoteState(c.env.DB, user.id, adaptation.book_id),
-        getShelf(c.env.DB, user.id, 'adaptation', id),
-        getUserChoice(c.env.DB, user.id, id),
-      ])
+    ? await (async () => {
+        // One D1 round trip for the three per-user lookups (was: three).
+        const userBatch = await c.env.DB.batch([
+          bookVoteStateStatement(c.env.DB, user.id, adaptation.book_id),
+          shelfStatement(c.env.DB, user.id, 'adaptation', id),
+          userChoiceStatement(c.env.DB, user.id, id),
+        ]);
+        const voteRes = batched(userBatch, 0);
+        const shelfRes = batched(userBatch, 1);
+        const choiceRes = batched(userBatch, 2);
+        return [
+          (voteRes.results?.length ?? 0) > 0,
+          (shelfRes.results?.[0] as { shelf: ShelfName } | undefined)?.shelf ?? null,
+          (choiceRes.results?.[0] as { choice: PollChoice } | undefined)?.choice ?? null,
+        ] as const;
+      })()
     : [false, null, null];
+  // NOT edge-cached: user_voted / user_shelf / user_choice are personalized
+  // when logged in, and the edge cache key doesn't vary on cookies (see
+  // publicCache). The D1 batching above is the whole win here.
   return c.json({
     adaptation,
-    timeline: timeline.map((t) => ({
-      status: t.status,
-      at: t.at,
-      source_url: t.sourceUrl,
-    })),
+    timeline,
     user_voted: userVoted,
     user_shelf: userShelf,
     poll: {
@@ -581,14 +657,16 @@ v1.get('/most-wanted', async (c) => {
   const user = await v1User(c);
   // getMostWanted caps at its `limit` and takes no offset, so fetch enough
   // rows for the requested page (bounded at 1000) and count voted books
-  // separately for an exact `total`.
-  const [rows, total] = await Promise.all([
-    getMostWanted(c.env.DB, user?.id ?? null, Math.min(1000, page * per_page)),
-    c.env.DB
-      .prepare('SELECT COUNT(DISTINCT book_id) AS n FROM votes')
-      .first<{ n: number }>()
-      .then((r) => r?.n ?? 0),
-  ]);
+  // separately for an exact `total` — both in one D1 round trip (was: two).
+  const wantedBatch = await c.env.DB.batch(
+    mostWantedStatements(c.env.DB, user?.id ?? null, Math.min(1000, page * per_page)),
+  );
+  const rowsRes = batched(wantedBatch, 0);
+  const totalRes = batched(wantedBatch, 1);
+  const rows = mostWantedFromRows((rowsRes.results ?? []) as MostWantedRawRow[]);
+  const total = (totalRes.results?.[0] as { n: number } | undefined)?.n ?? 0;
+  // NOT edge-cached: user_voted is personalized when logged in, and the edge
+  // cache key doesn't vary on cookies (see publicCache).
   return c.json(
     paginate(
       rows.map((r) => ({
@@ -1270,19 +1348,25 @@ v1.get('/search', async (c) => {
   let limit = Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : RESULT_LIMIT;
   limit = Math.min(limit, RESULT_LIMIT);
   if (!q) {
-    return c.json({
-      q: '',
-      books: { data: [], total: 0 },
-      screen_works: { data: [], total: 0 },
-      adaptations: { data: [], total: 0 },
-      popular: await getPopularBooks(c.env.DB),
-    });
+    // Pure public fallback (no user fields) — safe to edge-cache.
+    return publicCache(
+      c.json({
+        q: '',
+        books: { data: [], total: 0 },
+        screen_works: { data: [], total: 0 },
+        adaptations: { data: [], total: 0 },
+        popular: await getPopularBooks(c.env.DB),
+      }),
+    );
   }
-  const [books, works, stories] = await Promise.all([
-    searchBooks(c.env.DB, q),
-    searchScreenWorks(c.env.DB, q),
-    searchAdaptations(c.env.DB, q),
-  ]);
+  // One D1 round trip for the three search groups (was: three).
+  const searchBatch = await c.env.DB.batch(searchStatements(c.env.DB, q));
+  const booksRes = batched(searchBatch, 0);
+  const worksRes = batched(searchBatch, 1);
+  const storiesRes = batched(searchBatch, 2);
+  const books = (booksRes.results ?? []) as BookHit[];
+  const works = (worksRes.results ?? []) as ScreenWorkHit[];
+  const stories = (storiesRes.results ?? []) as AdaptationHit[];
   const group = <T,>(rows: T[]) => {
     const data = rows.slice(0, limit);
     return { data, total: data.length };
@@ -1291,25 +1375,31 @@ v1.get('/search', async (c) => {
     books.length + works.length + stories.length === 0
       ? await getPopularBooks(c.env.DB)
       : [];
-  return c.json({
-    q,
-    books: group(books),
-    screen_works: group(works),
-    adaptations: group(stories),
-    popular,
-  });
+  // Pure function of q (no user fields) — safe to edge-cache per URL.
+  return publicCache(
+    c.json({
+      q,
+      books: group(books),
+      screen_works: group(works),
+      adaptations: group(stories),
+      popular,
+    }),
+  );
 });
 
 // --- calendar ----------------------------------------------------------------
 
 v1.get('/calendar', async (c) => {
   const { today, buckets } = await getCalendarFeed(c.env.DB);
-  return c.json({
-    today,
-    coming_soon: buckets.comingSoon,
-    recently_released: buckets.recentlyReleased,
-    tba: buckets.tba,
-  });
+  // Single query, identical for every visitor — safe to edge-cache.
+  return publicCache(
+    c.json({
+      today,
+      coming_soon: buckets.comingSoon,
+      recently_released: buckets.recentlyReleased,
+      tba: buckets.tba,
+    }),
+  );
 });
 
 // --- feedback (public submit) -------------------------------------------------

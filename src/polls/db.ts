@@ -12,27 +12,56 @@ export interface PollResults {
   total: number;
 }
 
-/** Live results for an adaptation: per-choice counts + total votes. */
-export async function getPollResults(
+/** Raw row shape of the poll-results aggregate. */
+export interface PollRow {
+  choice: PollChoice;
+  n: number;
+}
+
+/** The poll-results aggregate as a prepared statement, for db.batch() callers. */
+export function pollResultsStatement(
   db: D1Database,
   adaptationId: number,
-): Promise<PollResults> {
-  const { results } = await db
+): D1PreparedStatement {
+  return db
     .prepare(
       `SELECT choice, COUNT(*) AS n
          FROM poll_votes
         WHERE adaptation_id = ?1
         GROUP BY choice`,
     )
-    .bind(adaptationId)
-    .all<{ choice: PollChoice; n: number }>();
+    .bind(adaptationId);
+}
+
+/** The user's current choice lookup as a prepared statement. */
+export function userChoiceStatement(
+  db: D1Database,
+  userId: number,
+  adaptationId: number,
+): D1PreparedStatement {
+  return db
+    .prepare('SELECT choice FROM poll_votes WHERE user_id = ?1 AND adaptation_id = ?2')
+    .bind(userId, adaptationId);
+}
+
+/** Fold raw aggregate rows into PollResults (shared by getPollResults and batch callers). */
+export function pollResultsFromRows(rows: PollRow[]): PollResults {
   const counts: Record<PollChoice, number> = { book: 0, screen: 0, both: 0, undecided: 0 };
   let total = 0;
-  for (const r of results ?? []) {
+  for (const r of rows) {
     counts[r.choice] = r.n;
     total += r.n;
   }
   return { counts, total };
+}
+
+/** Live results for an adaptation: per-choice counts + total votes. */
+export async function getPollResults(
+  db: D1Database,
+  adaptationId: number,
+): Promise<PollResults> {
+  const { results } = await pollResultsStatement(db, adaptationId).all<PollRow>();
+  return pollResultsFromRows(results ?? []);
 }
 
 /** The user's current choice for this poll, or null if they haven't voted. */
@@ -41,12 +70,7 @@ export async function getUserChoice(
   userId: number,
   adaptationId: number,
 ): Promise<PollChoice | null> {
-  const row = await db
-    .prepare(
-      'SELECT choice FROM poll_votes WHERE user_id = ?1 AND adaptation_id = ?2',
-    )
-    .bind(userId, adaptationId)
-    .first<{ choice: PollChoice }>();
+  const row = await userChoiceStatement(db, userId, adaptationId).first<{ choice: PollChoice }>();
   return row?.choice ?? null;
 }
 

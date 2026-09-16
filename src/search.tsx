@@ -60,52 +60,64 @@ function likePattern(q: string): string {
 }
 
 export async function searchBooks(db: D1Database, q: string): Promise<BookHit[]> {
-  const pattern = likePattern(q);
-  const { results } = await db
-    .prepare(
-      `SELECT id, title, authors FROM books
-        WHERE title LIKE ?1 ESCAPE '\\' OR authors LIKE ?2 ESCAPE '\\'
-        ORDER BY title ASC
-        LIMIT ?3`,
-    )
-    .bind(pattern, pattern, RESULT_LIMIT)
-    .all<BookHit>();
+  const { results } = await searchStatements(db, q)[0].all<BookHit>();
   return results ?? [];
 }
 
 export async function searchScreenWorks(db: D1Database, q: string): Promise<ScreenWorkHit[]> {
-  const pattern = likePattern(q);
-  const { results } = await db
-    .prepare(
-      `SELECT id, title, kind, poster_url FROM screen_works
-        WHERE title LIKE ?1 ESCAPE '\\'
-        ORDER BY title ASC
-        LIMIT ?2`,
-    )
-    .bind(pattern, RESULT_LIMIT)
-    .all<ScreenWorkHit>();
+  const { results } = await searchStatements(db, q)[1].all<ScreenWorkHit>();
   return results ?? [];
 }
 
 export async function searchAdaptations(db: D1Database, q: string): Promise<AdaptationHit[]> {
-  const pattern = likePattern(q);
-  const { results } = await db
-    .prepare(
-      `SELECT a.id, a.status,
-              b.title AS book_title, b.authors AS book_authors,
-              s.title AS screen_title, s.kind AS screen_kind
-         FROM adaptations a
-         JOIN books b ON b.id = a.book_id
-         JOIN screen_works s ON s.id = a.screen_work_id
-        WHERE b.title LIKE ?1 ESCAPE '\\'
-           OR b.authors LIKE ?2 ESCAPE '\\'
-           OR s.title LIKE ?3 ESCAPE '\\'
-        ORDER BY a.id DESC
-        LIMIT ?4`,
-    )
-    .bind(pattern, pattern, pattern, RESULT_LIMIT)
-    .all<AdaptationHit>();
+  const { results } = await searchStatements(db, q)[2].all<AdaptationHit>();
   return results ?? [];
+}
+
+/**
+ * The three search-group queries as prepared statements, in [books, works,
+ * adaptations] order, so callers can run them in one D1 round trip via
+ * db.batch() (see src/api/v1.ts). SQL identical to the single-shot helpers
+ * above — they delegate to this.
+ */
+export function searchStatements(
+  db: D1Database,
+  q: string,
+): [D1PreparedStatement, D1PreparedStatement, D1PreparedStatement] {
+  const pattern = likePattern(q);
+  return [
+    db
+      .prepare(
+        `SELECT id, title, authors FROM books
+          WHERE title LIKE ?1 ESCAPE '\\' OR authors LIKE ?2 ESCAPE '\\'
+          ORDER BY title ASC
+          LIMIT ?3`,
+      )
+      .bind(pattern, pattern, RESULT_LIMIT),
+    db
+      .prepare(
+        `SELECT id, title, kind, poster_url FROM screen_works
+          WHERE title LIKE ?1 ESCAPE '\\'
+          ORDER BY title ASC
+          LIMIT ?2`,
+      )
+      .bind(pattern, RESULT_LIMIT),
+    db
+      .prepare(
+        `SELECT a.id, a.status,
+                b.title AS book_title, b.authors AS book_authors,
+                s.title AS screen_title, s.kind AS screen_kind
+           FROM adaptations a
+           JOIN books b ON b.id = a.book_id
+           JOIN screen_works s ON s.id = a.screen_work_id
+          WHERE b.title LIKE ?1 ESCAPE '\\'
+             OR b.authors LIKE ?2 ESCAPE '\\'
+             OR s.title LIKE ?3 ESCAPE '\\'
+          ORDER BY a.id DESC
+          LIMIT ?4`,
+      )
+      .bind(pattern, pattern, pattern, RESULT_LIMIT),
+  ];
 }
 
 /**

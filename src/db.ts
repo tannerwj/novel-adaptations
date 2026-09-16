@@ -55,7 +55,9 @@ export interface AdaptationSummary extends Adaptation {
   screen_backdrop_url: string | null;
 }
 
-const SELECT_ADAPTATION_SUMMARY = `
+/** Shared JOIN behind listAdaptations / getAdaptationSummary. Exported so the
+ * v1 API can batch it with sibling statements in one D1 round trip. */
+export const SELECT_ADAPTATION_SUMMARY = `
   SELECT a.id, a.book_id, a.screen_work_id, a.status, a.source_url,
          b.title AS book_title, b.authors AS book_authors,
          b.cover_url AS book_cover_url,

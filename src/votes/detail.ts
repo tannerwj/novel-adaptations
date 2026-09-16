@@ -18,15 +18,7 @@ export async function getAdaptationTimeline(
   db: D1Database,
   adaptationId: number,
 ): Promise<TimelineEvent[]> {
-  const { results } = await db
-    .prepare(
-      `SELECT new_status AS status, created_at AS at, source_url AS sourceUrl
-         FROM adaptation_status_audit
-        WHERE adaptation_id = ?1
-        ORDER BY created_at ASC, id ASC`,
-    )
-    .bind(adaptationId)
-    .all<TimelineEvent>();
+  const { results } = await adaptationTimelineStatement(db, adaptationId).all<TimelineEvent>();
 
   if (results && results.length > 0) return results;
 
@@ -38,15 +30,39 @@ export async function getAdaptationTimeline(
   return [{ status: current.status, at: null, sourceUrl: current.sourceUrl }];
 }
 
+/** The audit rows behind the timeline, as a prepared statement, so callers can
+ * batch it with sibling queries in one D1 round trip (see src/api/v1.ts). */
+export function adaptationTimelineStatement(
+  db: D1Database,
+  adaptationId: number,
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `SELECT new_status AS status, created_at AS at, source_url AS sourceUrl
+         FROM adaptation_status_audit
+        WHERE adaptation_id = ?1
+        ORDER BY created_at ASC, id ASC`,
+    )
+    .bind(adaptationId);
+}
+
+/** The vote-state lookup as a prepared statement, for db.batch() callers. */
+export function bookVoteStateStatement(
+  db: D1Database,
+  userId: number,
+  bookId: number,
+): D1PreparedStatement {
+  return db
+    .prepare('SELECT 1 AS one FROM votes WHERE user_id = ?1 AND book_id = ?2')
+    .bind(userId, bookId);
+}
+
 /** Whether a user currently has a vote on a book. */
 export async function getBookVoteState(
   db: D1Database,
   userId: number,
   bookId: number,
 ): Promise<boolean> {
-  const row = await db
-    .prepare('SELECT 1 AS one FROM votes WHERE user_id = ?1 AND book_id = ?2')
-    .bind(userId, bookId)
-    .first<{ one: number }>();
+  const row = await bookVoteStateStatement(db, userId, bookId).first<{ one: number }>();
   return row !== null;
 }
