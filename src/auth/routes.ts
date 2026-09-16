@@ -15,7 +15,7 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { Env } from '../index';
 import { AuthErrorPage, LoginPage, MagicLinkSentPage, themeOf } from '../ui';
 import { newToken, sha256Hex } from './crypto';
-import { sendMagicLink } from './email';
+import { sendMagicLink, type EmailEnv } from './email';
 import { SESSION_COOKIE } from './session';
 
 /** Bindings for the auth routes (EMAIL send binding comes from Env). */
@@ -35,7 +35,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * email-bombing / provider cost abuse via the public /auth/magic-link endpoint.
  */
 const MAGIC_LINK_HOURLY_LIMIT = 5;
-async function checkMagicLinkRate(db: D1Database, email: string): Promise<boolean> {
+export async function checkMagicLinkRate(db: D1Database, email: string): Promise<boolean> {
   const hour = new Date().toISOString().slice(0, 13); // YYYY-MM-DDTHH (UTC)
   const row = await db
     .prepare('SELECT count FROM magic_link_rate WHERE email = ?1 AND hour = ?2')
@@ -52,7 +52,7 @@ async function checkMagicLinkRate(db: D1Database, email: string): Promise<boolea
   return true;
 }
 
-async function findOrCreateUser(db: D1Database, email: string): Promise<number> {
+export async function findOrCreateUser(db: D1Database, email: string): Promise<number> {
   const existing = await db
     .prepare('SELECT id FROM users WHERE email = ?1')
     .bind(email)
@@ -83,7 +83,7 @@ async function findOrCreateUser(db: D1Database, email: string): Promise<number> 
  *   UPDATE users SET is_admin = 0 WHERE email = '…';).
  * No route, API, or UI may mutate is_admin.
  */
-async function promoteAdmin(
+export async function promoteAdmin(
   db: D1Database,
   adminEmails: string | undefined,
   userId: number,
@@ -105,6 +105,81 @@ async function promoteAdmin(
       .run();
   }
 }
+
+/**
+ * Issue a magic link for an email: find-or-create the user, store a hashed
+ * single-use token (15-min TTL), and attempt delivery via the Email Service.
+ * Shared by the legacy HTML route and the v1 JSON API (src/api/v1.ts).
+ * Returns whether the email was actually sent and the link itself (the
+ * caller decides whether the on-screen dev link is safe to show).
+ */
+export async function issueMagicLink(
+  db: D1Database,
+  env: EmailEnv,
+  email: string,
+  origin: string,
+): Promise<{ sent: boolean; link: string }> {
+  const userId = await findOrCreateUser(db, email);
+  const token = newToken();
+  const tokenHash = await sha256Hex(token);
+  await db
+    .prepare(
+      `INSERT INTO magic_tokens (user_id, token_hash, expires_at)
+       VALUES (?1, ?2, ${MAGIC_LINK_TTL})`,
+    )
+    .bind(userId, tokenHash)
+    .run();
+
+  const link = `${origin}/auth/verify?token=${encodeURIComponent(token)}`;
+  const { sent } = await sendMagicLink(env, email, link);
+  return { sent, link };
+}
+
+/**
+ * Consume a single-use magic token and create a 30-day session.
+ * Returns the raw session token (to set as the na_session cookie) and the
+ * owning user id — or null when the token is missing, expired, or used.
+ * Shared by the legacy HTML route and the v1 JSON API (src/api/v1.ts).
+ */
+export async function consumeMagicToken(
+  db: D1Database,
+  token: string,
+): Promise<{ sessionToken: string; userId: number } | null> {
+  const tokenHash = await sha256Hex(token);
+  const row = await db
+    .prepare(
+      `SELECT id, user_id FROM magic_tokens
+        WHERE token_hash = ?1
+          AND used_at IS NULL
+          AND expires_at > datetime('now')`,
+    )
+    .bind(tokenHash)
+    .first<{ id: number; user_id: number }>();
+
+  if (!row) return null;
+
+  // Single-use: mark consumed before issuing the session.
+  const sessionToken = newToken();
+  const sessionHash = await sha256Hex(sessionToken);
+  await db.batch([
+    db.prepare("UPDATE magic_tokens SET used_at = datetime('now') WHERE id = ?1").bind(
+      row.id,
+    ),
+    db
+      .prepare(
+        `INSERT INTO sessions (user_id, token_hash, expires_at)
+         VALUES (?1, ?2, ${SESSION_TTL})`,
+      )
+      .bind(row.user_id, sessionHash),
+  ]);
+  return { sessionToken, userId: row.user_id };
+}
+
+/**
+ * Sender-facing mail environment for issueMagicLink (the Email Service
+ * binding). Re-exported so API callers can type their env the same way.
+ */
+export type { EmailEnv };
 
 export function mountAuth<E extends AuthBindings>(app: Hono<{ Bindings: E }>): void {
   app.get('/auth/login', (c) => {
@@ -131,19 +206,8 @@ export function mountAuth<E extends AuthBindings>(app: Hono<{ Bindings: E }>): v
       );
     }
 
-    const userId = await findOrCreateUser(c.env.DB, email);
-    const token = newToken();
-    const tokenHash = await sha256Hex(token);
-    await c.env.DB.prepare(
-      `INSERT INTO magic_tokens (user_id, token_hash, expires_at)
-       VALUES (?1, ?2, ${MAGIC_LINK_TTL})`,
-    )
-      .bind(userId, tokenHash)
-      .run();
-
     const origin = new URL(c.req.url).origin;
-    const link = `${origin}/auth/verify?token=${encodeURIComponent(token)}`;
-    const { sent } = await sendMagicLink(c.env, email, link);
+    const { sent, link } = await issueMagicLink(c.env.DB, c.env, email, origin);
 
     if (sent) {
       return c.html(MagicLinkSentPage({ email, theme: themeOf(c) }));
@@ -173,17 +237,8 @@ export function mountAuth<E extends AuthBindings>(app: Hono<{ Bindings: E }>): v
         400,
       );
     }
-    const tokenHash = await sha256Hex(token);
-    const row = await c.env.DB.prepare(
-      `SELECT id, user_id FROM magic_tokens
-        WHERE token_hash = ?1
-          AND used_at IS NULL
-          AND expires_at > datetime('now')`,
-    )
-      .bind(tokenHash)
-      .first<{ id: number; user_id: number }>();
-
-    if (!row) {
+    const consumed = await consumeMagicToken(c.env.DB, token);
+    if (!consumed) {
       return c.html(
         AuthErrorPage({
           message: 'This sign-in link is invalid, expired, or already used.',
@@ -194,26 +249,15 @@ export function mountAuth<E extends AuthBindings>(app: Hono<{ Bindings: E }>): v
     }
 
     // Single-use: mark consumed before issuing the session.
-    const sessionToken = newToken();
-    const sessionHash = await sha256Hex(sessionToken);
-    await c.env.DB.batch([
-      c.env.DB.prepare('UPDATE magic_tokens SET used_at = datetime(\'now\') WHERE id = ?1').bind(
-        row.id,
-      ),
-      c.env.DB
-        .prepare(
-          `INSERT INTO sessions (user_id, token_hash, expires_at)
-           VALUES (?1, ?2, ${SESSION_TTL})`,
-        )
-        .bind(row.user_id, sessionHash),
-    ]);
+    const sessionToken = consumed.sessionToken;
+    const userId = consumed.userId;
 
     // Admin bootstrap (the ONLY promotion path in the codebase): if the
     // sign-in email is on the ADMIN_EMAILS allow-list, grant is_admin. Runs
     // on every successful verify so later list edits promote existing users.
     // NEVER demotes — removing an email from ADMIN_EMAILS does not revoke
     // access; revoke manually via SQL if needed. See migration 0007.
-    await promoteAdmin(c.env.DB, c.env.ADMIN_EMAILS, row.user_id);
+    await promoteAdmin(c.env.DB, c.env.ADMIN_EMAILS, userId);
 
     const secure = new URL(c.req.url).protocol === 'https:';
     setCookie(c, SESSION_COOKIE, sessionToken, {

@@ -25,6 +25,9 @@ import { getWatchProviders } from './watch_providers';
 import { registerSearchRoutes } from './search';
 import { registerSeoRoutes } from './seo';
 import { registerEnrichmentRoutes } from './enrichment';
+// Phase 1 (SSR→SPA): versioned JSON API at /api/v1 — the SPA contract.
+// Existing /api/* routes and SSR pages are untouched; this only ADDS routes.
+import { mountV1 } from './api/v1';
 // Round 4: community — ratings, spoiler-safe reviews, polls, hype, lists.
 import { mountRatings } from './ratings/routes';
 import { mountReviews } from './reviews/routes';
@@ -288,6 +291,11 @@ registerCalendarRoutes(app);
 registerSearchRoutes(app);
 registerSeoRoutes(app);
 registerEnrichmentRoutes(app);
+
+// Phase 1 (SSR→SPA): versioned JSON API. Registered after all legacy
+// routes; a trailing wildcard inside src/api/v1.ts answers unknown
+// /api/v1/* paths with the JSON error envelope.
+mountV1(app);
 
 app.notFound((c) => c.html(<Layout title="Not found" theme={themeOf(c)}>404 — page not found.</Layout>, 404));
 

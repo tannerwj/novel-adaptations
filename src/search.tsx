@@ -19,25 +19,25 @@ import { Layout, PosterArt, StatusBadge, themeOf, type AuthUser, type ThemeName 
 import { getUser } from './auth/session';
 
 const QUERY_MAX_LEN = 100;
-const RESULT_LIMIT = 12;
+export const RESULT_LIMIT = 12;
 const POPULAR_LIMIT = 8;
 
 // --- SQL (track-local; src/db.ts is owned by other tracks — DO NOT EDIT it) ---
 
-interface BookHit {
+export interface BookHit {
   id: number;
   title: string;
   authors: string;
 }
 
-interface ScreenWorkHit {
+export interface ScreenWorkHit {
   id: number;
   title: string;
   kind: 'film' | 'series';
   poster_url: string | null;
 }
 
-interface AdaptationHit {
+export interface AdaptationHit {
   id: number;
   status: string;
   book_title: string;
@@ -46,7 +46,7 @@ interface AdaptationHit {
   screen_kind: 'film' | 'series';
 }
 
-interface PopularBook {
+export interface PopularBook {
   id: number;
   title: string;
   authors: string;
@@ -59,7 +59,7 @@ function likePattern(q: string): string {
   return `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
 }
 
-async function searchBooks(db: D1Database, q: string): Promise<BookHit[]> {
+export async function searchBooks(db: D1Database, q: string): Promise<BookHit[]> {
   const pattern = likePattern(q);
   const { results } = await db
     .prepare(
@@ -73,7 +73,7 @@ async function searchBooks(db: D1Database, q: string): Promise<BookHit[]> {
   return results ?? [];
 }
 
-async function searchScreenWorks(db: D1Database, q: string): Promise<ScreenWorkHit[]> {
+export async function searchScreenWorks(db: D1Database, q: string): Promise<ScreenWorkHit[]> {
   const pattern = likePattern(q);
   const { results } = await db
     .prepare(
@@ -87,7 +87,7 @@ async function searchScreenWorks(db: D1Database, q: string): Promise<ScreenWorkH
   return results ?? [];
 }
 
-async function searchAdaptations(db: D1Database, q: string): Promise<AdaptationHit[]> {
+export async function searchAdaptations(db: D1Database, q: string): Promise<AdaptationHit[]> {
   const pattern = likePattern(q);
   const { results } = await db
     .prepare(
@@ -115,7 +115,7 @@ async function searchAdaptations(db: D1Database, q: string): Promise<AdaptationH
  * catalog itself is empty. Used for the empty-query page and as the
  * suggestions fallback when a search has no matches.
  */
-async function getPopularBooks(db: D1Database): Promise<PopularBook[]> {
+export async function getPopularBooks(db: D1Database): Promise<PopularBook[]> {
   const { results } = await db
     .prepare(
       `SELECT b.id, b.title, b.authors, b.cover_url,

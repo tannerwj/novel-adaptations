@@ -19,7 +19,7 @@ import { getUser } from './auth/session';
 
 type CalendarBindings = { DB: D1Database };
 
-interface CalendarWork {
+export interface CalendarWork {
   id: number;
   title: string;
   kind: string;
@@ -46,7 +46,7 @@ const MONTH_NAMES = [
   'December',
 ] as const;
 
-async function listCalendarWorks(db: D1Database): Promise<CalendarWork[]> {
+export async function listCalendarWorks(db: D1Database): Promise<CalendarWork[]> {
   const { results } = await db
     .prepare(
       `SELECT id, title, kind, release_date, poster_url
@@ -66,7 +66,7 @@ function cleanDate(w: CalendarWork): string | null {
   return isIsoDate(d) ? d.trim() : null;
 }
 
-interface CalendarBuckets {
+export interface CalendarBuckets {
   comingSoon: CalendarWork[];
   recentlyReleased: CalendarWork[];
   tba: CalendarWork[];
@@ -260,6 +260,20 @@ export function CalendarPage({
       </section>
     </Layout>
   );
+}
+
+/** Bucketed calendar feed for the JSON API (same buckets the page renders). */
+export async function getCalendarFeed(
+  db: D1Database,
+): Promise<{ today: string; buckets: CalendarBuckets }> {
+  const works = await listCalendarWorks(db);
+  const today = new Date().toISOString().slice(0, 10);
+  const windowStart = new Date(
+    Date.parse(`${today}T00:00:00Z`) - RECENT_WINDOW_DAYS * DAY_MS,
+  )
+    .toISOString()
+    .slice(0, 10);
+  return { today, buckets: bucketWorks(works, today, windowStart) };
 }
 
 export function registerCalendarRoutes<E extends CalendarBindings>(

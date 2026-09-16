@@ -149,13 +149,7 @@ export function registerCurationRoutes<E extends CurationBindings>(
   // set or clear it by hand. TBA-first ordering so undated works are fixed
   // first. Same admin-session gate as the queue.
   app.get('/admin/screen-works', async (c) => {
-    const { results } = await c.env.DB
-      .prepare(
-        `SELECT id, title, kind, release_date, tmdb_id
-           FROM screen_works
-          ORDER BY (release_date IS NULL) DESC, release_date ASC, title ASC`,
-      )
-      .all<ReleaseDateRow>();
+    const results = await listScreenWorksForAdmin(c.env.DB);
     const sessionUser = await getUser(c);
     const user: AuthUser = sessionUser
       ? { email: sessionUser.email, isAdmin: sessionUser.isAdmin }
@@ -171,33 +165,11 @@ export function registerCurationRoutes<E extends CurationBindings>(
       return c.json({ error: 'invalid screen work id' }, 400);
     }
     const body = await parseJsonBody(c);
-    const raw =
-      typeof body.release_date === 'string' ? body.release_date.trim() : '';
-    let releaseDate: string | null = null;
-    if (raw !== '') {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-        return c.json(
-          { error: 'release_date must be YYYY-MM-DD (or empty to clear it)' },
-          400,
-        );
-      }
-      const parts = raw.split('-');
-      const y = Number(parts[0]);
-      const m = Number(parts[1]);
-      const d = Number(parts[2]);
-      const roundTrip = new Date(Date.UTC(y, m - 1, d));
-      if (
-        roundTrip.getUTCFullYear() !== y ||
-        roundTrip.getUTCMonth() !== m - 1 ||
-        roundTrip.getUTCDate() !== d
-      ) {
-        return c.json(
-          { error: `release_date '${raw}' is not a real calendar date` },
-          400,
-        );
-      }
-      releaseDate = raw;
+    const parsed = validateReleaseDate(body.release_date);
+    if (!parsed.ok) {
+      return c.json({ error: parsed.error }, 400);
     }
+    const releaseDate = parsed.value;
     const existing = await c.env.DB
       .prepare('SELECT id FROM screen_works WHERE id = ?1')
       .bind(id)
@@ -291,20 +263,9 @@ export function registerCurationRoutes<E extends CurationBindings>(
     );
 
     // Round 3 / Track 5: queue the adaptation's linked screen work for TMDB
-    // poster enrichment when it has no poster yet. Only poster-less rows are
-    // flagged (manually-set posters are never overwritten downstream); the
-    // in-worker POST /admin/backfill/tmdb endpoint and the daily cron's
-    // backstop sweep clear the flag once enrichment is attempted.
-    // Requires migration 0013_enrichment_flag.sql.
-    await c.env.DB
-      .prepare(
-        `UPDATE screen_works
-            SET needs_enrichment = 1
-          WHERE id = (SELECT screen_work_id FROM adaptations WHERE id = ?1)
-            AND (poster_url IS NULL OR poster_url = '')`,
-      )
-      .bind(adaptationId)
-      .run();
+    // poster enrichment when it has no poster yet (see
+    // flagEnrichmentForAdaptation above). Requires migration 0013.
+    await flagEnrichmentForAdaptation(c.env.DB, adaptationId);
 
     return c.json({
       ok: true,
@@ -334,12 +295,75 @@ async function requireItem<E extends CurationBindings>(
 // ---------------------------------------------------------------------------
 
 /** Row shape for the release-dates admin table (snake_case DB convention). */
-interface ReleaseDateRow {
+export interface ReleaseDateRow {
   id: number;
   title: string;
   kind: string;
   release_date: string | null;
   tmdb_id: number | null;
+}
+
+/**
+ * Release-date admin rows, TBA-first — shared by the legacy page route and
+ * the v1 JSON API (src/api/v1.ts).
+ */
+export async function listScreenWorksForAdmin(db: D1Database): Promise<ReleaseDateRow[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT id, title, kind, release_date, tmdb_id
+         FROM screen_works
+        ORDER BY (release_date IS NULL) DESC, release_date ASC, title ASC`,
+    )
+    .all<ReleaseDateRow>();
+  return results ?? [];
+}
+
+/**
+ * Validate a release_date body value: empty/absent clears to NULL (TBA);
+ * anything else must be a real YYYY-MM-DD calendar date. Shared by the
+ * legacy form route and the v1 JSON API.
+ */
+export function validateReleaseDate(
+  raw: unknown,
+): { ok: true; value: string | null } | { ok: false; error: string } {
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  if (s === '') return { ok: true, value: null };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return { ok: false, error: 'release_date must be YYYY-MM-DD (or empty to clear it)' };
+  }
+  const parts = s.split('-');
+  const y = Number(parts[0]);
+  const m = Number(parts[1]);
+  const d = Number(parts[2]);
+  const roundTrip = new Date(Date.UTC(y, m - 1, d));
+  if (
+    roundTrip.getUTCFullYear() !== y ||
+    roundTrip.getUTCMonth() !== m - 1 ||
+    roundTrip.getUTCDate() !== d
+  ) {
+    return { ok: false, error: `release_date '${s}' is not a real calendar date` };
+  }
+  return { ok: true, value: s };
+}
+
+/**
+ * Queue the linked screen work for TMDB poster enrichment when a promote
+ * leaves it poster-less (manually-set posters are never flagged). Shared by
+ * the legacy promote route and the v1 JSON API. Requires migration 0013.
+ */
+export async function flagEnrichmentForAdaptation(
+  db: D1Database,
+  adaptationId: number,
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE screen_works
+          SET needs_enrichment = 1
+        WHERE id = (SELECT screen_work_id FROM adaptations WHERE id = ?1)
+          AND (poster_url IS NULL OR poster_url = '')`,
+    )
+    .bind(adaptationId)
+    .run();
 }
 
 /**
