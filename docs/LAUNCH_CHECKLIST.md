@@ -14,18 +14,21 @@ deploy.
    language before real users create accounts. Do not launch with the draft
    copy.
 
-2. **[OWNER] Fix the dark-mode toggle.** Known bug: the toggle flips the
-   theme state but nothing visibly changes. All static paths check out
-   (theme API returns 200 and sets the cookie; the deployed JS switches the
-   DOM instantly; dark CSS variables exist), so this needs live-browser
-   debugging — it could not be reproduced or fixed from the server side.
+2. **~~[OWNER] Fix the dark-mode toggle.~~ RESOLVED 2026-09-15.** The
+   "known bug" report was a false alarm from an agent without browser
+   access. Verified with a live browser on the production SPA (after the
+   SPA conversion): the toggle flips dark → light → dark instantly with no
+   page reload, and `data-theme` tracks the visible theme. Served CSS
+   selectors are unescaped and valid; the pre-paint theme script defaults
+   first-time visitors to light.
 
 3. **[VERIFY] Confirm the daily news pipeline cron is firing.** The
-   `0 6 * * *` trigger is registered on the production worker and
-   `PIPELINE_ENABLED="1"`, but `pipeline_runs` in production D1 has **zero
-   rows** — the scheduled handler records a row on every invocation, so it
-   has never fired. Check `/admin/news/runs` after the next 06:00 UTC tick;
-   if still empty, inspect the trigger in the Cloudflare dashboard
+   `0 6 * * *` trigger was verified **registered and healthy via the
+   Cloudflare API on 2026-09-15** (not just in config). `pipeline_runs`
+   has zero rows only because the first tick had not occurred yet — first
+   expected fire **2026-09-16 06:00 UTC**. A 7am MDT check is scheduled to
+   confirm the run executed and report feed health. If still empty after
+   that, inspect the trigger in the Cloudflare dashboard
    (Workers → novel-adaptations → Triggers).
 
 4. **[VERIFY] Confirm a magic-link email lands in a real inbox.** The
@@ -43,12 +46,15 @@ deploy.
    `/most-wanted`, `/search`, `/feedback`, `/privacy`, `/terms`, and every
    book / watch / adaptation detail page. `robots.txt` points at it.
 
-7. **Keep TMDB data fresh.** The 2026-09-15 backfill enriched 5 of 8 screen
-   works (posters, backdrops, TMDB IDs, release dates). Three unreleased
-   works — *Fourth Wing*, *The Midnight Library*, *A Court of Thorns and
-   Roses* — have no TMDB match yet and show no poster/date; re-run
-   **Admin → Screen works → Run backfill** (10 works per run) as new works
-   are added or when those titles get TMDB entries.
+7. **Keep TMDB data fresh.** The backfill enriched 5 of the original 8
+   screen works (posters, backdrops, TMDB IDs, release dates). Three
+   unreleased works — *Fourth Wing*, *The Midnight Library*, *A Court of
+   Thorns and Roses* — have no TMDB match yet and show no poster/date.
+   After the 2026-09-15 content seeding (catalog grew 8 → 40 adaptations),
+   the admin backfill was re-run for all new rows — see backfill results
+   in the 2026-09-15 dated log. Re-run **Admin → Screen works → Run
+   backfill** (10 works per run) as new works are added or when unmatched
+   titles get TMDB entries.
 
 ## Already verified (2026-09-15)
 
