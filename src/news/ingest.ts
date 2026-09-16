@@ -11,10 +11,13 @@
  *     kills the run). Feed health is recorded in the `sources` table.
  *  2. Parse → normalize → dedupe (sha256 of canonical URL; UNIQUE in D1).
  *  3. Keyword pre-filter gates which items reach the LLM.
- *  4. Classify with Workers AI (Llama 3.1 8B Instruct) through the
+ *  4. Classify with Workers AI (Llama 4 Scout) through the
  *     "novel-adaptations" AI Gateway. If the LLM is unavailable, fall back
  *     to keyword heuristics and flag needs_review=1.
  *  5. Insert pending items into D1 `news_items` for owner curation.
+ *     Items failing the keyword pre-filter are recorded as `dismissed`
+ *     (non-adaptation noise), never queued, and never counted against the
+ *     pending quarantine cap.
  *
  * Feed content is untrusted third-party text: it only ever goes into the
  * LLM's *user* message, output is schema-validated, and extracted strings
@@ -31,13 +34,15 @@
  * - Any classification with confidence < 0.6 is flagged needs_review=1.
  * - Every run (ran/disabled/error) writes a row to `pipeline_runs`.
  * This module never publishes, never changes adaptation statuses, never
- * sends anything — it only writes `pending` rows for owner curation.
+ * sends anything — it only writes `pending` rows (plus `dismissed` prefilter
+ * noise) for owner curation.
  */
 
 import {
   CRON_BATCH_SIZE,
   runEnrichmentBatch,
 } from '../enrichment';
+import { keywordGate, prefilterDisposition } from './gate';
 
 export interface NewsEnv {
   DB: D1Database;
@@ -73,9 +78,6 @@ export const SOURCES: Source[] = [
   { name: 'Flickering Myth', feed_url: 'https://www.flickeringmyth.com/feed/', trust_tier: 'rumor' },
 ];
 
-const ADAPTATION_TERMS = ['novel', 'book', 'adaptation', 'based on', 'optioned', 'rights', 'author'];
-const SCREEN_TERMS = ['film', 'movie', 'series', 'show', 'tv', 'netflix', 'hulu', 'apple tv', 'casting', 'director', 'streaming'];
-
 const SYSTEM_PROMPT = `You are a classifier for Novel Adaptations, a tracker of books adapted into films and TV series. Given a news headline and summary, decide whether it is about a book being adapted for the screen.
 
 Respond with ONLY a JSON object:
@@ -94,7 +96,7 @@ const MAX_PENDING_INSERTS_PER_RUN = 40;
 /** Classifications below this confidence are flagged needs_review=1. */
 const CONFIDENCE_REVIEW_THRESHOLD = 0.6;
 const GATEWAY_ID = 'novel-adaptations';
-const MODEL = '@cf/meta/llama-3.1-8b-instruct';
+const MODEL = '@cf/meta/llama-4-scout-17b-16e-instruct';
 /** Spec §8: pending items older than this are auto-dismissed each run. */
 const PENDING_SLA_DAYS = 30;
 
@@ -185,11 +187,6 @@ function canonicalUrl(url: string): string {
   } catch {
     return url;
   }
-}
-
-function keywordGate(text: string): boolean {
-  const t = text.toLowerCase();
-  return ADAPTATION_TERMS.some((w) => t.includes(w)) && SCREEN_TERMS.some((w) => t.includes(w));
 }
 
 /** Spec §4.1 secondary dedupe: same story re-posted under a new URL. */
@@ -352,6 +349,7 @@ export async function scheduledNewsRun(env: NewsEnv): Promise<void> {
     items_fetched: 0,
     items_new: 0,
     items_skipped_cap: 0,
+    items_dismissed_prefilter: 0,
     llm_calls: 0,
   };
 
@@ -426,6 +424,7 @@ async function runIngestion(
     items_fetched: number;
     items_new: number;
     items_skipped_cap: number;
+    items_dismissed_prefilter: number;
     llm_calls: number;
   },
 ): Promise<void> {
@@ -502,14 +501,15 @@ async function runIngestion(
       const titleNorm = normalizeTitle(item.title);
       if (recentTitles.has(titleNorm)) continue; // dedupe: same title, new URL
 
-      // QUARANTINE CAP: extras are skipped (never queued) and counted.
-      if (stats.items_new >= MAX_PENDING_INSERTS_PER_RUN) {
+      // QUARANTINE CAP: applies to pending candidates only. Below-gate
+      // items are dismissed outright and never consume cap.
+      const text = `${item.title} ${item.summary}`;
+      const passesGate = keywordGate(text);
+      if (passesGate && stats.items_new >= MAX_PENDING_INSERTS_PER_RUN) {
         stats.items_skipped_cap++;
         continue;
       }
-
-      const text = `${item.title} ${item.summary}`;
-      const passesGate = keywordGate(text);
+      const disposition = prefilterDisposition(passesGate);
 
       let cls: Classification;
       let llmModel = 'none';
@@ -572,9 +572,9 @@ async function runIngestion(
       await env.DB.prepare(
         `INSERT OR IGNORE INTO news_items
            (url, url_hash, title, summary, source, trust_tier, published_at,
-            status, is_adaptation_news, book_title, author, screen_kind,
+            status, dismiss_reason, is_adaptation_news, book_title, author, screen_kind,
             status_signal, confidence, llm_model, needs_review)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
         .bind(
           url,
@@ -584,6 +584,8 @@ async function runIngestion(
           src.name,
           src.trust_tier,
           item.published_at,
+          disposition.status,
+          disposition.dismiss_reason,
           cls.is_adaptation_news ? 1 : 0,
           cls.book_title,
           cls.author,
@@ -595,11 +597,12 @@ async function runIngestion(
         )
         .run();
       recentTitles.add(titleNorm);
-      stats.items_new++;
+      if (passesGate) stats.items_new++;
+      else stats.items_dismissed_prefilter++;
     }
   }
 
   console.log(
-    `news run complete: ${stats.items_new} items inserted, ${stats.items_skipped_cap} skipped (cap), ${stats.llm_calls} LLM calls, ${stats.feeds_ok} feeds ok / ${stats.feeds_failed} failed`,
+    `news run complete: ${stats.items_new} pending inserted, ${stats.items_dismissed_prefilter} dismissed (below gate), ${stats.items_skipped_cap} skipped (cap), ${stats.llm_calls} LLM calls, ${stats.feeds_ok} feeds ok / ${stats.feeds_failed} failed`,
   );
 }

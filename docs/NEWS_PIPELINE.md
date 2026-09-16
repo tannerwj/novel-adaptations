@@ -68,7 +68,7 @@ owner curates with morning coffee (MDT).
 6. Pre-filter keywords (see §4.2). Non-matching items are still recorded as
    `is_adaptation_news=0, status='dismissed'` (cheap, keeps the dedupe working
    without LLM cost).
-7. For candidates: one `env.AI.run('@cf/meta/llama-3.1-8b-instruct', ...,
+7. For candidates: one `env.AI.run('@cf/meta/llama-4-scout-17b-16e-instruct', ...,
    { gateway: { id: 'novel-adaptations', skipCache: false } })` call each.
 8. Insert results; update `sources.last_fetched_at` / failure counters.
 
@@ -129,7 +129,7 @@ The worker calls Workers AI through the binding with the gateway attached:
 
 ```ts
 const result = await env.AI.run(
-  '@cf/meta/llama-3.1-8b-instruct',
+  '@cf/meta/llama-4-scout-17b-16e-instruct',
   { messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: `TITLE: ${title}\nSUMMARY: ${summary}` },
