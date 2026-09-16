@@ -421,6 +421,7 @@ def flow_mobile_layout(page, c):
         overflow = page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
         assert not overflow, f"horizontal overflow on {path}"
     spa_goto(page, c.base + "/")
+    expect(page.locator(".tab-bar .tab-link").first).to_be_visible(timeout=30000)
     tabs = page.locator(".tab-bar .tab-link").all()
     assert len(tabs) == 5, f"expected 5 tab targets, found {len(tabs)}"
     for t in tabs:
