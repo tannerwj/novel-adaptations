@@ -248,7 +248,9 @@ export function wireHype(root) {
 const REVIEW_TITLE_MAX = 120;
 const REVIEW_BODY_MAX = 5000;
 
-function reviewItemHtml(r, currentUserId) {
+// Exported for the E2E regression suite (tests/e2e) so the spoiler
+// treatment can be asserted on the real widget output. No behavior change.
+export function reviewItemHtml(r, currentUserId) {
   const isAuthor = currentUserId !== null && r.author_id === currentUserId;
   const edited = r.updated_at !== r.created_at;
   const body = r.has_spoilers
