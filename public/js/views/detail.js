@@ -31,7 +31,7 @@ export async function adaptationView({ params }) {
     html:
       `<a class="back-link" href="/">← All adaptations</a>` +
       `<div class="hero">` +
-        posterArt(a.screen_poster_url ?? a.book_cover_url, a.screen_title, `${kindLabel(a.screen_kind)} adaptation`) +
+        posterArt(a.screen_poster_url ?? a.book_cover_url, a.screen_title, `${kindLabel(a.screen_kind)} adaptation`, { eager: true, fetchpriority: 'high' }) +
         `<div>` +
           `<p class="kicker">${esc(kindLabel(a.screen_kind))} adaptation</p>` +
           `<h1>${esc(a.screen_title)}</h1>` +
@@ -98,7 +98,7 @@ export async function bookView({ params }) {
     html:
       `<a class="back-link" href="/">← All adaptations</a>` +
       `<div class="hero">` +
-        posterArt(b.cover_url, b.title, b.authors) +
+        posterArt(b.cover_url, b.title, b.authors, { eager: true, fetchpriority: 'high' }) +
         `<div>` +
           `<p class="kicker">The book</p>` +
           `<h1>${esc(b.title)}</h1>` +
@@ -184,7 +184,7 @@ export async function watchView({ params }) {
     html:
       `<a class="back-link" href="/">← All adaptations</a>` +
       `<div class="hero">` +
-        posterArt(w.backdrop_url ?? w.poster_url, w.title, `${kindLabel(w.kind)}${year ? ` · ${year}` : ''}`) +
+        posterArt(w.backdrop_url ?? w.poster_url, w.title, `${kindLabel(w.kind)}${year ? ` · ${year}` : ''}`, { eager: true, fetchpriority: 'high' }) +
         `<div>` +
           `<p class="kicker">The screen work — ${esc(kindLabel(w.kind).toLowerCase())}</p>` +
           `<h1>${esc(w.title)}</h1>` +

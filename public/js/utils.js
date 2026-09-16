@@ -78,12 +78,18 @@ export function displayName(email) {
  * Poster/cover art that can never show a broken <img>: a gradient
  * placeholder always renders underneath; a dead image URL removes itself
  * via onerror, revealing the gradient.
+ *
+ * opts.eager — for above-the-fold art (hero, first grid cards): skips
+ * loading="lazy" so the image is eligible for LCP. Combine with
+ * opts.fetchpriority ('high') to prioritize the single most important image.
  */
-export function posterArt(src, title, subtitle) {
+export function posterArt(src, title, subtitle, opts) {
   const hue = hueFor(title);
   const gradient = `linear-gradient(135deg, hsl(${hue}, 48%, 22%), hsl(${(hue + 50) % 360}, 55%, 10%) 70%)`;
   const clean = typeof src === 'string' && src.trim() ? src.trim() : null;
   const safeSrc = clean && safeUrl(clean) ? esc(clean) : null;
+  const eager = !!(opts && opts.eager);
+  const fp = opts && opts.fetchpriority === 'high' ? ' fetchpriority="high"' : '';
   return (
     `<div class="poster">` +
       `<div class="art-fallback" style="background:${gradient}">` +
@@ -91,7 +97,7 @@ export function posterArt(src, title, subtitle) {
         (subtitle ? `<div class="art-sub">${esc(subtitle)}</div>` : '') +
       `</div>` +
       (safeSrc
-        ? `<img src="${safeSrc}" alt="${esc(title)} artwork" loading="lazy" onerror="this.remove()">`
+        ? `<img src="${safeSrc}" alt="${esc(title)} artwork"${eager ? fp : ' loading="lazy"'} decoding="async" onerror="this.remove()">`
         : '') +
     `</div>`
   );

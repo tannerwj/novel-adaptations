@@ -8,13 +8,16 @@ export type ThemeName = 'light' | 'dark';
 const LIGHT_BG = '#faf9f6';
 const DARK_BG = '#0b0c10';
 
-/** Minimal above-the-fold CSS so first paint isn't blank before /styles.css lands. */
+/** Minimal above-the-fold CSS so first paint isn't blank before /styles.css lands.
+ * The boot spinner is a fixed overlay (out of document flow): it looks
+ * exactly the same centered spinner, but removing it never shifts page
+ * content, so the SPA boot costs no Cumulative Layout Shift. */
 const CRITICAL_CSS = `
 html{background:${LIGHT_BG}}
 html[data-theme="dark"]{background:${DARK_BG}}
 body{margin:0;min-height:100vh}
-#app{min-height:60vh;display:flex;align-items:center;justify-content:center}
-.boot{display:flex;align-items:center;gap:.75rem;color:#8a8578;font-family:system-ui,sans-serif}
+#app{min-height:60vh}
+.boot{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;gap:.75rem;color:#8a8578;font-family:system-ui,sans-serif;background:transparent}
 html[data-theme="dark"] .boot{color:#8b93a3}
 .boot .spinner{width:22px;height:22px;border-radius:50%;border:3px solid currentColor;border-top-color:transparent;animation:bootspin .8s linear infinite}
 @keyframes bootspin{to{transform:rotate(360deg)}}
@@ -64,7 +67,7 @@ export function spaShell(theme: ThemeName): string {
     `<link rel="stylesheet" href="/styles.css">` +
     `</head>` +
     `<body>` +
-    `<div id="app"><div class="boot" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Loading…</span></div></div>` +
+    `<main id="app"><div class="boot" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Loading…</span></div></main>` +
     `<noscript><p style="text-align:center;font-family:system-ui,sans-serif;padding:2rem">Novel Adaptations needs JavaScript to run.</p></noscript>` +
     `<script type="module" src="/app.js"></script>` +
     `${WEB_ANALYTICS_BEACON}` +

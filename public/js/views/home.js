@@ -21,7 +21,7 @@ export async function homeView() {
       `<p class="lede">From whispered rumors to opening night — follow novels as they're optioned, filmed, and released as movies and series.</p>` +
       (items.length === 0
         ? `<p class="empty">No adaptations tracked yet. Check back soon.</p>`
-        : `<div class="poster-grid">${items.map(adaptationCard).join('')}</div>`),
+        : `<div class="poster-grid">${items.map((a, i) => adaptationCard(a, { eager: i < 2 })).join('')}</div>`),
     after(root) { wireUserControls(root); },
   };
 }

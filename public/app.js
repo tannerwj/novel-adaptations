@@ -5,12 +5,15 @@ import { mountChrome, refreshChrome } from './js/components.js';
 import { registerRoutes, startRouter, onNavigated } from './js/router.js';
 import { homeView, calendarView, mostWantedView, searchView } from './js/views/home.js';
 import { adaptationView, bookView, watchView } from './js/views/detail.js';
-import { myListsView, listDetailView, shelvesView } from './js/views/lists.js';
-import { feedbackView } from './js/views/feedback.js';
-import { loginView, verifyView } from './js/views/auth.js';
-import {
-  adminNewsView, adminRunsView, adminScreenWorksView, adminFeedbackView,
-} from './js/views/admin.js';
+
+/**
+ * Route-level code splitting: views below are fetched on demand the first
+ * time their route is visited, keeping the initial module graph (and its
+ * parse/compile cost) limited to the public browsing views. The router
+ * already awaits promise-returning views, so a loader is just a function
+ * that imports the module and delegates.
+ */
+const lazyView = (path, exportName) => (ctx) => import(path).then((m) => m[exportName](ctx));
 
 // Theme is pre-painted by the inline shell script; initTheme mirrors it into the store.
 initTheme();
@@ -27,16 +30,16 @@ registerRoutes([
   { pattern: /^\/watch\/(?<id>\d+)\/?$/, view: watchView },
   { pattern: /^\/adaptations\/(?<id>\d+)\/?$/, view: adaptationView },
   { pattern: /^\/books\/(?<id>\d+)\/?$/, view: bookView },
-  { pattern: /^\/lists\/?$/, view: myListsView, auth: true },
-  { pattern: /^\/lists\/(?<slug>[^/]+)\/?$/, view: listDetailView },
-  { pattern: /^\/shelves\/?$/, view: shelvesView, auth: true },
-  { pattern: /^\/feedback\/?$/, view: feedbackView },
-  { pattern: /^\/auth\/login\/?$/, view: loginView },
-  { pattern: /^\/auth\/verify\/?$/, view: verifyView },
-  { pattern: /^\/admin\/news\/?$/, view: adminNewsView, admin: true },
-  { pattern: /^\/admin\/news\/runs\/?$/, view: adminRunsView, admin: true },
-  { pattern: /^\/admin\/screen-works\/?$/, view: adminScreenWorksView, admin: true },
-  { pattern: /^\/admin\/feedback\/?$/, view: adminFeedbackView, admin: true },
+  { pattern: /^\/lists\/?$/, view: lazyView('./js/views/lists.js', 'myListsView'), auth: true },
+  { pattern: /^\/lists\/(?<slug>[^/]+)\/?$/, view: lazyView('./js/views/lists.js', 'listDetailView') },
+  { pattern: /^\/shelves\/?$/, view: lazyView('./js/views/lists.js', 'shelvesView'), auth: true },
+  { pattern: /^\/feedback\/?$/, view: lazyView('./js/views/feedback.js', 'feedbackView') },
+  { pattern: /^\/auth\/login\/?$/, view: lazyView('./js/views/auth.js', 'loginView') },
+  { pattern: /^\/auth\/verify\/?$/, view: lazyView('./js/views/auth.js', 'verifyView') },
+  { pattern: /^\/admin\/news\/?$/, view: lazyView('./js/views/admin.js', 'adminNewsView'), admin: true },
+  { pattern: /^\/admin\/news\/runs\/?$/, view: lazyView('./js/views/admin.js', 'adminRunsView'), admin: true },
+  { pattern: /^\/admin\/screen-works\/?$/, view: lazyView('./js/views/admin.js', 'adminScreenWorksView'), admin: true },
+  { pattern: /^\/admin\/feedback\/?$/, view: lazyView('./js/views/admin.js', 'adminFeedbackView'), admin: true },
 ]);
 
 startRouter();

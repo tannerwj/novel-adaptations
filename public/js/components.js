@@ -35,11 +35,12 @@ export function kindPill(kind) {
 // --- cards ------------------------------------------------------------------
 
 /** Poster card for the home grid / search results (adaptation object, v1 snake_case). */
-export function adaptationCard(a) {
+export function adaptationCard(a, opts) {
+  const eager = !!(opts && opts.eager);
   return (
     `<article class="poster-card">` +
-      `<a class="poster-link" href="/watch/${a.screen_work_id}" aria-label="${esc(a.screen_title)} — the screen work">` +
-        posterArt(a.screen_poster_url ?? a.book_cover_url, a.screen_title, `${kindLabel(a.screen_kind)} · ${a.book_authors}`) +
+      `<a class="poster-link" href="/watch/${a.screen_work_id}">` +
+        posterArt(a.screen_poster_url ?? a.book_cover_url, a.screen_title, `${kindLabel(a.screen_kind)} · ${a.book_authors}`, eager ? { eager: true, fetchpriority: 'high' } : null) +
       `</a>` +
       `<div class="card-body">` +
         `<h2 class="card-title"><a href="/adaptations/${a.id}">${esc(a.screen_title)}</a></h2>` +

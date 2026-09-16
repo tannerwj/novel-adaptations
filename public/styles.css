@@ -316,7 +316,7 @@ a.menu-item:hover, button.menu-item:hover { background: var(--surface-2); text-d
   padding: .22rem .65rem; border-radius: 999px; border: 1px solid;
   text-transform: uppercase; letter-spacing: .06em; white-space: nowrap;
 }
-.tier-trusted { background: rgba(47, 125, 68, .12); color: #2f7d44; border-color: rgba(47, 125, 68, .4); }
+.tier-trusted { background: rgba(47, 125, 68, .12); color: #2a6f3d; border-color: rgba(47, 125, 68, .4); }
 .tier-reputable { background: rgba(43, 108, 176, .12); color: #2b6cb0; border-color: rgba(43, 108, 176, .4); }
 .tier-rumor { background: rgba(179, 53, 47, .1); color: #b3352f; border-color: rgba(179, 53, 47, .4); }
 .flag-review { background: rgba(199, 143, 46, .14); color: var(--accent-deep); border-color: rgba(199, 143, 46, .45); }
@@ -332,13 +332,15 @@ a.menu-item:hover, button.menu-item:hover { background: var(--surface-2); text-d
  * Rendered by StatusBadge via .status-<status> classes so the dark-theme
  * override always applies. Every light/dark text color below was verified
  * >= 4.5:1 against its surface (#fff / #12141b); the pre-revamp single-hex
- * map (e.g. #9aa4b2 ≈ 2.8:1 on white) failed in light mode. */
+ * map (e.g. #9aa4b2 ≈ 2.8:1 on white) failed in light mode.
+ * 2026-09-15: light .status-released/.tier-trusted green re-checked at 4.45:1
+ * and darkened #2f7d44 -> #2a6f3d (5.35:1) per Lighthouse color-contrast. */
 .status-rumored { background: rgba(87, 98, 110, .1); color: #57626e; border-color: rgba(87, 98, 110, .4); }
 .status-optioned { background: rgba(138, 95, 20, .1); color: #8a5f14; border-color: rgba(138, 95, 20, .4); }
 .status-in_development { background: rgba(43, 108, 176, .1); color: #2b6cb0; border-color: rgba(43, 108, 176, .4); }
 .status-filming { background: rgba(122, 63, 160, .1); color: #7a3fa0; border-color: rgba(122, 63, 160, .4); }
 .status-post_production { background: rgba(179, 74, 31, .1); color: #b34a1f; border-color: rgba(179, 74, 31, .4); }
-.status-released { background: rgba(47, 125, 68, .1); color: #2f7d44; border-color: rgba(47, 125, 68, .4); }
+.status-released { background: rgba(47, 125, 68, .1); color: #2a6f3d; border-color: rgba(47, 125, 68, .4); }
 .status-cancelled { background: rgba(179, 53, 47, .1); color: #b3352f; border-color: rgba(179, 53, 47, .4); }
 .status-unknown { background: rgba(87, 98, 110, .1); color: #57626e; border-color: rgba(87, 98, 110, .4); }
 [data-theme="dark"] .status-rumored { background: rgba(154, 164, 178, .14); color: #9aa4b2; border-color: rgba(154, 164, 178, .45); }
@@ -378,6 +380,10 @@ select.shelf-select:hover { border-color: var(--accent); }
   padding: 1.5rem;
 }
 .panel h2 { font-family: var(--serif); font-size: 1.3rem; margin: 0 0 1rem; }
+/* In-text links must be distinguishable without relying on color alone
+   (a11y: link-in-text-block). Scoped to .panel .meta so nav, card and
+   pill links keep their clean hover-underline look. */
+.panel .meta a { text-decoration: underline; text-underline-offset: 2px; }
 dl.facts { display: grid; grid-template-columns: 8.5rem 1fr; gap: .5rem 1rem; margin: 0; }
 dl.facts dt { color: var(--faint); font-size: .82rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; padding-top: .15rem; }
 dl.facts dd { margin: 0; }
