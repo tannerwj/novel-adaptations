@@ -158,7 +158,11 @@ import {
   type BookHit,
   type ScreenWorkHit,
 } from '../search';
-import { getCalendarFeed } from '../calendar';
+import {
+  getCalendarFeed,
+  getEarlierWorksForYear,
+  recentWindowStart,
+} from '../calendar';
 import { getWatchProviders } from '../watch_providers';
 
 const v1 = new Hono<{ Bindings: Env }>();
@@ -1445,15 +1449,38 @@ v1.get('/search', async (c) => {
 
 v1.get('/calendar', async (c) => {
   // Single query, identical for every visitor — safe to edge-cache.
+  // Earlier releases are year-summarized; only the newest year's items ship
+  // inline (it renders open on first paint). Older years lazy-load via
+  // /calendar/year/:year when their <details> opens, so the payload stays
+  // ~tens of KB no matter how large the catalog grows.
   return edgeCached(c, async () => {
-    const { today, buckets } = await getCalendarFeed(c.env.DB);
+    const { today, buckets, earlierYears } = await getCalendarFeed(c.env.DB);
+    const newestYear = earlierYears[0]?.year ?? '';
     return c.json({
       today,
       coming_soon: buckets.comingSoon,
       recently_released: buckets.recentlyReleased,
-      earlier_releases: buckets.earlierReleases,
+      earlier_years: earlierYears,
+      earlier_releases: buckets.earlierReleases.filter(
+        (w) => (w.release_date ?? '').slice(0, 4) === newestYear,
+      ),
       tba: buckets.tba,
     });
+  });
+});
+
+// One earlier-release year, for lazy-loading a collapsed calendar year group.
+v1.get('/calendar/year/:year', async (c) => {
+  const year = c.req.param('year');
+  if (!/^\d{4}$/.test(year)) return c.json({ error: 'invalid year' }, 400);
+  return edgeCached(c, async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const works = await getEarlierWorksForYear(
+      c.env.DB,
+      year,
+      recentWindowStart(today),
+    );
+    return c.json({ year, works });
   });
 });
 

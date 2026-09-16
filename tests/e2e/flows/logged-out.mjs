@@ -95,10 +95,35 @@ export const tests = [
   test('calendar: API buckets and client year groupings', async () => {
     const r = await apiGet('/api/v1/calendar');
     eq(r.status, 200, 'GET /api/v1/calendar status');
+    // Earlier releases arrive as year summaries (lazy-loaded per year);
+    // the full catalog must be accounted for across the summaries.
     assert(
-      r.data.earlier_releases.length >= 900,
-      `calendar has the full earlier-releases catalog (got ${r.data.earlier_releases.length})`,
+      Array.isArray(r.data.earlier_years) && r.data.earlier_years.length > 0,
+      'calendar returns earlier-year summaries',
     );
+    const totalEarlier = r.data.earlier_years.reduce((n, y) => n + y.count, 0);
+    assert(
+      totalEarlier >= 900,
+      `calendar year summaries cover the full earlier catalog (got ${totalEarlier})`,
+    );
+    // Newest year's items ship inline and match its summary count.
+    const newest = r.data.earlier_years[0];
+    eq(
+      r.data.earlier_releases.length,
+      newest.count,
+      'newest year ships its items inline',
+    );
+    assert(
+      r.data.earlier_releases.every((w) => (w.release_date || '').startsWith(newest.year)),
+      'inline earlier releases all belong to the newest year',
+    );
+    // Lazy year endpoint serves a collapsed year on demand.
+    const yr = await apiGet(`/api/v1/calendar/year/${newest.year}`);
+    eq(yr.status, 200, 'GET /api/v1/calendar/year/:year status');
+    eq(yr.data.works.length, newest.count, 'year endpoint returns the full year');
+    const bad = await apiGet('/api/v1/calendar/year/notayear');
+    eq(bad.status, 400, 'year endpoint rejects a malformed year');
+    // Only the truly dateless works are TBA.
     eq(r.data.tba.length, 3, 'calendar has exactly 3 TBA titles');
     const tbaTitles = r.data.tba.map((w) => w.title).sort();
     eq(
@@ -110,7 +135,8 @@ export const tests = [
     const { home } = await loadClientViews();
     const view = await home.calendarView();
     contains(view.html, 'Earlier releases', 'calendar view renders the Earlier releases section');
-    contains(view.html, '>2025<', 'calendar view groups earlier releases by year');
+    contains(view.html, `>${newest.year}<`, 'calendar view groups earlier releases by year');
+    contains(view.html, 'data-cal-year', 'calendar year groups lazy-load on open');
     contains(view.html, 'Fourth Wing', 'calendar view lists the TBA titles');
   }),
 

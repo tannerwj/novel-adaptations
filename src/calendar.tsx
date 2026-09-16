@@ -287,9 +287,7 @@ export function CalendarPage({
   user: AuthUser;
   theme?: ThemeName;
 }) {
-  const windowStart = new Date(Date.parse(`${today}T00:00:00Z`) - RECENT_WINDOW_DAYS * DAY_MS)
-    .toISOString()
-    .slice(0, 10);
+  const windowStart = recentWindowStart(today);
   const { comingSoon, recentlyReleased, earlierReleases, tba } = bucketWorks(works, today, windowStart);
   return (
     <Layout title="Release calendar" user={user} theme={theme}>
@@ -343,17 +341,55 @@ export function CalendarPage({
 }
 
 /** Bucketed calendar feed for the JSON API (same buckets the page renders). */
-export async function getCalendarFeed(
-  db: D1Database,
-): Promise<{ today: string; buckets: CalendarBuckets }> {
+export async function getCalendarFeed(db: D1Database): Promise<{
+  today: string;
+  buckets: CalendarBuckets;
+  earlierYears: { year: string; count: number }[];
+}> {
   const works = await listCalendarWorks(db);
   const today = new Date().toISOString().slice(0, 10);
-  const windowStart = new Date(
-    Date.parse(`${today}T00:00:00Z`) - RECENT_WINDOW_DAYS * DAY_MS,
-  )
+  const windowStart = recentWindowStart(today);
+  const buckets = bucketWorks(works, today, windowStart);
+  const years = new Map<string, number>();
+  for (const w of buckets.earlierReleases) {
+    const year = (cleanDate(w) ?? '').slice(0, 4);
+    years.set(year, (years.get(year) ?? 0) + 1);
+  }
+  const earlierYears = [...years.entries()]
+    .map(([year, count]) => ({ year, count }))
+    .sort((a, b) => b.year.localeCompare(a.year));
+  return { today, buckets, earlierYears };
+}
+
+/** Works for one earlier-release year, newest first. Powers the lazy year endpoint. */
+export async function getEarlierWorksForYear(
+  db: D1Database,
+  year: string,
+  windowStart: string,
+): Promise<CalendarWork[]> {
+  if (!/^\d{4}$/.test(year)) return [];
+  const { results } = await db
+    .prepare(
+      `SELECT id, title, kind, release_date, poster_url
+         FROM screen_works
+        WHERE substr(release_date, 1, 4) = ?1
+          AND (release_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+               OR release_date GLOB '[0-9][0-9][0-9][0-9]')
+          AND CASE WHEN length(release_date) = 4
+                   THEN release_date || '-01-01'
+                   ELSE release_date END < ?2
+        ORDER BY release_date DESC, title ASC`,
+    )
+    .bind(year, windowStart)
+    .all<CalendarWork>();
+  return results;
+}
+
+/** The recent-window start (YYYY-MM-DD) used to separate recent from earlier releases. */
+export function recentWindowStart(today: string): string {
+  return new Date(Date.parse(`${today}T00:00:00Z`) - RECENT_WINDOW_DAYS * DAY_MS)
     .toISOString()
     .slice(0, 10);
-  return { today, buckets: bucketWorks(works, today, windowStart) };
 }
 
 export function registerCalendarRoutes<E extends CalendarBindings>(

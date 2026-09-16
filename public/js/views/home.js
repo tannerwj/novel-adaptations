@@ -135,9 +135,11 @@ export async function calendarView() {
   const r = await api('/api/v1/calendar', { loginRedirect: false });
   if (!r.ok) throw new Error(errMsg(r));
   const { today, coming_soon, recently_released, tba } = r.data;
-  // Dated releases older than the 120-day window get their own section so no
-  // dated work ever vanishes from the calendar.
-  const earlier = r.data.earlier_releases || [];
+  // Earlier releases arrive as year summaries; only the newest year's items
+  // ship inline. Older years lazy-load from /api/v1/calendar/year/:year when
+  // their <details> group is opened — no full-page reload, no 1,200-item DOM.
+  const earlierYears = r.data.earlier_years || [];
+  const newestItems = r.data.earlier_releases || [];
 
   const groups = [];
   for (const w of coming_soon) {
@@ -147,14 +149,15 @@ export async function calendarView() {
     else groups.push({ key, heading: monthHeading(cleanDate(w) || ''), works: [w] });
   }
 
-  // earlier_releases arrives newest-first; group by release year, descending.
-  const yearGroups = [];
-  for (const w of earlier) {
-    const year = (cleanDate(w) || '').slice(0, 4);
-    const last = yearGroups[yearGroups.length - 1];
-    if (last && last.year === year) last.works.push(w);
-    else yearGroups.push({ year, works: [w] });
-  }
+  const yearGroupHtml = (y, i) => {
+    const items = i === 0 ? newestItems.map((w) => calendarItem(w, today)).join('') : '';
+    return (
+      `<details class="cal-year"${i === 0 ? ' open' : ''} data-cal-year="${esc(y.year)}">` +
+      `<summary><span>${esc(y.year)}</span>` +
+      `<span class="meta">${y.count} ${y.count === 1 ? 'title' : 'titles'}</span></summary>` +
+      `<ul class="shelf-list" data-cal-items>${items}</ul></details>`
+    );
+  };
 
   return {
     title: 'Release calendar',
@@ -176,21 +179,47 @@ export async function calendarView() {
           : `<ul class="shelf-list">${recently_released.map((w) => calendarItem(w, today)).join('')}</ul>`) +
       `</section>` +
       `<section class="shelf-group"><h2>Earlier releases</h2>` +
-        (yearGroups.length === 0
+        (earlierYears.length === 0
           ? `<p class="empty">No earlier releases.</p>`
-          : yearGroups.map((g, i) =>
-              `<details class="cal-year"${i === 0 ? ' open' : ''}>` +
-              `<summary><span>${esc(g.year)}</span>` +
-              `<span class="meta">${g.works.length} ${g.works.length === 1 ? 'title' : 'titles'}</span></summary>` +
-              `<ul class="shelf-list">${g.works.map((w) => calendarItem(w, today)).join('')}</ul></details>`
-            ).join('')) +
+          : earlierYears.map(yearGroupHtml).join('')) +
       `</section>` +
       `<section class="shelf-group"><h2>TBA</h2>` +
         (tba.length === 0
           ? `<p class="empty">Everything here has a release date.</p>`
           : `<ul class="shelf-list">${tba.map((w) => calendarItem(w, today)).join('')}</ul>`) +
       `</section>`,
+    after(root) { wireCalendarYears(root, today); },
   };
+}
+
+/**
+ * Lazy-loads a calendar year group the first time its <details> opens.
+ * Fetched years are cached on the element so repeat toggles never refetch.
+ */
+function wireCalendarYears(root, today) {
+  const loaded = new Set();
+  root.querySelectorAll('details[data-cal-year]').forEach((details) => {
+    const year = details.dataset.calYear;
+    if (details.open) loaded.add(year); // newest year ships inline
+    details.addEventListener('toggle', async () => {
+      if (!details.open || loaded.has(year)) return;
+      loaded.add(year);
+      const list = details.querySelector('[data-cal-items]');
+      if (list) list.innerHTML = `<li><p class="meta">Loading ${esc(year)}…</p></li>`;
+      const pr = await api(`/api/v1/calendar/year/${encodeURIComponent(year)}`, { loginRedirect: false });
+      if (!pr.ok) {
+        loaded.delete(year);
+        if (list) list.innerHTML = `<li><p class="inline-error" role="alert">${esc(errMsg(pr))}</p></li>`;
+        return;
+      }
+      if (list) {
+        const works = pr.data.works || [];
+        list.innerHTML = works.length > 0
+          ? works.map((w) => calendarItem(w, today)).join('')
+          : `<li><p class="empty">No titles for ${esc(year)}.</p></li>`;
+      }
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
