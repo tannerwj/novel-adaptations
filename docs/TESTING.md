@@ -50,8 +50,56 @@ relative `/api/v1/...` calls hit the target site (with the test session
 cookie when logged in), and installs shims that fail loudly if a render path
 touches the DOM. Tests then assert on the exact HTML strings users see —
 card counts, button labels, widget states, spoiler markup. Event wiring
-(`after()` handlers, clicks, navigation) still needs a live browser and is
-out of scope here.
+(`after()` handlers, clicks, navigation) is covered by the interactive
+browser suite below.
+
+## Interactive browser suite (`tests/e2e/browser/`)
+
+`run.py` drives a real Chromium (chrome-for-testing headless shell) through
+the deployed site and clicks the actual UI — the layer the Node suite can't
+reach. Full details in `tests/e2e/browser/README.md`.
+
+```bash
+# Full interactive run against production:
+/tmp/pw/bin/python tests/e2e/browser/run.py
+
+# Logged-out + mobile flows only (no D1 token needed):
+/tmp/pw/bin/python tests/e2e/browser/run.py --skip-auth
+
+# One flow while debugging:
+/tmp/pw/bin/python tests/e2e/browser/run.py --only watch_rate
+```
+
+How it works:
+
+- Routes Chromium through `proxy_fwd.py`, a local CONNECT forwarder on
+  `127.0.0.1:18080` (started automatically), because sandboxed Chromium
+  can't complete the egress proxy's auth handshake itself. The sandbox
+  proxy also MITMs TLS, so the suite launches with
+  `--ignore-certificate-errors` — test-harness-only; production traffic has
+  valid certs.
+- Mints the same guarded `e2e-test@example.com` session via
+  `tests/e2e/setup.mjs`, injects the `na_session` cookie into the browser
+  context (token never logged), and always runs `tests/e2e/teardown.mjs` in
+  a `finally`.
+- Every flow gets a fresh page in a shared context: desktop 1440×900 authed,
+  desktop 1440×900 anonymous, or mobile 390×844 (`is_mobile`, `has_touch`)
+  anonymous.
+- "No reload" is asserted with a `window.__alive` marker on every
+  interaction — the SPA must never trigger a full page load.
+
+What it covers (14 flows, all green against production): avatar menu +
+logout; home 24→40 cards in place with **every poster image actually
+loading** (scroll-triggered, catches broken TMDB artwork); Most Wanted vote
+with live count +1; 4★ rating → persistence across reload → change to 2★;
+"Book" poll vote with tally movement; spoiler review post → blurred until
+revealed; list create → add item → item with poster on the detail page →
+listed in /lists; shelf add → persist → change → visible on /shelves; logout
+→ /lists redirects to /auth/login; mobile tabs (Home/Calendar/Most
+Wanted/Search/More) with SPA navigation; More sheet + theme toggle; no
+horizontal overflow and ≥40px tap targets on /, /calendar, /watch/38;
+header theme toggle with persistence; header search → results → detail,
+no reload.
 
 ## What it covers
 
@@ -88,8 +136,10 @@ gives you `{ home, detail, listsViews, widgets, store }`; use
 ## Known gaps (deliberate)
 
 - **Magic-link email delivery** — no inbox access in CI; verify manually.
-- **Interactive browser behavior** — clicks, navigation, `after()` wiring,
-  mobile taps, Lighthouse — needs a live browser.
 - **Rating deletion** — there is no public `DELETE /ratings` endpoint;
   removal is covered by teardown's zero-leftover verification.
-- **Hype meter** — not yet covered; follow the poll flow pattern to add it.
+- **Hype meter** — not yet covered in either suite; follow the poll flow
+  pattern to add it.
+- **Lighthouse / perf budgets** — no automated mobile performance or
+  accessibility audit yet; the browser suite asserts layout (no overflow,
+  tap targets) but not timings.
