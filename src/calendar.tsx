@@ -177,7 +177,7 @@ function ComingSoonSection({
   today: string;
 }) {
   if (works.length === 0) {
-    return <p class="empty">Nothing dated in the pipeline yet.</p>;
+    return <p class="empty">No upcoming releases with dates yet.</p>;
   }
   const groups: { heading: string; works: CalendarWork[] }[] = [];
   for (const w of works) {
@@ -230,8 +230,8 @@ export function CalendarPage({
         When books hit the screen
       </h1>
       <p class="meta" style="margin-bottom:2rem">
-        Every dated adaptation, arranged by release — upcoming first, then the
-        last {RECENT_WINDOW_DAYS} days, then earlier releases, then the ones
+        Every dated adaptation, in release order: upcoming first, then the
+        last {RECENT_WINDOW_DAYS} days, then older releases, then the ones
         still waiting on a date.
       </p>
 
@@ -256,7 +256,7 @@ export function CalendarPage({
       <section class="shelf-group">
         <h2>Earlier releases</h2>
         {earlierReleases.length === 0 ? (
-          <p class="empty">Nothing older on the calendar.</p>
+          <p class="empty">No earlier releases.</p>
         ) : (
           <ul class="shelf-list">
             {earlierReleases.map((w) => (
@@ -269,7 +269,7 @@ export function CalendarPage({
       <section class="shelf-group">
         <h2>TBA</h2>
         {tba.length === 0 ? (
-          <p class="empty">Every work has a date. Remarkable.</p>
+          <p class="empty">Everything here has a release date.</p>
         ) : (
           <ul class="shelf-list">
             {tba.map((w) => (

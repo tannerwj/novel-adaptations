@@ -67,38 +67,71 @@ export function wireRatings(root) {
 }
 
 // ---------------------------------------------------------------------------
-// Book-vs-screen poll
+// Book-vs-screen poll — a modern duel: two tappable cards (Book vs Screen)
+// with cover/poster art, animated percentage bars, live voter counts, and a
+// clearly marked voted state. "Both great" / "Undecided" remain as secondary
+// options. Votes POST to /api/v1/polls/:id (same request/response contract);
+// results render in place with no reload.
 // ---------------------------------------------------------------------------
 
 const CHOICE_LABELS = { book: 'Book', screen: 'Screen', both: 'Both great', undecided: 'Undecided' };
 const CHOICE_ORDER = ['book', 'screen', 'both', 'undecided'];
+const DUEL_SIDES = { book: '📖 The book', screen: '🎬 The screen' };
 
 function pollPct(n, total) {
   return total > 0 ? Math.round((n / total) * 100) : 0;
 }
 
-export function pollWidget(adaptationId, counts, total, userChoice, signedIn) {
+function duelArt(url, title) {
+  const t = esc(title || '?');
+  return url
+    ? `<span class="duel-art"><img src="${esc(url)}" alt="" loading="lazy"></span>`
+    : `<span class="duel-art" aria-hidden="true">${t.charAt(0)}</span>`;
+}
+
+function duelCard(choice, title, artUrl, n, total, userChoice) {
+  const pct = pollPct(n, total);
+  const mine = userChoice === choice;
+  return (
+    `<button type="button" class="duel-card${mine ? ' mine' : ''}" data-poll-btn="${choice}" data-poll-row="${choice}" ` +
+    `aria-pressed="${mine ? 'true' : 'false'}" aria-label="${esc(CHOICE_LABELS[choice])}: ${esc(title)}">` +
+      `<span class="duel-pick" aria-hidden="true"${mine ? '' : ' hidden'}>✓</span>` +
+      duelArt(artUrl, title) +
+      `<span class="duel-body">` +
+        `<span class="duel-side">${DUEL_SIDES[choice]}</span>` +
+        `<span class="duel-name">${esc(title)}</span>` +
+        `<span class="duel-pct" aria-hidden="true">${pct}%</span>` +
+        `<span class="duel-bar" aria-hidden="true"><span style="width:${pct}%"></span></span>` +
+        `<span class="poll-count">${n} · ${pct}%</span>` +
+      `</span>` +
+    `</button>`
+  );
+}
+
+export function pollWidget(adaptationId, counts, total, userChoice, signedIn, art) {
   counts = counts || { book: 0, screen: 0, both: 0, undecided: 0 };
+  art = art || {};
+  const altBtn = (c) => {
+    const n = Number(counts[c] || 0);
+    const mine = userChoice === c;
+    return (
+      `<button type="button" class="duel-alt-btn${mine ? ' mine' : ''}" data-poll-btn="${c}" data-poll-row="${c}" ` +
+      `aria-pressed="${mine ? 'true' : 'false'}">` +
+        `<span>${esc(CHOICE_LABELS[c])}${mine ? ' ✓' : ''}</span>` +
+        `<span class="poll-count">${n} · ${pollPct(n, total)}%</span>` +
+      `</button>`
+    );
+  };
   return (
     `<div class="poll-widget" data-poll-widget="${adaptationId}" data-poll-signed-in="${signedIn ? '1' : '0'}">` +
       `<h2 class="section-title">Which was better?</h2>` +
-      `<div class="poll-options" role="group" aria-label="Which was better?">` +
-      CHOICE_ORDER.map((c) =>
-        `<button type="button" class="poll-btn${userChoice === c ? ' mine' : ''}" data-poll-btn="${c}" aria-pressed="${userChoice === c ? 'true' : 'false'}">` +
-        `${esc(CHOICE_LABELS[c])}${userChoice === c ? ' ✓' : ''}</button>`
-      ).join('') +
+      `<div class="duel" role="group" aria-label="Which was better?">` +
+        duelCard('book', art.bookTitle || 'The book', art.bookCover, Number(counts.book || 0), total, userChoice) +
+        `<span class="duel-vs" aria-hidden="true">vs</span>` +
+        duelCard('screen', art.screenTitle || 'The screen work', art.screenPoster, Number(counts.screen || 0), total, userChoice) +
       `</div>` +
-      `<div class="poll-results" aria-live="polite">` +
-      CHOICE_ORDER.map((c) => {
-        const n = Number(counts[c] || 0);
-        return (
-          `<div class="poll-row${userChoice === c ? ' mine' : ''}" data-poll-row="${c}">` +
-            `<span class="poll-label">${esc(CHOICE_LABELS[c])}${userChoice === c ? ' ✓' : ''}</span>` +
-            `<div class="poll-bar"><span style="width:${pollPct(n, total)}%"></span></div>` +
-            `<span class="poll-count">${n} · ${pollPct(n, total)}%</span>` +
-          `</div>`
-        );
-      }).join('') +
+      `<div class="duel-alt" role="group" aria-label="Something else?">` +
+        altBtn('both') + altBtn('undecided') +
       `</div>` +
       `<p class="meta poll-total"><span data-poll-total>${total === 1 ? '1 vote' : `${total} votes`}</span>` +
       (signedIn ? '' : ` · <a href="/auth/login">Sign in to vote</a>`) +
@@ -121,19 +154,26 @@ export function wirePolls(root) {
         if (!row) return;
         const n = Number(counts[c] || 0);
         const pct = pollPct(n, total);
-        const bar = row.querySelector('.poll-bar > span');
-        const cnt = row.querySelector('.poll-count');
+        const bar = row.querySelector('.duel-bar > span');
         if (bar) bar.style.width = pct + '%';
+        const pctEl = row.querySelector('.duel-pct');
+        if (pctEl) pctEl.textContent = pct + '%';
+        const cnt = row.querySelector('.poll-count');
         if (cnt) cnt.textContent = `${n} · ${pct}%`;
-        row.classList.toggle('mine', mine === c);
+        const isMine = mine === c;
+        row.classList.toggle('mine', isMine);
+        if (row.hasAttribute('data-poll-btn')) {
+          row.setAttribute('aria-pressed', String(isMine));
+          const pick = row.querySelector('.duel-pick');
+          if (pick) pick.hidden = !isMine;
+          if (row.classList.contains('duel-alt-btn')) {
+            const lab = row.querySelector('span');
+            if (lab) lab.textContent = isMine ? `${CHOICE_LABELS[c]} ✓` : CHOICE_LABELS[c];
+          }
+        }
       });
       const totalEl = w.querySelector('[data-poll-total]');
       if (totalEl) totalEl.textContent = total === 1 ? '1 vote' : `${total} votes`;
-      w.querySelectorAll('[data-poll-btn]').forEach((b) => {
-        const isMine = b.dataset.pollBtn === mine;
-        b.classList.toggle('mine', isMine);
-        b.setAttribute('aria-pressed', String(isMine));
-      });
     };
     w.querySelectorAll('[data-poll-btn]').forEach((btn) => {
       btn.addEventListener('click', async () => {
@@ -326,7 +366,7 @@ export function wireReviews(root) {
       section.querySelector('[data-reviews-form-slot]').innerHTML = signedIn
         ? `<div class="review-form"><form data-review-form>` +
             `<label>Title (optional)<input type="text" name="title" maxlength="${REVIEW_TITLE_MAX}" placeholder="Sum it up in a line"></label>` +
-            `<label>Review<textarea name="body" required maxlength="${REVIEW_BODY_MAX}" placeholder="What did you think? No spoilers outside the spoiler flag…"></textarea></label>` +
+            `<label>Review<textarea name="body" required maxlength="${REVIEW_BODY_MAX}" placeholder="What did you think? Flag it below if your review has spoilers."></textarea></label>` +
             `<label class="checkbox-row"><input type="checkbox" name="has_spoilers"> Contains spoilers</label>` +
             `<div class="form-error" role="alert"></div>` +
             `<div><button type="submit" class="btn btn-sm btn-primary">Post review</button></div>` +
@@ -335,7 +375,7 @@ export function wireReviews(root) {
 
       const list = section.querySelector('[data-reviews-list]');
       const html = wrap.data.map((rev) => reviewItemHtml(rev, currentUserId)).join('') ||
-        `<p class="review-empty">No reviews yet — be the first to share your take.</p>`;
+        `<p class="review-empty">No reviews yet — be the first to write one.</p>`;
       list.innerHTML = append ? list.innerHTML + html : html;
 
       const moreSlot = section.querySelector('[data-reviews-more]');

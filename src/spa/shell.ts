@@ -95,7 +95,7 @@ export function spaShell(
     `<meta name="theme-color" content="${themeColor}">` +
     `<meta property="og:site_name" content="Novel Adaptations">` +
     `<meta property="og:title" content="Novel Adaptations">` +
-    `<meta property="og:description" content="Every book's journey to the screen — from whispered rumors to opening night.">` +
+    `<meta property="og:description" content="Follow novels as they're optioned, filmed, and released as movies and series.">` +
     `<meta property="og:type" content="website">` +
     `<meta property="og:image" content="${origin}/og-card.jpg">` +
     `<meta property="og:image:width" content="1200">` +
@@ -116,7 +116,11 @@ export function spaShell(
     `</head>` +
     `<body>` +
     `<div id="chrome-header">${headerHtml}</div>` +
-    `<main id="app"><div class="boot" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Loading…</span></div></main>` +
+    // class="page": the content column (max-width 1180px, ≥16px gutters on
+    // mobile). SPA views render bare HTML into #app, so the shell provides
+    // the container — matching the server-rendered <main class="page"> in
+    // src/ui.tsx's Layout that bots see.
+    `<main id="app" class="page"><div class="boot" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Loading…</span></div></main>` +
     `<div id="chrome-footer">${footerHtml}</div>` +
     `<noscript><p style="text-align:center;font-family:system-ui,sans-serif;padding:2rem">Novel Adaptations needs JavaScript to run.</p></noscript>` +
     // Boot user, resolved server-side for the header render. The client

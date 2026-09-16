@@ -194,8 +194,7 @@ export function ScreenWorkPage({
         <section class="panel">
           <h2>Cast &amp; crew</h2>
           <p class="empty" style="margin:0">
-            Cast and crew details arrive with TMDB enrichment — we don't guess
-            at who's in it.
+            Cast and crew appear here once TMDB has them listed.
           </p>
         </section>
       </div>

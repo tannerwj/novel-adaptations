@@ -5,7 +5,7 @@ import { api, errMsg } from '../api.js';
 import { renderNotFound } from '../router.js';
 import { isAuthedResolved } from '../store.js';
 import {
-  adaptationCard, statusBadge, kindPill, statusTimeline,
+  adaptationCard, statusBadge, kindPill, statusTimeline, releaseNotes,
   newsList, voteButton, shelfPicker, wireUserControls,
 } from '../components.js';
 import { ratingWidget, pollWidget, hypeWidget, reviewsSection, addToListControl, wireWidgets } from '../widgets.js';
@@ -48,8 +48,13 @@ export async function adaptationView({ params }) {
         `</div>` +
       `</div>` +
       `<section>` +
-        `<h2 class="section-title">Status timeline</h2>` +
-        statusTimeline(timeline && timeline.length > 0 ? timeline : [{ status: a.status, at: null, source_url: a.source_url }]) +
+        `<h2 class="section-title">${a.status === 'released' ? 'Release notes' : 'Status timeline'}</h2>` +
+        (a.status === 'released'
+          ? releaseNotes(
+              timeline && timeline.length > 0 ? timeline : [{ status: a.status, at: null, source_url: a.source_url }],
+              a.screen_release_date,
+            )
+          : statusTimeline(timeline && timeline.length > 0 ? timeline : [{ status: a.status, at: null, source_url: a.source_url }])) +
       `</section>` +
       `<div class="detail-grid two">` +
         `<section class="panel"><h2>The book</h2><dl class="facts">` +
@@ -57,15 +62,17 @@ export async function adaptationView({ params }) {
           `<dt>Authors</dt><dd>${esc(a.book_authors)}</dd>` +
         `</dl></section>` +
         `<section class="panel"><h2>The screen work</h2><dl class="facts">` +
-          `<dt>Title</dt><dd>${esc(a.screen_title)}</dd>` +
+          `<dt>Title</dt><dd><a href="/watch/${a.screen_work_id}">${esc(a.screen_title)}</a></dd>` +
           `<dt>Kind</dt><dd>${esc(kindLabel(a.screen_kind))}</dd>` +
           `<dt>Release</dt><dd>${esc(a.screen_release_date ?? 'TBA')}</dd>` +
         `</dl>` +
-        `<p class="meta" style="margin-top:0.75rem"><a href="/watch/${a.screen_work_id}">View the screen work →</a> the film/series page, with synopsis, cast, and related news.</p>` +
         `</section>` +
       `</div>` +
       `<section class="panel" style="margin-top:1.5rem">` +
-        pollWidget(a.id, poll?.counts, poll?.total ?? 0, poll?.user_choice ?? null, authed) +
+        pollWidget(a.id, poll?.counts, poll?.total ?? 0, poll?.user_choice ?? null, authed, {
+          bookTitle: a.book_title, bookCover: a.book_cover_url,
+          screenTitle: a.screen_title, screenPoster: a.screen_poster_url,
+        }) +
       `</section>` +
       `<div class="detail-grid" style="margin-top:1.5rem">` +
         `<section class="panel"><h2>Adaptation status</h2><dl class="facts">` +
@@ -122,7 +129,7 @@ export async function bookView({ params }) {
       `<section>` +
         `<h2 class="section-title">Adaptations <span class="count">${r.data.adaptations.length}</span></h2>` +
         (r.data.adaptations.length === 0
-          ? `<p class="meta">No screen adaptations tracked yet — but the vote button above says it all.</p>`
+          ? `<p class="meta">No screen adaptations tracked yet.</p>`
           : `<div class="poster-grid">${r.data.adaptations.map(adaptationCard).join('')}</div>`) +
       `</section>` +
       reviewsSection('book', b.id),
@@ -193,7 +200,7 @@ export async function watchView({ params }) {
           (w.release_date ? `<span class="kind-pill">📅 ${esc(w.release_date)}</span>` : '') +
           (w.tmdb_id ? `<a class="kind-pill" href="${esc(tmdbUrl(w.kind, w.tmdb_id))}" target="_blank" rel="noopener noreferrer">TMDB ↗</a>` : '') +
           `</div>` +
-          `<p class="meta" style="margin-top:0.75rem">This page is about the screen work itself — the film or series. For the full book-to-screen story and its status timeline, see the ${adaptLink}</p>` +
+          `<p class="meta" style="margin-top:0.75rem">This page covers the film or series itself. For the full book-to-screen story and its status timeline, see the ${adaptLink}</p>` +
           `<div class="hero-actions">` +
             ratingWidget('screen_work', w.id, r.data.rating?.average ?? 0, r.data.rating?.count ?? 0, r.data.user_rating ?? null, authed) +
             addToListControl('screen_work', w.id, r.data.user_lists ?? [], authed) +
@@ -206,7 +213,7 @@ export async function watchView({ params }) {
       `<section class="panel" style="margin-top:1.5rem"><h2>Synopsis</h2>` +
         (w.synopsis && w.synopsis.trim()
           ? `<p>${esc(w.synopsis.trim())}</p>`
-          : `<p class="empty" style="margin:0">Synopsis coming soon — we're enriching this page with data from TMDB.</p>`) +
+          : `<p class="empty" style="margin:0">Synopsis coming soon — we're pulling it in from TMDB.</p>`) +
       `</section>` +
       whereToWatch(r.data.watch_providers) +
       `<div class="detail-grid two" style="margin-top:1.5rem">` +
@@ -217,7 +224,7 @@ export async function watchView({ params }) {
           `<dt>TMDB</dt><dd>${w.tmdb_id ? `<a href="${esc(tmdbUrl(w.kind, w.tmdb_id))}" target="_blank" rel="noopener noreferrer">View on TMDB ↗</a>` : '—'}</dd>` +
         `</dl></section>` +
         `<section class="panel"><h2>Cast &amp; crew</h2>` +
-          `<p class="empty" style="margin:0">Cast and crew details arrive with TMDB enrichment — we don't guess at who's in it.</p>` +
+          `<p class="empty" style="margin:0">Cast and crew will appear once this page is filled in from TMDB.</p>` +
         `</section>` +
       `</div>` +
       `<section style="margin-top:2rem">` +
@@ -242,7 +249,7 @@ export async function watchView({ params }) {
       `<section style="margin-top:2rem">` +
         `<h2 class="section-title">Related news <span class="count">${r.data.news.length}</span></h2>` +
         (r.data.news.length === 0
-          ? `<p class="empty">No news matched to this title's books yet — new stories appear here as the pipeline classifies them.</p>`
+          ? `<p class="empty">No news matched to this title's books yet.</p>`
           : newsList(r.data.news)) +
       `</section>` +
       reviewsSection('screen_work', w.id),

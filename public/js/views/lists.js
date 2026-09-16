@@ -36,7 +36,7 @@ export async function myListsView() {
       html:
         `<p class="kicker">Your collection</p>` +
         `<h1 class="display-title">My Lists</h1>` +
-        `<p class="lede">Curate books and movies into shareable lists — reading queues, ranked favorites, watch-party lineups. Public lists get a shareable link.</p>` +
+        `<p class="lede">Put books and movies into shareable lists — reading queues, ranked favorites, watch-party lineups. Public lists get a shareable link.</p>` +
         `<section class="panel" style="margin-bottom:2.5rem">` +
           `<h2>Create a new list</h2>` +
           `<form data-create-list style="display:grid;gap:.9rem">` +
@@ -338,9 +338,9 @@ export async function shelvesView() {
     html:
       `<p class="kicker">Your collection</p>` +
       `<h1 class="display-title">Shelves</h1>` +
-      `<p class="lede">Everything you've shelved — reading, read, watchlist, and watched.</p>` +
+      `<p class="lede">Everything you've shelved: reading, read, watchlist, and watched.</p>` +
       (shelves.length === 0
-        ? `<p class="empty">Your shelves are empty. Browse <a href="/">adaptations</a> and shelve something.</p>`
+        ? `<p class="empty">Your shelves are empty. <a href="/">Browse adaptations</a> and add something.</p>`
         : ordered.map((shelf) =>
             `<section class="shelf-group">` +
               `<h2>${esc(shelfLabelOf(shelf))} <span class="count">(${(grouped.get(shelf) || []).length})</span></h2>` +

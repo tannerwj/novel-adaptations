@@ -122,6 +122,6 @@ export async function verifyView({ query }) {
   navigate(next);
   return {
     title: 'Signing you in',
-    html: `<div class="auth-card"><p class="kicker">Members</p><h1>Signing you in…</h1><p class="meta">Taking you to where you were headed.</p></div>`,
+    html: `<div class="auth-card"><p class="kicker">Members</p><h1>Signing you in…</h1><p class="meta">Taking you where you were headed.</p></div>`,
   };
 }

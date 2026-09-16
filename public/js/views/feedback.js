@@ -50,7 +50,7 @@ function thanksHtml() {
     `<div class="feedback-card">` +
       `<p class="kicker">Received</p>` +
       `<h1>Thanks for the feedback! 🎬</h1>` +
-      `<p>Your note is in the queue and a human will look at it. Want to keep browsing?</p>` +
+      `<p>Your note is in the queue — we'll take a look. Want to keep browsing?</p>` +
       `<p><a href="/">← Back to all adaptations</a></p>` +
     `</div>`
   );

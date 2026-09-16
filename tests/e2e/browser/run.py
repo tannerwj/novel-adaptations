@@ -293,18 +293,32 @@ def flow_lists(page, c):
     expect(page.locator("[data-list-row]", has_text=name)).to_be_visible(timeout=30000)
 
 
+def _shelf_change(page, value):
+    """Change the shelf select and wait for the app's async POST to finish.
+
+    The change handler POSTs to /api/v1/shelves asynchronously; reloading
+    before it completes aborts the request, so we must wait for it.
+    """
+    with page.expect_response(
+        lambda r: "/api/v1/shelves" in r.url and r.request.method == "POST",
+        timeout=30000,
+    ) as resp_info:
+        page.locator("[data-shelf-select]").select_option(value)
+    assert resp_info.value.ok, f"shelf POST failed: {resp_info.value.status}"
+
+
 def flow_shelf(page, c):
     page.goto(c.base + "/books/38", wait_until="domcontentloaded")
     sel = page.locator("[data-shelf-select]")
     expect(sel).to_be_visible(timeout=30000)
     mark_alive(page)
-    sel.select_option("want_to_read")
+    _shelf_change(page, "want_to_read")
     assert sel.evaluate("s => s.value") == "want_to_read"
     assert_no_reload(page, "shelf add")
     page.reload(wait_until="domcontentloaded")
     sel = page.locator("[data-shelf-select]")
     expect(sel).to_have_value("want_to_read", timeout=30000)
-    sel.select_option("read")
+    _shelf_change(page, "read")
     page.reload(wait_until="domcontentloaded")
     sel = page.locator("[data-shelf-select]")
     expect(sel).to_have_value("read", timeout=30000)

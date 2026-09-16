@@ -105,6 +105,48 @@ export function statusTimeline(events) {
   );
 }
 
+/**
+ * Compact "Release notes" for already-released adaptations. Renders only the
+ * beats the data actually supports: dated timeline events, oldest first,
+ * capped at 3 and anchored by the release itself (date from the adaptation
+ * record). Nothing is invented — with today's data that is a single
+ * "Released <date>" line.
+ */
+export function releaseNotes(events, releaseDate) {
+  const evts = Array.isArray(events) ? events : [];
+  const rel = evts.find((e) => e.status === 'released');
+  const dated = evts
+    .filter((e) => e.at && e.status !== 'released')
+    .sort((a, b) => String(a.at).localeCompare(String(b.at)))
+    .slice(0, 2);
+  const beats = dated.map((e) => ({
+    label: statusLabel(e.status),
+    date: e.at,
+    sourceUrl: e.source_url,
+  }));
+  beats.push({
+    label: 'Released',
+    date: releaseDate ?? rel?.at ?? null,
+    sourceUrl: rel?.source_url ?? null,
+  });
+  return (
+    `<div class="release-notes"><ol>` +
+    beats
+      .map(
+        (b) =>
+          `<li><span class="dot" aria-hidden="true">✓</span>` +
+          `<div class="beat"><span class="beat-label">${esc(b.label)}</span>` +
+          `<span class="beat-meta">${b.date ? esc(b.date) : 'date unknown'}` +
+          (b.sourceUrl && safeUrl(b.sourceUrl)
+            ? ` · <a href="${esc(b.sourceUrl)}" target="_blank" rel="noopener noreferrer">source</a>`
+            : '') +
+          `</span></div></li>`
+      )
+      .join('') +
+    `</ol></div>`
+  );
+}
+
 // --- news list ----------------------------------------------------------------
 
 export function newsList(items) {

@@ -51,7 +51,7 @@ export function renderError(title, heading, message, cta) {
 }
 
 export function renderNotFound() {
-  renderError('Not found', 'Page not found', 'That page doesn’t exist. It may have moved — or the link may be wrong.');
+  renderError('Not found', 'Page not found', 'That page doesn’t exist. It may have moved, or the link may be wrong.');
 }
 
 function renderForbidden() {

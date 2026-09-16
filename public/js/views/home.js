@@ -25,7 +25,7 @@ export async function homeView() {
     html:
       `<p class="kicker">The adaptation tracker</p>` +
       `<h1 class="display-title">Every book's journey to the screen.</h1>` +
-      `<p class="lede">From whispered rumors to opening night — follow novels as they're optioned, filmed, and released as movies and series.</p>` +
+      `<p class="lede">Follow novels as they're optioned, filmed, and released as movies and series.</p>` +
       (items.length === 0
         ? `<p class="empty">No adaptations tracked yet. Check back soon.</p>`
         : `<div class="poster-grid" data-home-grid>${items.map((a, i) => adaptationCard(a, { eager: i < 2 })).join('')}</div>` +
@@ -155,10 +155,10 @@ export async function calendarView() {
     html:
       `<p class="kicker">Release calendar</p>` +
       `<h1 style="font-family:var(--serif);font-size:2rem;margin:.25rem 0 .5rem">When books hit the screen</h1>` +
-      `<p class="meta" style="margin-bottom:2rem">Every dated adaptation, arranged by release — upcoming first, then the last 120 days, then earlier releases, then the ones still waiting on a date.</p>` +
+      `<p class="meta" style="margin-bottom:2rem">Every dated adaptation, in release order: upcoming first, then the last 120 days, then older releases, then the ones still waiting on a date.</p>` +
       `<section class="shelf-group"><h2>Coming soon</h2>` +
         (groups.length === 0
-          ? `<p class="empty">Nothing dated in the pipeline yet.</p>`
+          ? `<p class="empty">No upcoming releases with dates yet.</p>`
           : groups.map((g) =>
               `<div class="cal-group"><h3 class="cal-month">${esc(g.heading)}</h3>` +
               `<ul class="shelf-list">${g.works.map((w) => calendarItem(w, today)).join('')}</ul></div>`
@@ -171,7 +171,7 @@ export async function calendarView() {
       `</section>` +
       `<section class="shelf-group"><h2>Earlier releases</h2>` +
         (yearGroups.length === 0
-          ? `<p class="empty">Nothing older on the calendar.</p>`
+          ? `<p class="empty">No earlier releases.</p>`
           : yearGroups.map((g) =>
               `<div class="cal-group"><h3 class="cal-month">${esc(g.year)}</h3>` +
               `<ul class="shelf-list">${g.works.map((w) => calendarItem(w, today)).join('')}</ul></div>`
@@ -179,7 +179,7 @@ export async function calendarView() {
       `</section>` +
       `<section class="shelf-group"><h2>TBA</h2>` +
         (tba.length === 0
-          ? `<p class="empty">Every work has a date. Remarkable.</p>`
+          ? `<p class="empty">Everything here has a release date.</p>`
           : `<ul class="shelf-list">${tba.map((w) => calendarItem(w, today)).join('')}</ul>`) +
       `</section>`,
   };
@@ -219,9 +219,9 @@ export async function mostWantedView() {
     html:
       `<p class="kicker">Community leaderboard</p>` +
       `<h1 class="display-title">Most Wanted Adaptations</h1>` +
-      `<p class="lede">The books readers most want to see on screen. One vote per person — make yours count.</p>` +
+      `<p class="lede">The books readers most want to see on screen. One vote per person.</p>` +
       (items.length === 0
-        ? `<p class="empty">No votes yet. Be the first to champion a book.</p>`
+        ? `<p class="empty">No votes yet. Be the first.</p>`
         : `<ol class="leaderboard">${items.map(rankRow).join('')}</ol>`),
     after(root) { wireUserControls(root); },
   };

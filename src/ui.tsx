@@ -594,6 +594,23 @@ dl.facts dd { margin: 0; }
   .timeline .dot { left: 0; top: 0; }
 }
 
+/* ---- compact release notes (released adaptations) ---- */
+.release-notes { margin: 1rem 0 0; }
+.release-notes ol {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: .75rem 2.25rem;
+}
+.release-notes li { display: flex; gap: .6rem; align-items: flex-start; }
+.release-notes .dot {
+  flex: none; width: 1.5rem; height: 1.5rem; border-radius: 50%;
+  background: var(--success); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: .7rem;
+}
+[data-theme="dark"] .release-notes .dot { background: rgba(76, 175, 109, .18); color: var(--success); }
+.release-notes .beat-label { font-weight: 700; font-size: .95rem; }
+.release-notes .beat-meta { display: block; color: var(--faint); font-size: .82rem; margin-top: .15rem; }
+.release-notes .beat-meta a { color: var(--link); font-size: .82rem; }
+
 /* ---- leaderboard ---- */
 .leaderboard { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; }
 .leaderboard li.rank-row {
@@ -765,6 +782,28 @@ table.data tr.ok td:first-child { color: var(--text); }
   border-top: 1px solid var(--border); font-size: .78rem; color: var(--faint);
 }
 .footer-attribution a { color: inherit; text-decoration: underline; }
+.footer-legal { font-size: .8rem; margin-top: -.25rem; }
+.footer-legal a { color: var(--muted); }
+.footer-legal a:hover { color: var(--text); }
+/* Compact mobile footer (≤640px): brand + tagline, single legal line, the
+ * Explore + Feedback link groups side-by-side in a 2-column grid. Mirrors
+ * public/styles.css. */
+@media (max-width: 640px) {
+  .site-footer { margin-top: 2.5rem; }
+  .site-footer-inner {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem 1.25rem;
+    padding: 1.75rem 1.25rem 1.5rem;
+  }
+  .footer-brand { grid-column: 1 / -1; }
+  .footer-brand p { margin: .3rem 0; }
+  .footer-brand .copyright, .footer-brand .footer-legal { display: inline; }
+  .footer-brand .copyright { margin-right: .6rem; }
+  .footer-heading { margin: 0 0 .4rem; }
+  .footer-links { gap: 0; }
+  .footer-links a { padding: .55rem 0; }
+  .footer-attribution { grid-column: 1 / -1; margin-top: 0; padding-top: 1rem; }
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -913,6 +952,7 @@ export function Layout({
               <span class="footer-wordmark">Novel Adaptations<span class="brand-arrow">.</span></span>
               <p>Tracking every book's journey to the screen.</p>
               <p class="copyright">© 2026 Novel Adaptations.</p>
+              <p class="footer-legal"><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
             </div>
             <nav aria-label="Footer">
               <h2 class="footer-heading">Explore</h2>
@@ -1040,12 +1080,79 @@ export function PosterArt({
 // ---------------------------------------------------------------------------
 
 /**
+ * Compact "Release notes" for already-released adaptations. Renders only the
+ * beats the data actually supports: dated timeline events, oldest first,
+ * capped at 3 and anchored by the release itself. Nothing is invented — with
+ * today's data that is a single "Released <date>" line.
+ */
+export function ReleaseNotes({
+  events,
+  releaseDate,
+}: {
+  events: TimelineEvent[];
+  releaseDate: string | null;
+}) {
+  const rel = events.find((e) => e.status === 'released');
+  const dated = events
+    .filter((e) => e.at && e.status !== 'released')
+    .sort((a, b) => String(a.at).localeCompare(String(b.at)))
+    .slice(0, 2);
+  const beats: { label: string; date: string | null; sourceUrl: string | null }[] =
+    dated.map((e) => ({
+      label: statusLabel(e.status),
+      date: e.at,
+      sourceUrl: e.sourceUrl,
+    }));
+  beats.push({
+    label: 'Released',
+    date: releaseDate ?? rel?.at ?? null,
+    sourceUrl: rel?.sourceUrl ?? null,
+  });
+  return (
+    <div class="release-notes">
+      <ol>
+        {beats.map((b) => (
+          <li key={b.label + (b.date ?? '')}>
+            <span class="dot" aria-hidden="true">
+              ✓
+            </span>
+            <div class="beat">
+              <span class="beat-label">{b.label}</span>
+              <span class="beat-meta">
+                {b.date ?? 'date unknown'}
+                {b.sourceUrl && (
+                  <>
+                    {' · '}
+                    <a href={b.sourceUrl} {...extLink}>
+                      source
+                    </a>
+                  </>
+                )}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/**
  * Renders the rumored → … → released ladder. Each event maps onto a step:
  * steps at/before the last dated event are "done", the last dated event is
  * "current", later steps are "upcoming". A 'cancelled' event short-circuits
- * into a terminal state.
+ * into a terminal state. Already-released adaptations get the compact
+ * ReleaseNotes instead of the full ladder.
  */
-export function StatusTimeline({ events }: { events: TimelineEvent[] }) {
+export function StatusTimeline({
+  events,
+  released = false,
+  releaseDate = null,
+}: {
+  events: TimelineEvent[];
+  released?: boolean;
+  releaseDate?: string | null;
+}) {
   const cancelled = events.find((e) => e.status === 'cancelled');
   if (cancelled) {
     return (
@@ -1338,8 +1445,8 @@ export function HomePage({
       <p class="kicker">The adaptation tracker</p>
       <h1 class="display-title">Every book's journey to the screen.</h1>
       <p class="lede">
-        From whispered rumors to opening night — follow novels as they're
-        optioned, filmed, and released as movies and series.
+        Follow novels as they're optioned, filmed, and released as movies and
+        series.
       </p>
       {adaptations.length === 0 ? (
         <p class="empty">No adaptations tracked yet. Check back soon.</p>
@@ -1435,7 +1542,14 @@ export function AdaptationPage({
             />
             {!authed && <span class="meta">Log in to vote and shelve.</span>}
           </div>
-          <StatusTimeline events={timeline ?? [{ status: adaptation.status, at: null, sourceUrl: adaptation.source_url }]} />
+          {adaptation.status === 'released' && (
+            <h2 class="section-title" style="margin-top:1.5rem">Release notes</h2>
+          )}
+          <StatusTimeline
+            events={timeline ?? [{ status: adaptation.status, at: null, sourceUrl: adaptation.source_url }]}
+            released={adaptation.status === 'released'}
+            releaseDate={adaptation.screen_release_date}
+          />
           <p class="meta" style="margin-top:1rem">
             <a href={`/feedback?type=correction&subject=${encodeURIComponent(adaptation.screen_title)}`}>Suggest a correction</a>
           </p>
@@ -1458,16 +1572,14 @@ export function AdaptationPage({
           <h2>The screen work</h2>
           <dl class="facts">
             <dt>Title</dt>
-            <dd>{adaptation.screen_title}</dd>
+            <dd>
+              <a href={`/watch/${adaptation.screen_work_id}`}>{adaptation.screen_title}</a>
+            </dd>
             <dt>Kind</dt>
             <dd>{kindLabel(adaptation.screen_kind)}</dd>
             <dt>Release</dt>
             <dd>{adaptation.screen_release_date ?? 'TBA'}</dd>
           </dl>
-          <p class="meta" style="margin-top:0.75rem">
-            <a href={`/watch/${adaptation.screen_work_id}`}>View the screen work →</a>
-            {' '}the film/series page, with synopsis, cast, and related news.
-          </p>
         </section>
       </div>
 
@@ -1478,6 +1590,12 @@ export function AdaptationPage({
           total={pollResults?.total ?? 0}
           userChoice={pollChoice ?? null}
           signedIn={authed}
+          art={{
+            bookCoverUrl: adaptation.book_cover_url ?? null,
+            bookTitle: adaptation.book_title,
+            screenPosterUrl: adaptation.screen_poster_url ?? null,
+            screenTitle: adaptation.screen_title,
+          }}
         />
       </section>
 
@@ -1688,11 +1806,11 @@ export function MostWantedPage({
       <p class="kicker">Community leaderboard</p>
       <h1 class="display-title">Most Wanted Adaptations</h1>
       <p class="lede">
-        The books readers most want to see on screen. One vote per person —
-        {authed ? ' make yours count.' : ' log in to add yours.'}
+        The books readers most want to see on screen. One vote per person
+        {authed ? '.' : ' — log in to add yours.'}
       </p>
       {items.length === 0 ? (
-        <p class="empty">No votes yet. Be the first to champion a book.</p>
+        <p class="empty">No votes yet. Be the first.</p>
       ) : (
         <ol class="leaderboard">
           {items.map((item, i) => {

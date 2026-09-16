@@ -161,10 +161,10 @@ const STATIC_ROUTES: Record<string, { title: string; description: string; body: 
   },
   '/lists': {
     title: 'Lists — Novel Adaptations',
-    description: 'Shareable lists of book adaptations, curated by readers.',
+    description: 'Shareable lists of book adaptations, made by readers.',
     body:
       `<h1>Lists</h1>` +
-      `<p>Shareable lists of book adaptations, curated by readers.</p>`,
+      `<p>Shareable lists of book adaptations, made by readers.</p>`,
   },
   '/shelves': {
     title: 'Shelves — Novel Adaptations',
