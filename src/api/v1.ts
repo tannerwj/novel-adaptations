@@ -260,8 +260,8 @@ function toV1User(id: number, email: string, isAdmin: unknown): V1User {
 
 /**
  * Short-TTL edge caching for anonymous, non-personalized GETs (home,
- * calendar, search). Responses carry `public, s-maxage=60` so Cloudflare's
- * edge serves repeat hits without a D1 round trip.
+ * calendar, search) — see edgeCached. Responses carry `public, s-maxage=60`
+ * so the edge serves repeat hits without a D1 round trip.
  *
  * Deliberately NOT applied to /most-wanted or /adaptations/:id: those carry
  * user_voted / user_shelf / user_choice fields when a session cookie is
@@ -269,9 +269,48 @@ function toV1User(id: number, email: string, isAdmin: unknown): V1User {
  * would leak one user's personalized state to another visitor. Correctness
  * over speed there (they still get the D1 batching below).
  */
-function publicCache(res: Response): Response {
-  res.headers.set('Cache-Control', 'public, s-maxage=60, max-age=30');
-  return res;
+/**
+ * Serve a fully-public GET response from the edge cache (Workers Cache API),
+ * building + storing it on a miss. Keyed on the full request URL (query
+ * included), so /search?q=... variants and ?page= pages don't collide.
+ *
+ * Why the Cache API and not bare Cache-Control headers: on this zone
+ * Cloudflare's CDN does not evaluate Worker-generated JSON responses for
+ * edge caching from headers alone (verified live: header-only responses come
+ * back with no cf-cache-status at all, while static assets HIT). The worker
+ * therefore writes the entry explicitly. The stored response still carries
+ * `public, s-maxage=60, max-age=30`, which bounds the entry's TTL and lets
+ * browsers cache briefly too.
+ *
+ * ONLY for responses that are byte-identical for every visitor (no user
+ * fields). /most-wanted and /adaptations/:id are deliberately excluded:
+ * user_voted / user_shelf / user_choice are personalized when logged in, and
+ * the edge cache key does not vary on cookies — caching them would leak one
+ * user's state to another visitor. Correctness over speed there.
+ */
+async function edgeCached(
+  c: V1Context,
+  build: () => Promise<Response>,
+): Promise<Response> {
+  const key = new Request(c.req.url, { method: 'GET' });
+  const hit = await caches.default.match(key);
+  if (hit) {
+    // Cached responses have immutable headers — clone to stamp the header.
+    const h = new Response(hit.body, hit);
+    h.headers.set('X-Edge-Cache', 'HIT');
+    return h;
+  }
+  const res = await build();
+  if (res.status !== 200) return res;
+  const out = new Response(res.body, res);
+  out.headers.set('Cache-Control', 'public, s-maxage=60, max-age=30');
+  out.headers.set('X-Edge-Cache', 'MISS');
+  c.executionCtx.waitUntil(
+    caches.default.put(key, out.clone()).catch((e) => {
+      console.error('edge cache put failed:', (e as Error).message);
+    }),
+  );
+  return out;
 }
 
 /**
@@ -476,26 +515,26 @@ async function adaptationListData(c: V1Context) {
 v1.get('/home', async (c) => {
   const q = parseAdaptationListQuery(c);
   if (!q.ok) return q.response;
-  // One D1 round trip: the full adaptation list + the four stat counts.
-  // (The Promise.all version issued five separate D1 HTTP requests.)
-  const homeBatch = await c.env.DB.batch([
-    c.env.DB.prepare(`${SELECT_ADAPTATION_SUMMARY} ORDER BY a.id ASC`),
-    c.env.DB.prepare('SELECT COUNT(*) AS n FROM adaptations'),
-    c.env.DB.prepare('SELECT COUNT(*) AS n FROM books'),
-    c.env.DB.prepare('SELECT COUNT(*) AS n FROM screen_works'),
-    c.env.DB.prepare("SELECT COUNT(*) AS n FROM news_items WHERE status = 'approved'"),
-  ]);
-  const listRes = batched(homeBatch, 0);
-  const adaptationsRes = batched(homeBatch, 1);
-  const booksRes = batched(homeBatch, 2);
-  const worksRes = batched(homeBatch, 3);
-  const newsRes = batched(homeBatch, 4);
-  const count = (r: D1Result) => (r.results?.[0] as { n: number } | undefined)?.n ?? 0;
-  const adaptations = ((listRes.results ?? []) as AdaptationSummary[]).filter(
-    (a) => !q.status || a.status === q.status,
-  );
-  return publicCache(
-    c.json({
+  return edgeCached(c, async () => {
+    // One D1 round trip: the full adaptation list + the four stat counts.
+    // (The Promise.all version issued five separate D1 HTTP requests.)
+    const homeBatch = await c.env.DB.batch([
+      c.env.DB.prepare(`${SELECT_ADAPTATION_SUMMARY} ORDER BY a.id ASC`),
+      c.env.DB.prepare('SELECT COUNT(*) AS n FROM adaptations'),
+      c.env.DB.prepare('SELECT COUNT(*) AS n FROM books'),
+      c.env.DB.prepare('SELECT COUNT(*) AS n FROM screen_works'),
+      c.env.DB.prepare("SELECT COUNT(*) AS n FROM news_items WHERE status = 'approved'"),
+    ]);
+    const listRes = batched(homeBatch, 0);
+    const adaptationsRes = batched(homeBatch, 1);
+    const booksRes = batched(homeBatch, 2);
+    const worksRes = batched(homeBatch, 3);
+    const newsRes = batched(homeBatch, 4);
+    const count = (r: D1Result) => (r.results?.[0] as { n: number } | undefined)?.n ?? 0;
+    const adaptations = ((listRes.results ?? []) as AdaptationSummary[]).filter(
+      (a) => !q.status || a.status === q.status,
+    );
+    return c.json({
       adaptations: paginate(adaptations, q.page, q.per_page),
       stats: {
         total_adaptations: count(adaptationsRes),
@@ -503,8 +542,8 @@ v1.get('/home', async (c) => {
         total_screen_works: count(worksRes),
         approved_news: count(newsRes),
       },
-    }),
-  );
+    });
+  });
 });
 
 v1.get('/adaptations', async (c) => {
@@ -562,7 +601,7 @@ v1.get('/adaptations/:id', async (c) => {
     : [false, null, null];
   // NOT edge-cached: user_voted / user_shelf / user_choice are personalized
   // when logged in, and the edge cache key doesn't vary on cookies (see
-  // publicCache). The D1 batching above is the whole win here.
+  // edgeCached). The D1 batching above is the whole win here.
   return c.json({
     adaptation,
     timeline,
@@ -681,7 +720,7 @@ v1.get('/most-wanted', async (c) => {
   const rows = mostWantedFromRows((rowsRes.results ?? []) as MostWantedRawRow[]);
   const total = (totalRes.results?.[0] as { n: number } | undefined)?.n ?? 0;
   // NOT edge-cached: user_voted is personalized when logged in, and the edge
-  // cache key doesn't vary on cookies (see publicCache).
+  // cache key doesn't vary on cookies (see edgeCached).
   return c.json(
     paginate(
       rows.map((r) => ({
@@ -1364,7 +1403,7 @@ v1.get('/search', async (c) => {
   limit = Math.min(limit, RESULT_LIMIT);
   if (!q) {
     // Pure public fallback (no user fields) — safe to edge-cache.
-    return publicCache(
+    return edgeCached(c, async () =>
       c.json({
         q: '',
         books: { data: [], total: 0 },
@@ -1374,47 +1413,47 @@ v1.get('/search', async (c) => {
       }),
     );
   }
-  // One D1 round trip for the three search groups (was: three).
-  const searchBatch = await c.env.DB.batch(searchStatements(c.env.DB, q));
-  const booksRes = batched(searchBatch, 0);
-  const worksRes = batched(searchBatch, 1);
-  const storiesRes = batched(searchBatch, 2);
-  const books = (booksRes.results ?? []) as BookHit[];
-  const works = (worksRes.results ?? []) as ScreenWorkHit[];
-  const stories = (storiesRes.results ?? []) as AdaptationHit[];
-  const group = <T,>(rows: T[]) => {
-    const data = rows.slice(0, limit);
-    return { data, total: data.length };
-  };
-  const popular =
-    books.length + works.length + stories.length === 0
-      ? await getPopularBooks(c.env.DB)
-      : [];
-  // Pure function of q (no user fields) — safe to edge-cache per URL.
-  return publicCache(
-    c.json({
+  return edgeCached(c, async () => {
+    // One D1 round trip for the three search groups (was: three).
+    const searchBatch = await c.env.DB.batch(searchStatements(c.env.DB, q));
+    const booksRes = batched(searchBatch, 0);
+    const worksRes = batched(searchBatch, 1);
+    const storiesRes = batched(searchBatch, 2);
+    const books = (booksRes.results ?? []) as BookHit[];
+    const works = (worksRes.results ?? []) as ScreenWorkHit[];
+    const stories = (storiesRes.results ?? []) as AdaptationHit[];
+    const group = <T,>(rows: T[]) => {
+      const data = rows.slice(0, limit);
+      return { data, total: data.length };
+    };
+    const popular =
+      books.length + works.length + stories.length === 0
+        ? await getPopularBooks(c.env.DB)
+        : [];
+    // Pure function of q (no user fields) — safe to edge-cache per URL.
+    return c.json({
       q,
       books: group(books),
       screen_works: group(works),
       adaptations: group(stories),
       popular,
-    }),
-  );
+    });
+  });
 });
 
 // --- calendar ----------------------------------------------------------------
 
 v1.get('/calendar', async (c) => {
-  const { today, buckets } = await getCalendarFeed(c.env.DB);
   // Single query, identical for every visitor — safe to edge-cache.
-  return publicCache(
-    c.json({
+  return edgeCached(c, async () => {
+    const { today, buckets } = await getCalendarFeed(c.env.DB);
+    return c.json({
       today,
       coming_soon: buckets.comingSoon,
       recently_released: buckets.recentlyReleased,
       tba: buckets.tba,
-    }),
-  );
+    });
+  });
 });
 
 // --- feedback (public submit) -------------------------------------------------
