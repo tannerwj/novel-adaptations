@@ -31,18 +31,19 @@ export const tests = [
     const p1 = await apiGet('/api/v1/home');
     eq(p1.status, 200, 'GET /api/v1/home status');
     eq(p1.data.adaptations.data.length, 24, 'home page 1 returns 24 adaptations');
-    eq(p1.data.adaptations.total, 40, 'home reports 40 total adaptations');
-    eq(p1.data.stats.total_adaptations, 40, 'home stats.total_adaptations is 40');
+    const total = p1.data.adaptations.total;
+    assert(total >= 900, `home reports the full catalog total (got ${total})`);
+    eq(p1.data.stats.total_adaptations, total, 'home stats.total_adaptations matches the catalog total');
 
     const p2 = await apiGet('/api/v1/home', { query: { page: '2' } });
     eq(p2.status, 200, 'GET /api/v1/home?page=2 status');
-    eq(p2.data.adaptations.data.length, 16, 'home page 2 returns the remaining 16');
+    eq(p2.data.adaptations.data.length, 24, 'home page 2 returns a full page of 24');
 
     const { home } = await loadClientViews();
     const view = await home.homeView();
     eq(countOccurrences(view.html, 'class="poster-card"'), 24, 'client home view renders 24 cards');
     contains(view.html, 'Load more', 'client home view has a Load more button');
-    contains(view.html, '(16 of 40 remaining)', 'Load more button shows the remaining count');
+    contains(view.html, `(${total - 24} of ${total} remaining)`, 'Load more button shows the remaining count');
   }),
 
   test('search: API match, grouped client results, empty state', async () => {

@@ -208,6 +208,50 @@ function ComingSoonSection({
   );
 }
 
+/**
+ * Earlier releases, grouped by year in collapsible <details> — the newest
+ * year starts open, the rest stay closed until asked for. Native HTML, no
+ * JS: keyboard-operable, and lazy poster images inside closed groups are
+ * never fetched, so the section stays light even with ~1000 titles.
+ */
+function EarlierReleases({
+  works,
+  today,
+}: {
+  works: CalendarWork[];
+  today: string;
+}) {
+  if (works.length === 0) {
+    return <p class="empty">No earlier releases.</p>;
+  }
+  const groups: { year: string; items: CalendarWork[] }[] = [];
+  for (const w of works) {
+    const year = (cleanDate(w) ?? '').slice(0, 4) || 'Unknown';
+    const last = groups[groups.length - 1];
+    if (last && last.year === year) last.items.push(w);
+    else groups.push({ year, items: [w] });
+  }
+  return (
+    <>
+      {groups.map((g, i) => (
+        <details class="cal-year" {...(i === 0 ? { open: true } : {})}>
+          <summary>
+            <span>{g.year}</span>
+            <span class="meta">
+              {g.items.length} {g.items.length === 1 ? 'title' : 'titles'}
+            </span>
+          </summary>
+          <ul class="shelf-list">
+            {g.items.map((w) => (
+              <CalendarItem key={w.id} work={w} today={today} />
+            ))}
+          </ul>
+        </details>
+      ))}
+    </>
+  );
+}
+
 export function CalendarPage({
   works,
   today,
@@ -255,15 +299,7 @@ export function CalendarPage({
 
       <section class="shelf-group">
         <h2>Earlier releases</h2>
-        {earlierReleases.length === 0 ? (
-          <p class="empty">No earlier releases.</p>
-        ) : (
-          <ul class="shelf-list">
-            {earlierReleases.map((w) => (
-              <CalendarItem key={w.id} work={w} today={today} />
-            ))}
-          </ul>
-        )}
+        <EarlierReleases works={earlierReleases} today={today} />
       </section>
 
       <section class="shelf-group">

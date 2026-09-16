@@ -166,11 +166,24 @@ def flow_home_load_more(page, c):
     expect(grid.locator(".poster-card")).to_have_count(24, timeout=30000)
     btn = page.locator("[data-load-more]")
     expect(btn).to_be_visible()
-    assert "16 of 40 remaining" in btn.inner_text()
+    total = page.evaluate(
+        "fetch('/api/v1/home').then(r => r.json()).then(j => j.adaptations.total)"
+    )
+    assert total >= 900, f"expected the full catalog, got total={total}"
+    assert f"{total - 24} of {total} remaining" in btn.inner_text()
     mark_alive(page)
-    btn.click()
-    expect(grid.locator(".poster-card")).to_have_count(40, timeout=30000)
-    assert page.locator("[data-load-more]").count() == 0, "load-more button still present after all 40 shown"
+    # Page through a few times: each click appends 24 more cards in place,
+    # the remaining count ticks down, and nothing reloads. (Paging through
+    # all ~1000 would take 40+ clicks; the API pagination is covered by the
+    # Node suite.)
+    for expected in (48, 72):
+        btn.click()
+        expect(grid.locator(".poster-card")).to_have_count(expected, timeout=30000)
+        left = total - expected
+        assert f"{left} of {total} remaining" in btn.inner_text(), (
+            "remaining count did not tick down after load more"
+        )
+        mark_alive(page)
     # Scroll the whole grid so every lazy poster fires, then require all of
     # them to load — a broken TMDB artwork URL anywhere fails the suite.
     page.evaluate(

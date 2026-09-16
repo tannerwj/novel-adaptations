@@ -168,7 +168,7 @@ input[type="url"]:focus-visible, input[type="number"]:focus-visible,
 input[type="search"]:focus-visible, input[type="date"]:focus-visible,
 textarea:focus-visible, select:focus-visible {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-tint);
+  box-shadow: 0 0 0 3px var(--link);
   outline: none;
 }
 /* ---- header / nav ---- */
@@ -891,6 +891,19 @@ table.admin-table th {
 .cal-month {
   font-family: var(--serif); font-size: 1.05rem; margin: 0 0 .75rem; color: var(--muted);
 }
+/* Year groups for earlier releases: native <details>, no JS. */
+.cal-year {
+  margin-bottom: .6rem; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface);
+}
+.cal-year summary {
+  cursor: pointer; padding: .7rem .9rem; font-family: var(--serif);
+  font-size: 1.05rem; font-weight: 700; color: var(--text);
+  display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
+}
+.cal-year summary::marker { color: var(--faint); }
+.cal-year[open] summary { border-bottom: 1px solid var(--border); }
+.cal-year .shelf-list { margin: 0; padding: .4rem .9rem .7rem; }
 /* ---- footer ---- */
 .site-footer { border-top: 1px solid var(--border); margin-top: 4rem; }
 .site-footer-inner {

@@ -305,7 +305,7 @@ function ProviderGroup({
           >
             <img
               src={p.logo}
-              alt={p.name}
+              alt=""
               width="36"
               height="36"
               loading="lazy"
