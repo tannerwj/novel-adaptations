@@ -1,0 +1,1964 @@
+openapi: 3.1.0
+info:
+  title: Novel Adaptations API
+  version: 1.0.0
+  description: |
+    The versioned JSON API (`/api/v1`) powering the Novel Adaptations
+    client-rendered SPA. This is the canonical contract: it is generated from
+    and kept in sync with `src/api/v1.ts`, and served live at
+    `/api/openapi.json` (machine-readable JSON) and `/api/docs` (interactive
+    docs).
+
+    ## Shared conventions
+
+    * All request/response bodies are JSON. Send `Content-Type: application/json`
+      on requests with a body.
+    * JSON keys are **snake_case** everywhere.
+    * **Error envelope** — every error response has the shape
+      `{ "error": { "code": "snake_case_string", "message": "human readable" } }`
+      with the matching HTTP status. Common codes: `unauthorized` (401),
+      `invalid_token` (401), `forbidden` (403), `not_found` (404),
+      `conflict` (409), `validation_error` (422), `rate_limited` (429),
+      `email_not_configured` (503), `internal_error` (500). Validation
+      failures always answer **422**, never 400.
+    * **Pagination envelope** — paginated lists answer
+      `{ "data": [...], "page": 1, "per_page": 24, "total": 128 }`.
+      `page` defaults to 1; `per_page` defaults vary per endpoint and are
+      clamped to a maximum of 100.
+    * **Auth** — session cookie `na_session` (HttpOnly, 30 days). Endpoints
+      marked with the cookieAuth security requirement return
+      `401 { "error": { "code": "unauthorized", ... } }` when signed out, and
+      `403 { "error": { "code": "forbidden", ... } }` when the caller is
+      signed in but not an admin (admin routes only).
+    * Unknown `/api/v1/*` paths answer
+      `404 { "error": { "code": "not_found", "message": "Unknown API endpoint." } }`.
+  contact:
+    name: Novel Adaptations
+    url: https://noveladaptations.com
+  license:
+    name: Proprietary
+servers:
+  - url: https://noveladaptations.com
+    description: Production (apex; www.noveladaptations.com serves the same API)
+tags:
+  - name: Auth
+    description: Magic-link sign-in, session, logout.
+  - name: Home
+    description: Landing data — adaptation grid plus site stats.
+  - name: Adaptations
+    description: Book↔screen-work pairing records.
+  - name: Books
+    description: Book detail with adaptations, ratings, reviews.
+  - name: ScreenWorks
+    description: Film/series detail (the "watch" pages).
+  - name: Votes
+    description: Most-wanted voting.
+  - name: Ratings
+    description: 1–5 star ratings on books and screen works.
+  - name: Reviews
+    description: Spoiler-safe written reviews.
+  - name: Polls
+    description: Book-vs-screen polls on adaptations.
+  - name: Hype
+    description: 1–5 hype meter for unreleased screen works.
+  - name: Lists
+    description: Shareable user lists.
+  - name: Shelves
+    description: Personal read/watch shelves.
+  - name: Search
+    description: Site-wide search.
+  - name: Calendar
+    description: Release calendar feed.
+  - name: Feedback
+    description: Public feedback submission.
+  - name: Theme
+    description: Light/dark theme preference cookie.
+  - name: Admin
+    description: News queue, enrichment, release dates, feedback triage. Admin only.
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: na_session
+      description: Session cookie set by POST /api/v1/auth/verify (HttpOnly, 30 days).
+
+  parameters:
+    pageParam:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+      description: 1-based page number. Defaults to 1.
+    perPageParam:
+      name: per_page
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 24 }
+      description: Results per page. Clamped to 100. Default varies by endpoint.
+
+  responses:
+    Unauthorized:
+      description: 'Not signed in. `{ "error": { "code": "unauthorized", "message": "…" } }`.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example: { error: { code: unauthorized, message: 'Sign in to continue.' } }
+    Forbidden:
+      description: Signed in, but not an admin.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example: { error: { code: forbidden, message: 'Admin access required.' } }
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example: { error: { code: not_found, message: 'Not found.' } }
+    Unprocessable:
+      description: Validation failure — always 422 in this API, never 400.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example: { error: { code: validation_error, message: 'Enter a valid email address.' } }
+    RateLimited:
+      description: Per-user (or per-IP) rate budget exhausted.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example: { error: { code: rate_limited, message: 'Too many requests — try again later.' } }
+    InternalError:
+      description: Unexpected server failure.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example: { error: { code: internal_error, message: 'Something went wrong.' } }
+
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, example: not_found }
+            message: { type: string, example: 'Adaptation not found.' }
+
+    V1User:
+      type: object
+      required: [id, email, is_admin]
+      properties:
+        id: { type: integer, example: 7 }
+        email: { type: string, format: email, example: reader@example.com }
+        is_admin: { type: boolean, example: false }
+
+    AdaptationSummary:
+      type: object
+      required: [id, book_id, screen_work_id, status, source_url, book_title,
+        book_authors, book_cover_url, screen_title, screen_kind,
+        screen_release_date, screen_poster_url, screen_backdrop_url]
+      properties:
+        id: { type: integer, example: 1 }
+        book_id: { type: integer, example: 1 }
+        screen_work_id: { type: integer, example: 1 }
+        status:
+          $ref: '#/components/schemas/AdaptationStatus'
+        source_url: { type: [string, 'null'], example: 'https://deadline.com/dune-part-3' }
+        book_title: { type: string, example: 'Dune' }
+        book_authors: { type: string, example: 'Frank Herbert' }
+        book_cover_url: { type: [string, 'null'], example: 'https://covers.openlibrary.org/b/id/8231856-L.jpg' }
+        screen_title: { type: string, example: 'Dune: Part Two' }
+        screen_kind: { type: string, enum: [film, series], example: film }
+        screen_release_date: { type: [string, 'null'], format: date, example: '2024-03-01' }
+        screen_poster_url: { type: [string, 'null'], example: 'https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg' }
+        screen_backdrop_url: { type: [string, 'null'] }
+
+    AdaptationStatus:
+      type: string
+      enum: [rumored, optioned, in_development, filming, post_production, released, cancelled]
+
+    Book:
+      type: object
+      required: [id, title, authors, cover_url, pub_date, isbn, openlibrary_id, googlebooks_id]
+      properties:
+        id: { type: integer, example: 1 }
+        title: { type: string, example: 'Dune' }
+        authors: { type: string, example: 'Frank Herbert' }
+        cover_url: { type: [string, 'null'] }
+        pub_date: { type: [string, 'null'], example: '1965-06-01' }
+        isbn: { type: [string, 'null'] }
+        openlibrary_id: { type: [string, 'null'] }
+        googlebooks_id: { type: [string, 'null'] }
+
+    ScreenWork:
+      type: object
+      required: [id, tmdb_id, title, kind, poster_url, backdrop_url, release_date,
+        synopsis, purchase_url_screen]
+      properties:
+        id: { type: integer, example: 1 }
+        tmdb_id: { type: [integer, 'null'], example: 693134 }
+        title: { type: string, example: 'Dune: Part Two' }
+        kind: { type: string, enum: [film, series], example: film }
+        poster_url: { type: [string, 'null'] }
+        backdrop_url: { type: [string, 'null'] }
+        release_date: { type: [string, 'null'], format: date }
+        synopsis: { type: [string, 'null'] }
+        purchase_url_screen: { type: [string, 'null'], description: 'Affiliate URL column; no UI reads it yet.' }
+
+    ReviewV1:
+      type: object
+      required: [id, user_id, target_type, target_id, title, body, has_spoilers,
+        created_at, updated_at, author_id, author_email]
+      properties:
+        id: { type: integer, example: 12 }
+        user_id: { type: integer, example: 7 }
+        target_type: { type: string, enum: [book, screen_work], example: book }
+        target_id: { type: integer, example: 1 }
+        title: { type: [string, 'null'], example: 'A masterpiece' }
+        body: { type: string, example: 'Herbert built a universe…', maxLength: 5000 }
+        has_spoilers: { type: boolean, example: false }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        author_id: { type: integer, example: 7 }
+        author_email: { type: string, example: reader@example.com }
+
+    NewsItemV1:
+      type: object
+      required: [id, url, url_hash, title, summary, source, trust_tier, status,
+        is_adaptation_news, book_title, author, screen_kind, status_signal,
+        confidence, llm_model, needs_review, dismiss_reason, created_at]
+      properties:
+        id: { type: integer, example: 101 }
+        url: { type: string, example: 'https://deadline.com/dune-part-3-news' }
+        url_hash: { type: string }
+        title: { type: string }
+        summary: { type: [string, 'null'] }
+        source: { type: string, example: Deadline }
+        trust_tier: { type: string, enum: [trusted, reputable, rumor] }
+        status: { type: string, enum: [pending, approved, dismissed] }
+        is_adaptation_news: { type: boolean, description: 'D1 stores 0/1; the API projects a real boolean.' }
+        book_title: { type: [string, 'null'] }
+        author: { type: [string, 'null'] }
+        screen_kind: { type: [string, 'null'] }
+        status_signal: { type: [string, 'null'] }
+        confidence: { type: [number, 'null'] }
+        llm_model: { type: [string, 'null'] }
+        needs_review: { type: boolean, description: 'D1 stores 0/1; the API projects a real boolean.' }
+        dismiss_reason: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+
+    UserListV1:
+      type: object
+      required: [id, title, description, is_public, slug, item_count, created_at, updated_at]
+      properties:
+        id: { type: integer, example: 3 }
+        title: { type: string, example: 'Sci-fi to read this winter', maxLength: 120 }
+        description: { type: [string, 'null'], maxLength: 2000 }
+        is_public: { type: boolean, description: 'D1 stores 0/1; the API projects a real boolean.' }
+        slug: { type: string, example: 'sci-fi-to-read-this-winter-a1b2c3' }
+        item_count: { type: integer, example: 8 }
+        created_at: { type: [string, 'null'], format: date-time }
+        updated_at: { type: [string, 'null'], format: date-time }
+
+    ListItemV1:
+      type: object
+      required: [id, target_type, target_id, position, note, title, subtitle, image_url, href]
+      properties:
+        id: { type: integer, example: 14 }
+        target_type: { type: string, enum: [book, screen_work] }
+        target_id: { type: integer, example: 1 }
+        position: { type: integer, example: 0 }
+        note: { type: [string, 'null'], maxLength: 500 }
+        title: { type: string, example: 'Dune' }
+        subtitle: { type: string, example: 'Frank Herbert' }
+        image_url: { type: [string, 'null'] }
+        href: { type: string, example: '/books/1', description: 'Detail-page path for the target.' }
+
+    CalendarWork:
+      type: object
+      required: [id, title, kind, release_date, poster_url]
+      properties:
+        id: { type: integer, example: 1 }
+        title: { type: string, example: 'Dune: Part Three' }
+        kind: { type: string, example: film }
+        release_date: { type: [string, 'null'], format: date }
+        poster_url: { type: [string, 'null'] }
+
+    PopularBook:
+      type: object
+      required: [id, title, authors, cover_url, votes]
+      properties:
+        id: { type: integer, example: 1 }
+        title: { type: string, example: 'Dune' }
+        authors: { type: string, example: 'Frank Herbert' }
+        cover_url: { type: [string, 'null'] }
+        votes: { type: integer, example: 42 }
+
+    BookHit:
+      type: object
+      required: [id, title, authors]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        authors: { type: string }
+
+    ScreenWorkHit:
+      type: object
+      required: [id, title, kind, poster_url]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        kind: { type: string, enum: [film, series] }
+        poster_url: { type: [string, 'null'] }
+
+    AdaptationHit:
+      type: object
+      required: [id, status, book_title, book_authors, screen_title, screen_kind]
+      properties:
+        id: { type: integer }
+        status: { type: string }
+        book_title: { type: string }
+        book_authors: { type: string }
+        screen_title: { type: string }
+        screen_kind: { type: string, enum: [film, series] }
+
+    WatchProvider:
+      type: object
+      required: [id, name, logo]
+      properties:
+        id: { type: integer, example: 8 }
+        name: { type: string, example: 'Netflix' }
+        logo: { type: string, example: 'https://image.tmdb.org/t/p/w92/t2yyOv40HZeVlLjYsCsPHnWLk4W.jpg' }
+
+    WatchProviders:
+      type: object
+      required: [flatrate, rent, buy, link]
+      properties:
+        flatrate: { type: array, items: { $ref: '#/components/schemas/WatchProvider' } }
+        rent: { type: array, items: { $ref: '#/components/schemas/WatchProvider' } }
+        buy: { type: array, items: { $ref: '#/components/schemas/WatchProvider' } }
+        link: { type: [string, 'null'], description: 'TMDB-hosted page with the full provider list.' }
+
+    PipelineRun:
+      type: object
+      required: [id, started_at, finished_at, status, feeds_ok, feeds_failed,
+        items_fetched, items_new, items_skipped_cap, llm_calls, errors, created_at]
+      properties:
+        id: { type: integer }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
+        status: { type: string, enum: [ran, disabled, error] }
+        feeds_ok: { type: integer }
+        feeds_failed: { type: integer }
+        items_fetched: { type: integer }
+        items_new: { type: integer }
+        items_skipped_cap: { type: integer }
+        llm_calls: { type: integer }
+        errors: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+
+    ReleaseDateRow:
+      type: object
+      required: [id, title, kind, release_date, tmdb_id]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        kind: { type: string }
+        release_date: { type: [string, 'null'], format: date }
+        tmdb_id: { type: [integer, 'null'] }
+
+    TimelineEvent:
+      type: object
+      required: [status, at, source_url]
+      properties:
+        status: { type: string, example: in_development }
+        at:
+          type: [string, 'null']
+          format: date-time
+          description: Null when the event is synthesized from the adaptation's current status (no audit row).
+        source_url: { type: [string, 'null'] }
+
+    PollCounts:
+      type: object
+      required: [book, screen, both, undecided]
+      properties:
+        book: { type: integer, example: 31 }
+        screen: { type: integer, example: 12 }
+        both: { type: integer, example: 20 }
+        undecided: { type: integer, example: 5 }
+
+    PollResult:
+      type: object
+      required: [adaptation_id, counts, total, user_choice]
+      properties:
+        adaptation_id: { type: integer, example: 1 }
+        counts: { $ref: '#/components/schemas/PollCounts' }
+        total: { type: integer, example: 68 }
+        user_choice:
+          type: [string, 'null']
+          enum: [book, screen, both, undecided, null]
+          example: book
+
+    VoteResult:
+      type: object
+      required: [voted, votes]
+      properties:
+        voted: { type: boolean, example: true }
+        votes: { type: integer, example: 43 }
+
+    MostWantedRow:
+      type: object
+      required: [book_id, title, authors, cover_url, votes, user_voted]
+      properties:
+        book_id: { type: integer, example: 1 }
+        title: { type: string, example: 'Dune' }
+        authors: { type: string, example: 'Frank Herbert' }
+        cover_url: { type: [string, 'null'] }
+        votes: { type: integer, example: 43 }
+        user_voted: { type: boolean, example: true }
+
+    RatingResult:
+      type: object
+      required: [target_type, target_id, average, count, user_rating]
+      properties:
+        target_type: { type: string, enum: [book, screen_work] }
+        target_id: { type: integer }
+        average: { type: number, example: 4.2, description: 'Rounded to one decimal; 0 when there are no ratings.' }
+        count: { type: integer, example: 17 }
+        user_rating: { type: [integer, 'null'], minimum: 1, maximum: 5 }
+
+    HypeResult:
+      type: object
+      required: [screen_work_id, average, count, user_level]
+      properties:
+        screen_work_id: { type: integer }
+        average: { type: number, example: 4.7, description: 'Rounded to one decimal; 0 when there are no hype votes.' }
+        count: { type: integer, example: 9 }
+        user_level: { type: [integer, 'null'], minimum: 1, maximum: 5 }
+
+    NewsStatusCounts:
+      type: object
+      required: [pending, approved, dismissed]
+      properties:
+        pending: { type: integer, example: 6 }
+        approved: { type: integer, example: 210 }
+        dismissed: { type: integer, example: 14 }
+
+    FeedbackStatusCounts:
+      type: object
+      required: [new, reviewed, done]
+      properties:
+        'new': { type: integer, example: 3 }
+        reviewed: { type: integer, example: 1 }
+        done: { type: integer, example: 9 }
+
+    # --- pagination envelopes ------------------------------------------------
+    PagedAdaptations:
+      type: object
+      required: [data, page, per_page, total]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/AdaptationSummary' } }
+        page: { type: integer, example: 1 }
+        per_page: { type: integer, example: 24 }
+        total: { type: integer, example: 128 }
+    PagedReviews:
+      type: object
+      required: [data, page, per_page, total]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/ReviewV1' } }
+        page: { type: integer, example: 1 }
+        per_page: { type: integer, example: 20 }
+        total: { type: integer, example: 3 }
+    PagedLists:
+      type: object
+      required: [data, page, per_page, total]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/UserListV1' } }
+        page: { type: integer, example: 1 }
+        per_page: { type: integer, example: 50 }
+        total: { type: integer, example: 2 }
+    PagedNewsItems:
+      type: object
+      required: [data, page, per_page, total]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/NewsItemV1' } }
+        page: { type: integer, example: 1 }
+        per_page: { type: integer, example: 50 }
+        total: { type: integer, example: 6 }
+    PagedPipelineRuns:
+      type: object
+      required: [data, page, per_page, total]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/PipelineRun' } }
+        page: { type: integer, example: 1 }
+        per_page: { type: integer, example: 50 }
+        total: { type: integer, example: 42 }
+    PagedFeedback:
+      type: object
+      required: [data, page, per_page, total]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/FeedbackRow' } }
+        page: { type: integer, example: 1 }
+        per_page: { type: integer, example: 50 }
+        total: { type: integer, example: 13 }
+    PagedScreenWorksAdmin:
+      type: object
+      required: [data, page, per_page, total]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/ReleaseDateRow' } }
+        page: { type: integer, example: 1 }
+        per_page: { type: integer, example: 100 }
+        total: { type: integer, example: 96 }
+    PagedMostWanted:
+      type: object
+      required: [data, page, per_page, total]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/MostWantedRow' } }
+        page: { type: integer, example: 1 }
+        per_page: { type: integer, example: 100 }
+        total: { type: integer, example: 57 }
+
+    FeedbackRow:
+      type: object
+      required: [id, type, subject, body, proof_url, email, user_id, status, created_at]
+      properties:
+        id: { type: integer }
+        type: { type: string, enum: [feature, adaptation_tip, correction, other] }
+        subject: { type: string }
+        body: { type: string }
+        proof_url: { type: [string, 'null'] }
+        email: { type: [string, 'null'] }
+        user_id: { type: [integer, 'null'] }
+        status: { type: string, enum: ['new', reviewed, done] }
+        created_at: { type: string, format: date-time }
+
+paths:
+  /api/v1/auth/magic-link:
+    post:
+      tags: [Auth]
+      summary: Request a magic-link sign-in email
+      description: |
+        Rate-limited per email. In development/preview environments the response
+        also includes `dev_link` (the sign-in URL) as a local-dev convenience;
+        in production the link is sent by email only. If email sending is not
+        configured the API answers 503 `email_not_configured`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email, example: reader@example.com }
+      responses:
+        '200':
+          description: Sign-in email queued (or dev link returned).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, email]
+                properties:
+                  ok: { type: boolean, example: true }
+                  email: { type: string, example: reader@example.com }
+                  dev_link: { type: string, description: 'Development/preview only — the sign-in URL.' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: Email sending is not configured.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example: { error: { code: email_not_configured, message: 'Sign-in email is not configured yet.' } }
+
+  /api/v1/auth/verify:
+    post:
+      tags: [Auth]
+      summary: Consume a magic-link token and start a session
+      description: |
+        Consumes the one-time token (single use, expires), promotes the user to
+        admin when their email is in `ADMIN_EMAILS` (the only promotion path),
+        and sets the `na_session` cookie (HttpOnly, 30 days, Secure on https).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, example: '9f2c…(64 hex chars)' }
+      responses:
+        '200':
+          description: Session started; cookie set.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user: { $ref: '#/components/schemas/V1User' }
+        '401':
+          description: Token invalid, expired, or already used.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example: { error: { code: invalid_token, message: 'This sign-in link is invalid, expired, or already used.' } }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Current session user
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: The signed-in user.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user: { $ref: '#/components/schemas/V1User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: End the session
+      description: Deletes the server-side session and clears the `na_session` cookie.
+      responses:
+        '200':
+          description: Logged out.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean, example: true }
+
+  /api/v1/home:
+    get:
+      tags: [Home]
+      summary: Home grid + site stats
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/perPageParam'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/AdaptationStatus' }
+          description: Filter adaptations by status. 422 on any other value.
+      responses:
+        '200':
+          description: Paginated adaptation grid plus counts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [adaptations, stats]
+                properties:
+                  adaptations: { $ref: '#/components/schemas/PagedAdaptations' }
+                  stats:
+                    type: object
+                    required: [total_adaptations, total_books, total_screen_works, approved_news]
+                    properties:
+                      total_adaptations: { type: integer, example: 128 }
+                      total_books: { type: integer, example: 96 }
+                      total_screen_works: { type: integer, example: 110 }
+                      approved_news: { type: integer, example: 210 }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /api/v1/adaptations:
+    get:
+      tags: [Adaptations]
+      summary: List adaptations
+      description: Same list as GET /api/v1/home without the stats block. `per_page` defaults to 24.
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/perPageParam'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/AdaptationStatus' }
+          description: Filter adaptations by status. 422 on any other value.
+      responses:
+        '200':
+          description: Paginated adaptation summaries.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedAdaptations' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /api/v1/adaptations/{id}:
+    get:
+      tags: [Adaptations]
+      summary: Adaptation detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Adaptation with status timeline, personal state, and poll.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [adaptation, timeline, user_voted, user_shelf, poll]
+                properties:
+                  adaptation: { $ref: '#/components/schemas/AdaptationSummary' }
+                  timeline:
+                    type: array
+                    items: { $ref: '#/components/schemas/TimelineEvent' }
+                  user_voted: { type: boolean, description: 'Whether the signed-in user voted for the book (false when signed out).' }
+                  user_shelf:
+                    type: [string, 'null']
+                    enum: [want_to_read, read, want_to_watch, watched, null]
+                  poll: { $ref: '#/components/schemas/PollResult' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /api/v1/books/{id}:
+    get:
+      tags: [Books]
+      summary: Book detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/perPageParam'
+      responses:
+        '200':
+          description: Book with adaptations, rating summary, reviews, and personal state.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [book, adaptations, rating, user_rating, user_voted,
+                  user_shelf, reviews, user_lists]
+                properties:
+                  book: { $ref: '#/components/schemas/Book' }
+                  adaptations:
+                    type: array
+                    items: { $ref: '#/components/schemas/AdaptationSummary' }
+                  rating:
+                    type: object
+                    required: [average, count]
+                    properties:
+                      average: { type: number, example: 4.3 }
+                      count: { type: integer, example: 12 }
+                  user_rating: { type: [integer, 'null'], minimum: 1, maximum: 5 }
+                  user_voted: { type: boolean }
+                  user_shelf:
+                    type: [string, 'null']
+                    enum: [want_to_read, read, want_to_watch, watched, null]
+                  reviews: { $ref: '#/components/schemas/PagedReviews' }
+                  user_lists:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, title]
+                      properties:
+                        id: { type: integer }
+                        title: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /api/v1/watch/{id}:
+    get:
+      tags: [ScreenWorks]
+      summary: Screen-work detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/perPageParam'
+      responses:
+        '200':
+          description: |
+            Screen work with related news, where-to-watch providers, ratings,
+            reviews, and — when unreleased — the hype meter. `watch_providers`
+            may be null (7-day D1 cache; the fetch never throws).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [work, news, watch_providers, rating, user_rating,
+                  reviews, hype, user_lists]
+                properties:
+                  work: { $ref: '#/components/schemas/ScreenWork' }
+                  news:
+                    type: array
+                    items: { $ref: '#/components/schemas/NewsItemV1' }
+                  watch_providers:
+                    oneOf:
+                      - { $ref: '#/components/schemas/WatchProviders' }
+                      - { type: 'null' }
+                  rating:
+                    type: object
+                    required: [average, count]
+                    properties:
+                      average: { type: number, example: 4.5 }
+                      count: { type: integer, example: 9 }
+                  user_rating: { type: [integer, 'null'], minimum: 1, maximum: 5 }
+                  reviews: { $ref: '#/components/schemas/PagedReviews' }
+                  hype:
+                    oneOf:
+                      - { $ref: '#/components/schemas/HypeResult' }
+                      - { type: 'null' }
+                    description: Present only when the work is unreleased.
+                  user_lists:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, title]
+                      properties:
+                        id: { type: integer }
+                        title: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /api/v1/most-wanted:
+    get:
+      tags: [Votes]
+      summary: Most-wanted books by vote count
+      description: '`per_page` defaults to 100. `total` is the exact count of books with votes.'
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/perPageParam'
+      responses:
+        '200':
+          description: Ranked books with votes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedMostWanted' }
+
+  /api/v1/votes:
+    post:
+      tags: [Votes]
+      summary: Vote for a book
+      description: Idempotent re-vote does not consume the daily budget (20 votes/day).
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [book_id]
+              properties:
+                book_id: { type: integer, minimum: 1, example: 1 }
+      responses:
+        '200':
+          description: Vote recorded.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VoteResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /api/v1/votes/{bookId}:
+    delete:
+      tags: [Votes]
+      summary: Withdraw a vote
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: bookId
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Vote withdrawn.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VoteResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /api/v1/ratings:
+    get:
+      tags: [Ratings]
+      summary: Rating summary for a book or screen work
+      parameters:
+        - name: target_type
+          in: query
+          required: true
+          schema: { type: string, enum: [book, screen_work] }
+        - name: target_id
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Average, count, and the caller's own rating.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RatingResult' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    post:
+      tags: [Ratings]
+      summary: Set a 1–5 rating
+      description: Rate limit 60/hour per user. Upserts — re-rating replaces the old value.
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_type, target_id, rating]
+              properties:
+                target_type: { type: string, enum: [book, screen_work], example: book }
+                target_id: { type: integer, minimum: 1, example: 1 }
+                rating: { type: integer, minimum: 1, maximum: 5, example: 5 }
+      responses:
+        '200':
+          description: Rating stored.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RatingResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /api/v1/reviews:
+    get:
+      tags: [Reviews]
+      summary: List reviews for a book or screen work
+      parameters:
+        - name: target_type
+          in: query
+          required: true
+          schema: { type: string, enum: [book, screen_work] }
+        - name: target_id
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/perPageParam'
+      responses:
+        '200':
+          description: Reviews for the target.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [target_type, target_id, reviews]
+                properties:
+                  target_type: { type: string, enum: [book, screen_work] }
+                  target_id: { type: integer }
+                  reviews: { $ref: '#/components/schemas/PagedReviews' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    post:
+      tags: [Reviews]
+      summary: Write a review
+      description: |
+        One review per user per item — a second POST answers 409 `conflict`
+        with `review_id` pointing at the existing review (edit it instead).
+        Rate limit 20/hour. Body ≤ 5000 chars; title optional, ≤ 120 chars.
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_type, target_id, body]
+              properties:
+                target_type: { type: string, enum: [book, screen_work], example: book }
+                target_id: { type: integer, minimum: 1, example: 1 }
+                title: { type: string, maxLength: 120, example: 'A masterpiece' }
+                body: { type: string, maxLength: 5000, example: 'Herbert built a universe…' }
+                has_spoilers: { type: boolean, default: false }
+      responses:
+        '201':
+          description: Review created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [review]
+                properties:
+                  review: { $ref: '#/components/schemas/ReviewV1' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: |
+            The user already reviewed this item. Unlike every other error, the
+            response also carries `review_id` at the top level.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error, review_id]
+                properties:
+                  error:
+                    type: object
+                    required: [code, message]
+                    properties:
+                      code: { type: string, example: conflict }
+                      message: { type: string, example: "You've already reviewed this — edit your existing review instead." }
+                  review_id: { type: integer, example: 12 }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /api/v1/reviews/{id}:
+    put:
+      tags: [Reviews]
+      summary: Edit a review
+      description: Authors only — editing someone else's review answers 403.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                title: { type: string, maxLength: 120 }
+                body: { type: string, maxLength: 5000 }
+                has_spoilers: { type: boolean }
+      responses:
+        '200':
+          description: Review updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [review]
+                properties:
+                  review: { $ref: '#/components/schemas/ReviewV1' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    delete:
+      tags: [Reviews]
+      summary: Delete a review
+      description: Authors only.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Review deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, id]
+                properties:
+                  ok: { type: boolean, example: true }
+                  id: { type: integer, example: 12 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /api/v1/polls/{adaptationId}:
+    get:
+      tags: [Polls]
+      summary: Poll results for an adaptation
+      parameters:
+        - name: adaptationId
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Book-vs-screen poll tallies.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PollResult' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    post:
+      tags: [Polls]
+      summary: Vote in the book-vs-screen poll
+      description: Upserts — re-voting replaces the old choice. Rate limit 30/hour.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: adaptationId
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [choice]
+              properties:
+                choice:
+                  type: string
+                  enum: [book, screen, both, undecided]
+                  example: book
+      responses:
+        '200':
+          description: Vote recorded; fresh tallies returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PollResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /api/v1/hype:
+    get:
+      tags: [Hype]
+      summary: Hype meter for a screen work
+      parameters:
+        - name: screen_work_id
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Average hype level, count, and the caller's own level.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HypeResult' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    post:
+      tags: [Hype]
+      summary: Set your hype level (1–5)
+      description: Upserts. Rate limit 60/hour.
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [screen_work_id, level]
+              properties:
+                screen_work_id: { type: integer, minimum: 1, example: 1 }
+                level: { type: integer, minimum: 1, maximum: 5, example: 5 }
+      responses:
+        '200':
+          description: Hype stored.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HypeResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /api/v1/lists:
+    get:
+      tags: [Lists]
+      summary: My lists
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/perPageParam'
+      responses:
+        '200':
+          description: Paginated lists owned by the caller.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedLists' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Lists]
+      summary: Create a list
+      description: Rate limit 20 lists/hour.
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, maxLength: 120, example: 'Sci-fi to read this winter' }
+                description: { type: string, maxLength: 2000 }
+                is_public: { type: boolean, default: true }
+      responses:
+        '201':
+          description: List created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, slug]
+                properties:
+                  id: { type: integer, example: 3 }
+                  slug: { type: string, example: 'sci-fi-to-read-this-winter-a1b2c3' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /api/v1/lists/{slug}:
+    get:
+      tags: [Lists]
+      summary: Public list by slug
+      description: |
+        Private lists answer 404 `not_found` for non-owners — the API never
+        leaks that a private list exists.
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: List with its items.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [list, items, is_owner]
+                properties:
+                  list: { $ref: '#/components/schemas/UserListV1' }
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ListItemV1' }
+                  is_owner: { type: boolean, example: false }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/lists/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    put:
+      tags: [Lists]
+      summary: Update a list
+      description: Owner only; omitted fields are left unchanged.
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, maxLength: 120 }
+                description: { type: [string, 'null'], maxLength: 2000, description: 'Null or empty clears it.' }
+                is_public: { type: boolean }
+      responses:
+        '200':
+          description: List updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean, example: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    delete:
+      tags: [Lists]
+      summary: Delete a list
+      description: Owner only.
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: List deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean, example: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /api/v1/lists/{id}/items:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    post:
+      tags: [Lists]
+      summary: Add an item to a list
+      description: Owner only. Duplicates answer 409 `conflict`.
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_type, target_id]
+              properties:
+                target_type: { type: string, enum: [book, screen_work], example: book }
+                target_id: { type: integer, minimum: 1, example: 1 }
+                note: { type: string, maxLength: 500, example: 'Read before the sequel drops.' }
+      responses:
+        '201':
+          description: Item added.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id]
+                properties:
+                  id: { type: integer, example: 14 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This item is already on the list.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example: { error: { code: conflict, message: 'This item is already on the list.' } }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    put:
+      tags: [Lists]
+      summary: Reorder list items
+      description: |
+        Owner only. `order` must be an array of positive integer item ids;
+        unknown or duplicate ids answer 422 `bad_ids`. Ownership is checked
+        first, so a non-owner gets 403 even with a malformed body.
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order]
+              properties:
+                order:
+                  type: array
+                  items: { type: integer, minimum: 1 }
+                  example: [14, 9, 3]
+      responses:
+        '200':
+          description: Order saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean, example: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /api/v1/lists/{id}/items/{itemId}:
+    delete:
+      tags: [Lists]
+      summary: Remove an item from a list
+      description: Owner only.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Item removed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean, example: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /api/v1/shelves:
+    get:
+      tags: [Shelves]
+      summary: My shelf entries
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: All shelf entries for the caller.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [shelves]
+                properties:
+                  shelves:
+                    type: array
+                    items:
+                      type: object
+                      required: [target_type, target_id, title, shelf]
+                      properties:
+                        target_type: { type: string, enum: [book, adaptation] }
+                        target_id: { type: integer }
+                        title: { type: string, example: 'Dune' }
+                        shelf:
+                          type: string
+                          enum: [want_to_read, read, want_to_watch, watched]
+                          example: want_to_read
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Shelves]
+      summary: Shelve a book or adaptation
+      description: Upserts — reshelving replaces the old shelf.
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_type, target_id, shelf]
+              properties:
+                target_type: { type: string, enum: [book, adaptation], example: book }
+                target_id: { type: integer, minimum: 1, example: 1 }
+                shelf:
+                  type: string
+                  enum: [want_to_read, read, want_to_watch, watched]
+                  example: want_to_read
+      responses:
+        '200':
+          description: Shelf updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean, example: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    delete:
+      tags: [Shelves]
+      summary: Remove a shelf entry
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_type, target_id]
+              properties:
+                target_type: { type: string, enum: [book, adaptation], example: book }
+                target_id: { type: integer, minimum: 1, example: 1 }
+      responses:
+        '200':
+          description: Shelf entry removed (no-op when absent).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean, example: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /api/v1/search:
+    get:
+      tags: [Search]
+      summary: Site-wide search
+      description: |
+        Searches books, screen works, and adaptations (each capped at 12 hits;
+        `limit` narrows that, never widens it). With an empty query — or no
+        hits — the response carries `popular` books instead.
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 100 }
+          description: Query, trimmed and truncated at 100 chars.
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 12, default: 12 }
+          description: Max hits per group; capped at 12.
+      responses:
+        '200':
+          description: Grouped search results.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [q, books, screen_works, adaptations, popular]
+                properties:
+                  q: { type: string, example: 'dune' }
+                  books:
+                    type: object
+                    required: [data, total]
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/BookHit' } }
+                      total: { type: integer, example: 2 }
+                  screen_works:
+                    type: object
+                    required: [data, total]
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/ScreenWorkHit' } }
+                      total: { type: integer, example: 3 }
+                  adaptations:
+                    type: object
+                    required: [data, total]
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/AdaptationHit' } }
+                      total: { type: integer, example: 3 }
+                  popular:
+                    type: array
+                    items: { $ref: '#/components/schemas/PopularBook' }
+
+  /api/v1/calendar:
+    get:
+      tags: [Calendar]
+      summary: Release calendar feed
+      description: |
+        Screen works bucketed by release date: `coming_soon` (today or later),
+        `recently_released` (trailing 120 days), and `tba` (no usable date).
+      responses:
+        '200':
+          description: Calendar feed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [today, coming_soon, recently_released, tba]
+                properties:
+                  today: { type: string, format: date, example: '2026-09-15' }
+                  coming_soon:
+                    type: array
+                    items: { $ref: '#/components/schemas/CalendarWork' }
+                  recently_released:
+                    type: array
+                    items: { $ref: '#/components/schemas/CalendarWork' }
+                  tba:
+                    type: array
+                    items: { $ref: '#/components/schemas/CalendarWork' }
+
+  /api/v1/feedback:
+    post:
+      tags: [Feedback]
+      summary: Submit feedback
+      description: |
+        Public — no login required; the session user is attached when present.
+        Rate-limited by IP. Subject 3–120 chars, body 10–5000 chars.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, subject, body]
+              properties:
+                type:
+                  type: string
+                  enum: [feature, adaptation_tip, correction, other]
+                  example: adaptation_tip
+                subject: { type: string, minLength: 3, maxLength: 120, example: 'Dune: Part Three is filming' }
+                body: { type: string, minLength: 10, maxLength: 5000, example: 'Villeneuve started principal photography in Budapest…' }
+                proof_url: { type: string, example: 'https://deadline.com/dune-part-3-filming', description: 'Must start with http:// or https://.' }
+                email: { type: string, format: email, description: 'Optional contact email.' }
+      responses:
+        '201':
+          description: Feedback recorded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, id]
+                properties:
+                  ok: { type: boolean, example: true }
+                  id: { type: integer, example: 25 }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /api/v1/theme:
+    post:
+      tags: [Theme]
+      summary: Set the theme preference
+      description: Writes the 1-year theme cookie (shared across apex/www on the production domain).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [theme]
+              properties:
+                theme: { type: string, enum: [light, dark], example: dark }
+      responses:
+        '200':
+          description: Theme saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, theme]
+                properties:
+                  ok: { type: boolean, example: true }
+                  theme: { type: string, enum: [light, dark], example: dark }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /api/v1/admin/news:
+    get:
+      tags: [Admin]
+      summary: News moderation queue
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, dismissed]
+            default: pending
+          description: Any other value falls back to `pending` (no 422).
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/perPageParam'
+      responses:
+        '200':
+          description: Queue page plus per-status counts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, items, counts]
+                properties:
+                  status: { type: string, enum: [pending, approved, dismissed], example: pending }
+                  items: { $ref: '#/components/schemas/PagedNewsItems' }
+                  counts: { $ref: '#/components/schemas/NewsStatusCounts' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/news/{id}/approve:
+    post:
+      tags: [Admin]
+      summary: Approve a news item
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Item approved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, id, status]
+                properties:
+                  ok: { type: boolean, example: true }
+                  id: { type: integer, example: 101 }
+                  status: { type: string, example: approved }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /api/v1/admin/news/{id}/dismiss:
+    post:
+      tags: [Admin]
+      summary: Dismiss a news item
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, description: 'Optional; truncated at 500 chars.', example: 'Duplicate of item 98.' }
+      responses:
+        '200':
+          description: Item dismissed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, id, status]
+                properties:
+                  ok: { type: boolean, example: true }
+                  id: { type: integer, example: 101 }
+                  status: { type: string, example: dismissed }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /api/v1/admin/news/{id}/promote:
+    post:
+      tags: [Admin]
+      summary: Promote a news item into an adaptation status change
+      description: |
+        Links the news item to an adaptation and advances the adaptation's
+        status. `corroborating_url` is required when the item is rumor-tier.
+        When `status` is omitted the adaptation advances one rung on the
+        promote ladder (rumored → optioned → … → released); an explicit
+        `status` must be a valid adaptation status. Already at the final
+        status with no explicit `status` → 422. The linked screen work is
+        queued for TMDB poster enrichment when poster-less.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [adaptation_id]
+              properties:
+                adaptation_id: { type: integer, minimum: 1, example: 1 }
+                corroborating_url: { type: string, maxLength: 2000, description: 'Required for rumor-tier items.' }
+                status: { $ref: '#/components/schemas/AdaptationStatus' }
+      responses:
+        '200':
+          description: Status promoted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, news_item_id, adaptation_id, old_status, new_status, source_url]
+                properties:
+                  ok: { type: boolean, example: true }
+                  news_item_id: { type: integer, example: 101 }
+                  adaptation_id: { type: integer, example: 1 }
+                  old_status: { type: string, example: in_development }
+                  new_status: { type: string, example: filming }
+                  source_url: { type: string, example: 'https://deadline.com/dune-part-3-filming' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /api/v1/admin/news/runs:
+    get:
+      tags: [Admin]
+      summary: News pipeline run history
+      description: Last 200 runs; `per_page` defaults to 50.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/perPageParam'
+      responses:
+        '200':
+          description: Run history.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [runs]
+                properties:
+                  runs: { $ref: '#/components/schemas/PagedPipelineRuns' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/backfill/tmdb:
+    post:
+      tags: [Admin]
+      summary: Run one TMDB enrichment batch
+      description: |
+        Enriches up to `n` poster-less screen works via TMDB. `n` must be an
+        integer 1–10; default 5. Failures are counted per-row, not fatal.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: n
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 10, default: 5 }
+          description: Batch size. Default 5.
+      responses:
+        '200':
+          description: Batch complete.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [done, enriched, failed, remaining]
+                properties:
+                  done: { type: integer, description: 'Rows attempted.', example: 5 }
+                  enriched: { type: integer, description: 'Rows with a TMDB hit.', example: 4 }
+                  failed: { type: integer, description: 'Rows with no TMDB match, no key, or an exception.', example: 1 }
+                  remaining: { type: integer, description: 'Rows still needing enrichment AFTER this batch.', example: 61 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/v1/admin/screen-works:
+    get:
+      tags: [Admin]
+      summary: Screen works with release-date data
+      description: '`per_page` defaults to 100.'
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/perPageParam'
+      responses:
+        '200':
+          description: Release-date rows, TBA first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [screen_works]
+                properties:
+                  screen_works: { $ref: '#/components/schemas/PagedScreenWorksAdmin' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/screen-works/{id}/release-date:
+    post:
+      tags: [Admin]
+      summary: Set a screen work's release date
+      description: |
+        `release_date` must be a real YYYY-MM-DD calendar date; empty/absent
+        clears it back to TBA (null).
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                release_date:
+                  type: [string, 'null']
+                  example: '2026-12-18'
+                  description: 'YYYY-MM-DD, or empty/null to clear (TBA).'
+      responses:
+        '200':
+          description: Release date saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, id, release_date]
+                properties:
+                  ok: { type: boolean, example: true }
+                  id: { type: integer, example: 1 }
+                  release_date: { type: [string, 'null'], format: date, example: '2026-12-18' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /api/v1/admin/feedback:
+    get:
+      tags: [Admin]
+      summary: Feedback triage queue
+      description: |
+        `type` and `status` filters are optional; values outside the enums are
+        ignored (treated as no filter), not rejected.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: type
+          in: query
+          schema: { type: string, enum: [feature, adaptation_tip, correction, other] }
+        - name: status
+          in: query
+          schema: { type: string, enum: ['new', reviewed, done] }
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/perPageParam'
+      responses:
+        '200':
+          description: Feedback page plus per-status counts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [filters, feedback, counts]
+                properties:
+                  filters:
+                    type: object
+                    required: [type, status]
+                    properties:
+                      type: { type: [string, 'null'], example: adaptation_tip }
+                      status: { type: [string, 'null'], example: 'new' }
+                  feedback: { $ref: '#/components/schemas/PagedFeedback' }
+                  counts: { $ref: '#/components/schemas/FeedbackStatusCounts' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/feedback/{id}/status:
+    post:
+      tags: [Admin]
+      summary: Triage a feedback item
+      description: Only forward transitions are allowed — `reviewed` or `done`.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [reviewed, done], example: reviewed }
+      responses:
+        '200':
+          description: Status updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, id, status]
+                properties:
+                  ok: { type: boolean, example: true }
+                  id: { type: integer, example: 25 }
+                  status: { type: string, enum: [reviewed, done], example: reviewed }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }

@@ -14,8 +14,9 @@ import { getCookie } from 'hono/cookie';
 import { serveFavicon } from './favicon';
 import { scheduledNewsRun } from './news/ingest';
 import { registerSeoRoutes } from './seo';
-// Versioned JSON API at /api/v1 — the SPA contract (docs/API.md).
+// Versioned JSON API at /api/v1 — the SPA contract (docs/openapi.yaml).
 import { mountV1 } from './api/v1';
+import openapiSpec from '../public/openapi.json';
 import { THEME_COOKIE } from './ui';
 import { spaShell, type ThemeName } from './spa/shell';
 
@@ -78,6 +79,30 @@ app.get('/apple-touch-icon.png', () => serveFavicon());
 // inside src/api/v1.ts answers unknown /api/v1/* paths with the JSON error
 // envelope.
 mountV1(app);
+
+// OpenAPI spec + interactive docs. Single source of truth is
+// docs/openapi.yaml; public/openapi.json is generated alongside it via
+// scripts/openapi-to-json.py. Served by the worker (dependency-free on our
+// side: Redoc loads from CDN).
+/** Interactive API docs shell (Redoc, CDN). */
+function apiDocsShell(): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Novel Adaptations — API docs</title>
+<style>body { margin: 0; padding: 0; }</style>
+</head>
+<body>
+<redoc spec-url="/api/openapi.json"></redoc>
+<script src="https://cdn.jsdelivr.net/npm/redoc@2.5.1/bundles/redoc.standalone.js"></script>
+</body>
+</html>`;
+}
+
+app.get('/api/openapi.json', (c) => c.json(openapiSpec));
+app.get('/api/docs', (c) => c.html(apiDocsShell()));
 
 // SEO: /sitemap.xml + /robots.txt.
 registerSeoRoutes(app);
