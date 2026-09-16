@@ -13,6 +13,7 @@ import type { Child } from 'hono/jsx';
 import type { Context } from 'hono';
 import { getCookie } from 'hono/cookie';
 import type { AdaptationSummary, Book, NewsItem, NewsStatus, SourceRow } from './db';
+import { ADAPTATION_STATUSES } from './db';
 // Round 3 (SEO): per-page meta/OG/Twitter tags; no-op when origin is absent.
 import { seoHead } from './seo';
 import { FONT_FACE_CSS } from './spa/fonts';
@@ -143,27 +144,13 @@ function hueFor(s: string): number {
  * styles. Every light/dark text color passes >= 4.5:1 on its surface
  * (the old single-hex map failed on light surfaces, e.g. #9aa4b2 ≈ 2.8:1
  * on white). Statuses missing from KNOWN_STATUSES fall back to the gray
- * `.status-unknown` treatment.
+ * `.status-unknown` treatment. Single source of truth: ADAPTATION_STATUSES
+ * in db.ts — these derive from it so a new status can't drift out of sync.
  */
-const KNOWN_STATUSES: ReadonlySet<string> = new Set([
-  'rumored',
-  'optioned',
-  'in_development',
-  'filming',
-  'post_production',
-  'released',
-  'cancelled',
-]);
+const KNOWN_STATUSES: ReadonlySet<string> = new Set(ADAPTATION_STATUSES);
 
 /** The pipeline ladder (cancelled is a terminal side-branch, not a step). */
-const PIPELINE: string[] = [
-  'rumored',
-  'optioned',
-  'in_development',
-  'filming',
-  'post_production',
-  'released',
-];
+const PIPELINE: string[] = ADAPTATION_STATUSES.filter((s) => s !== 'cancelled');
 
 // ---------------------------------------------------------------------------
 // Global stylesheet — cinematic dark editorial theme
@@ -2006,15 +1993,8 @@ export function AuthErrorPage({ message, theme }: { message: string; theme?: The
 // ---------------------------------------------------------------------------
 
 const QUEUE_STATUSES: NewsStatus[] = ['pending', 'approved', 'dismissed'];
-const PROMOTE_STATUSES = [
-  'rumored',
-  'optioned',
-  'in_development',
-  'filming',
-  'post_production',
-  'released',
-  'cancelled',
-];
+/** Promote dropdown options — mirrors ADAPTATION_STATUSES (db.ts). */
+const PROMOTE_STATUSES: readonly string[] = ADAPTATION_STATUSES;
 
 /**
  * QUEUE_SCRIPT — interaction contract:

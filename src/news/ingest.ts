@@ -88,7 +88,7 @@ Rules:
 - Casting/sequel news for an existing adaptation -> true, status_signal from context.
 - Book reviews, author interviews, box-office reports with no adaptation angle -> false.
 - status_signal "rumored" only when the text hedges ("in talks", "eyed", "reportedly", "could").
-- confidence < 0.5 stays pending but sorts to the bottom of the curation queue.`;
+- confidence < 0.6 stays pending but sorts to the bottom of the curation queue.`;
 
 const MAX_LLM_CALLS_PER_RUN = 25;
 /** Quarantine cap: at most this many new `pending` rows per run. */
@@ -99,6 +99,12 @@ const GATEWAY_ID = 'novel-adaptations';
 const MODEL = '@cf/meta/llama-4-scout-17b-16e-instruct';
 /** Spec §8: pending items older than this are auto-dismissed each run. */
 const PENDING_SLA_DAYS = 30;
+/** Spec §4.1: normalized titles seen in the last this-many days count as dupes. */
+const DEDUPE_WINDOW_DAYS = 7;
+/** A feed whose failures reach this count is auto-paused (is_active = 0). */
+const FEED_PAUSE_THRESHOLD = 5;
+/** Per-feed fetch timeout — a hung feed must not stall the run. */
+const FEED_FETCH_TIMEOUT_MS = 15000;
 
 interface FeedItem {
   title: string;
@@ -428,27 +434,29 @@ async function runIngestion(
     llm_calls: number;
   },
 ): Promise<void> {
-  // Step 0 — SLA: auto-dismiss pending items older than 30 days (spec §8).
+  // Step 0 — SLA: auto-dismiss stale pending items (spec §8).
   const sla = await env.DB.prepare(
-    `UPDATE news_items SET status = 'dismissed', dismiss_reason = 'auto-dismissed: pending > 30 days'
-     WHERE status = 'pending' AND created_at < datetime('now', ?1)`,
+    `UPDATE news_items SET status = 'dismissed', dismiss_reason = ?1
+     WHERE status = 'pending' AND created_at < datetime('now', ?2)`,
   )
-    .bind(`-${PENDING_SLA_DAYS} days`)
+    .bind(`auto-dismissed: pending > ${PENDING_SLA_DAYS} days`, `-${PENDING_SLA_DAYS} days`)
     .run();
   if ((sla.meta?.changes ?? 0) > 0) {
     console.log(`SLA auto-dismissed ${sla.meta.changes} stale pending items`);
   }
 
-  // Secondary dedupe (spec §4.1): normalized titles seen in the last 7 days.
+  // Secondary dedupe (spec §4.1): normalized titles seen in the dedupe window.
   const recentRows = await env.DB.prepare(
-    `SELECT title FROM news_items WHERE created_at > datetime('now', '-7 days')`,
-  ).all<{ title: string }>();
+    `SELECT title FROM news_items WHERE created_at > datetime('now', ?1)`,
+  )
+    .bind(`-${DEDUPE_WINDOW_DAYS} days`)
+    .all<{ title: string }>();
   const recentTitles = new Set((recentRows.results ?? []).map((r) => normalizeTitle(r.title)));
 
   const results = await Promise.allSettled(
     SOURCES.map(async (src) => {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 15000);
+      const t = setTimeout(() => ctrl.abort(), FEED_FETCH_TIMEOUT_MS);
       try {
         const resp = await fetch(src.feed_url, {
           signal: ctrl.signal,
@@ -471,9 +479,9 @@ async function runIngestion(
            VALUES (?, ?, ?, 'error', 1)
            ON CONFLICT(name) DO UPDATE SET last_status='error',
              consecutive_failures = consecutive_failures + 1,
-             is_active = CASE WHEN consecutive_failures + 1 >= 5 THEN 0 ELSE is_active END`,
+             is_active = CASE WHEN consecutive_failures + 1 >= ? THEN 0 ELSE is_active END`,
         )
-          .bind(src.name, src.feed_url, src.trust_tier)
+          .bind(src.name, src.feed_url, src.trust_tier, FEED_PAUSE_THRESHOLD)
           .run();
         console.error(`Feed failed: ${src.name}:`, (e as Error).message);
         return { src, items: [] as FeedItem[], ok: false };

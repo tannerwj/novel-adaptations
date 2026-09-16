@@ -18,6 +18,7 @@ Only touches the slug columns — no user, vote, persona, or content data.
 """
 
 import json
+import os
 import re
 import sys
 import unicodedata
@@ -26,8 +27,8 @@ import urllib.request
 sys.path.insert(0, "/opt/hatch/skills/skill-creator/bin")
 from dynamic_credentials import add_surrogate_to_request, read_json_response
 
-ACCT = "83c27d7f9b8764a53148888203d434cb"
-DB = "c5b38c69-8695-4841-8191-d004b323fdd6"
+ACCT = os.environ.get("CF_ACCOUNT_ID", "83c27d7f9b8764a53148888203d434cb")
+DB = os.environ.get("CF_D1_DATABASE_ID", "c5b38c69-8695-4841-8191-d004b323fdd6")
 CRED = "custom.cloudflare"
 HOSTS = ["api.cloudflare.com"]
 BASE = f"https://api.cloudflare.com/client/v4/accounts/{ACCT}/d1/database/{DB}/query"
