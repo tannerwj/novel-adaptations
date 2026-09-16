@@ -1,0 +1,11 @@
+-- migrations/0019_enrichment_attempts.sql — cap TMDB enrichment retries.
+--
+-- The bulk backfill (POST /admin/backfill/tmdb-full) drives batches until
+-- no rows remain. Without a retry cap, rows with no TMDB match (or no
+-- overview for the synopsis backfill) would be selected forever and the
+-- loop would never converge. enrichment_attempts counts search attempts;
+-- selection requires attempts < 3, so every row is tried at most three
+-- times and then left alone.
+--
+-- Safe: plain ADD COLUMN with NOT NULL DEFAULT, no table rebuild.
+ALTER TABLE screen_works ADD COLUMN enrichment_attempts INTEGER NOT NULL DEFAULT 0;
