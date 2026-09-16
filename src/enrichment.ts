@@ -10,11 +10,13 @@
  *      failing sweep never breaks the news run.
  *
  * Guardrails (carried over from scripts/backfill-tmdb-posters.ts):
- *   - NEVER overwrites a manually-set poster_url. The poster write carries
- *     `WHERE … AND (poster_url IS NULL OR poster_url = '')`, so a poster set
- *     between the SELECT and the UPDATE always wins. The needs_enrichment
- *     flag is cleared regardless (a separate statement).
- *   - Idempotent: re-running enriches only flagged or still-poster-less rows.
+ *   - NEVER overwrites manually-set data. The poster/backdrop/release_date
+ *     writes are CASE-guarded to fill only NULL/'' slots and tmdb_id only
+ *     fills NULL, so a poster or date set between the SELECT and the UPDATE
+ *     always wins. The needs_enrichment flag is cleared regardless (a
+ *     separate statement).
+ *   - Idempotent: re-running enriches only flagged or still-missing rows
+ *     (posters, backdrops, tmdb_id, release_date).
  *   - Throttled: ~300 ms between TMDB calls (≈33 req/10 s, under the free
  *     tier's ~40/10 s cap).
  *   - Fail-soft: per-item try/catch — a bad title, API error, or timeout is
@@ -99,7 +101,8 @@ export function extractYear(releaseDate: string | null): number | null {
 
 /**
  * Up to `n` rows needing enrichment: explicitly flagged rows first, then
- * anything still poster-less. Pure query — unit-testable with a stub DB.
+ * anything still poster-less OR still missing a release date. Pure query —
+ * unit-testable with a stub DB.
  */
 export async function selectEnrichmentBatch(
   db: D1Database,
@@ -109,7 +112,9 @@ export async function selectEnrichmentBatch(
     .prepare(
       `SELECT id, title, kind, release_date
          FROM screen_works
-        WHERE needs_enrichment = 1 OR poster_url IS NULL OR poster_url = ''
+        WHERE needs_enrichment = 1
+           OR poster_url IS NULL OR poster_url = ''
+           OR release_date IS NULL OR release_date = ''
         ORDER BY needs_enrichment DESC, id ASC
         LIMIT ?1`,
     )
@@ -124,30 +129,45 @@ export async function countRemaining(db: D1Database): Promise<number> {
     .prepare(
       `SELECT COUNT(*) AS n
          FROM screen_works
-        WHERE needs_enrichment = 1 OR poster_url IS NULL OR poster_url = ''`,
+        WHERE needs_enrichment = 1
+           OR poster_url IS NULL OR poster_url = ''
+           OR release_date IS NULL OR release_date = ''`,
     )
     .first<{ n: number }>();
   return row?.n ?? 0;
 }
 
 /**
- * Persist one TMDB hit. The poster/backdrop write is guarded so a manually
- * set poster is never overwritten; the needs_enrichment flag is cleared
- * regardless so the row stops being selected. Two statements on purpose:
- * a single statement couldn't clear the flag on the guarded-no-op path.
+ * Persist one TMDB hit. Every column write is guarded so manually-set data
+ * is never overwritten — poster/backdrop only fill empty slots, tmdb_id only
+ * fills NULL, and release_date only fills NULL/''. The needs_enrichment
+ * flag is cleared regardless so the row stops being selected. Two
+ * statements on purpose: a single statement couldn't clear the flag on a
+ * fully-guarded no-op path.
  */
 async function applyEnrichment(
   db: D1Database,
   rowId: number,
-  hit: { posterUrl: string; backdropUrl: string | null; tmdbId: number },
+  hit: {
+    posterUrl: string;
+    backdropUrl: string | null;
+    tmdbId: number;
+    releaseDate: string | null;
+  },
 ): Promise<void> {
   await db
     .prepare(
       `UPDATE screen_works
-          SET poster_url = ?1, backdrop_url = ?2, tmdb_id = ?3
-        WHERE id = ?4 AND (poster_url IS NULL OR poster_url = '')`,
+          SET poster_url = CASE WHEN poster_url IS NULL OR poster_url = ''
+                               THEN ?1 ELSE poster_url END,
+              backdrop_url = CASE WHEN backdrop_url IS NULL OR backdrop_url = ''
+                                  THEN ?2 ELSE backdrop_url END,
+              tmdb_id = COALESCE(tmdb_id, ?3),
+              release_date = CASE WHEN release_date IS NULL OR release_date = ''
+                                  THEN ?4 ELSE release_date END
+        WHERE id = ?5`,
     )
-    .bind(hit.posterUrl, hit.backdropUrl, hit.tmdbId, rowId)
+    .bind(hit.posterUrl, hit.backdropUrl, hit.tmdbId, hit.releaseDate, rowId)
     .run();
   await db
     .prepare(`UPDATE screen_works SET needs_enrichment = 0 WHERE id = ?1`)

@@ -90,6 +90,8 @@ export function posterArt(src, title, subtitle, opts) {
   const safeSrc = clean && safeUrl(clean) ? esc(clean) : null;
   const eager = !!(opts && opts.eager);
   const fp = opts && opts.fetchpriority === 'high' ? ' fetchpriority="high"' : '';
+  const srcset = clean ? tmdbSrcset(clean) : null;
+  const sizes = (opts && opts.sizes) || POSTER_SIZES;
   return (
     `<div class="poster">` +
       `<div class="art-fallback" style="background:${gradient}">` +
@@ -98,11 +100,35 @@ export function posterArt(src, title, subtitle, opts) {
         (subtitle ? `<div class="art-sub">${esc(subtitle)}</div>` : '') +
       `</div>` +
       (safeSrc
-        ? `<img src="${safeSrc}" alt="${esc(title)} artwork"${eager ? fp : ' loading="lazy"'} decoding="async" onerror="this.remove()">`
+        ? `<img src="${safeSrc}"` +
+          (srcset ? ` srcset="${esc(srcset)}" sizes="${esc(sizes)}"` : '') +
+          ` alt="${esc(title)} artwork"${eager ? fp : ' loading="lazy"'} decoding="async" onerror="this.remove()">`
         : '') +
     `</div>`
   );
 }
+
+/**
+ * Responsive srcset for TMDB image URLs (`https://image.tmdb.org/t/p/w500/…`):
+ * rebuilds the same path at smaller TMDB widths so phones don't download the
+ * full-size file. Returns null for non-TMDB sources (book covers etc.),
+ * where no smaller variants exist. Deferred in the mobile plan until the
+ * TMDB backfill populated real poster URLs — those now exist.
+ */
+const TMDB_IMG = /^https:\/\/image\.tmdb\.org\/t\/p\/(?:w\d+|original)(\/[^?#\s]+)$/;
+const TMDB_SRCSET_WIDTHS = [185, 342, 500, 780];
+export function tmdbSrcset(src) {
+  const m = TMDB_IMG.exec(src);
+  if (!m) return null;
+  const path = m[1];
+  return TMDB_SRCSET_WIDTHS.map(
+    (w) => `https://image.tmdb.org/t/p/w${w}${path} ${w}w`,
+  ).join(', ');
+}
+/** Default `sizes` for poster-grid cards: 2/3/4 columns by breakpoint. */
+export const POSTER_SIZES = '(max-width:719px) 50vw, (max-width:959px) 33vw, 25vw';
+/** `sizes` for the 300px-capped hero poster (`.hero .poster`). */
+export const HERO_SIZES = '(max-width:819px) 100vw, 300px';
 
 /** Year from a YYYY-MM-DD release_date, or null. */
 export function releaseYear(releaseDate) {

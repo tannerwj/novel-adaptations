@@ -21,6 +21,13 @@ export interface TmdbEnrichment {
   posterUrl: string;
   /** `https://image.tmdb.org/t/p/w1280…` — may be null when TMDB has none. */
   backdropUrl: string | null;
+  /**
+   * TMDB `release_date` (film) / `first_air_date` (series), strictly
+   * validated as `YYYY-MM-DD`. May be null when TMDB has no date —
+   * applied to `screen_works.release_date` only when the row lacks one,
+   * so the release calendar stops saying TBA wherever TMDB knows the date.
+   */
+  releaseDate: string | null;
 }
 
 export interface TmdbSearchInput {
@@ -55,6 +62,16 @@ interface TmdbSearchResult {
   original_name?: string;
   poster_path: string | null;
   backdrop_path: string | null;
+  release_date?: string | null;
+  first_air_date?: string | null;
+}
+
+/** Strict `YYYY-MM-DD`, the only shape we persist as a release date. */
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** TMDB date field (may be empty/malformed) → validated date or null. */
+function isoDateOrNull(raw: string | null | undefined): string | null {
+  return typeof raw === 'string' && ISO_DATE.test(raw) ? raw : null;
 }
 
 /**
@@ -132,6 +149,10 @@ export async function searchTmdb(
     backdropUrl: match.backdrop_path
       ? `https://image.tmdb.org/t/p/${BACKDROP_SIZE}${match.backdrop_path}`
       : null,
+    releaseDate:
+      input.kind === 'series'
+        ? isoDateOrNull(match.first_air_date)
+        : isoDateOrNull(match.release_date),
   };
 }
 
