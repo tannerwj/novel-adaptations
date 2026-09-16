@@ -8,6 +8,10 @@
  *   2. The daily news cron calls sweepEnrichment() (src/news/ingest.ts) as
  *      a backstop after the pipeline work, wrapped in try/catch so a
  *      failing sweep never breaks the news run.
+ *   3. POST /admin/backfill/tmdb-full?n=10 — bulk backfill for the catalog
+ *      build-out: TMDB search (poster/backdrop/release date/synopsis) plus
+ *      a watch-provider cache refresh per row, in small chunks. Registered
+ *      in src/api/v1.ts under the same /admin/* gate.
  *
  * Guardrails (carried over from scripts/backfill-tmdb-posters.ts):
  *   - NEVER overwrites manually-set data. The poster/backdrop/release_date
@@ -30,9 +34,11 @@ import type { Hono } from 'hono';
 import { requireAdminPage } from './auth/session';
 import {
   enrichScreenWorkFromEnv,
+  type TmdbEnrichment,
   type TmdbEnv,
   type TmdbFetcher,
 } from './tmdb';
+import { fetchAndCacheProviders } from './watch_providers';
 
 /** What registerEnrichmentRoutes (and sweepEnrichment's caller) need. */
 export interface EnrichmentDeps {
@@ -53,6 +59,17 @@ export interface EnrichmentCandidate {
   title: string;
   kind: string;
   release_date: string | null;
+  tmdb_id: number | null;
+}
+
+/**
+ * One row for the full backfill: enrichment candidates plus rows that only
+ * need their watch-provider cache refreshed. D1 returns 0/1 for the
+ * computed flags — normalize to booleans when mapping.
+ */
+export interface FullBatchCandidate extends EnrichmentCandidate {
+  needsEnrich: boolean;
+  hasFreshProviders: boolean;
 }
 
 /** Batch progress, returned by both the endpoint and the cron backstop. */
@@ -63,6 +80,8 @@ export interface EnrichBatchResult {
   enriched: number;
   /** Rows with no TMDB match, no key, or an exception — counted, not fatal. */
   failed: number;
+  /** Watch-provider cache writes in this invocation (0 when not requested). */
+  providers_cached: number;
 }
 
 /** Default `?n=` on the endpoint; max caps one invocation's TMDB spend. */
@@ -110,7 +129,7 @@ export async function selectEnrichmentBatch(
 ): Promise<EnrichmentCandidate[]> {
   const { results } = await db
     .prepare(
-      `SELECT id, title, kind, release_date
+      `SELECT id, title, kind, release_date, tmdb_id
          FROM screen_works
         WHERE needs_enrichment = 1
            OR poster_url IS NULL OR poster_url = ''
@@ -139,21 +158,16 @@ export async function countRemaining(db: D1Database): Promise<number> {
 
 /**
  * Persist one TMDB hit. Every column write is guarded so manually-set data
- * is never overwritten — poster/backdrop only fill empty slots, tmdb_id only
- * fills NULL, and release_date only fills NULL/''. The needs_enrichment
- * flag is cleared regardless so the row stops being selected. Two
- * statements on purpose: a single statement couldn't clear the flag on a
- * fully-guarded no-op path.
+ * is never overwritten — poster/backdrop/synopsis only fill empty slots,
+ * tmdb_id only fills NULL, and release_date only fills NULL/''. The
+ * needs_enrichment flag is cleared regardless so the row stops being
+ * selected. Two statements on purpose: a single statement couldn't clear
+ * the flag on a fully-guarded no-op path.
  */
 async function applyEnrichment(
   db: D1Database,
   rowId: number,
-  hit: {
-    posterUrl: string;
-    backdropUrl: string | null;
-    tmdbId: number;
-    releaseDate: string | null;
-  },
+  hit: TmdbEnrichment,
 ): Promise<void> {
   await db
     .prepare(
@@ -164,10 +178,19 @@ async function applyEnrichment(
                                   THEN ?2 ELSE backdrop_url END,
               tmdb_id = COALESCE(tmdb_id, ?3),
               release_date = CASE WHEN release_date IS NULL OR release_date = ''
-                                  THEN ?4 ELSE release_date END
-        WHERE id = ?5`,
+                                  THEN ?4 ELSE release_date END,
+              synopsis = CASE WHEN synopsis IS NULL OR synopsis = ''
+                              THEN ?5 ELSE synopsis END
+        WHERE id = ?6`,
     )
-    .bind(hit.posterUrl, hit.backdropUrl, hit.tmdbId, hit.releaseDate, rowId)
+    .bind(
+      hit.posterUrl,
+      hit.backdropUrl,
+      hit.tmdbId,
+      hit.releaseDate,
+      hit.overview,
+      rowId,
+    )
     .run();
   await db
     .prepare(`UPDATE screen_works SET needs_enrichment = 0 WHERE id = ?1`)
@@ -176,45 +199,147 @@ async function applyEnrichment(
 }
 
 /**
+ * Up to `n` rows for the full backfill: enrichment candidates first
+ * (flagged, poster-less, dateless, or synopsis-less), then rows that only
+ * need a watch-provider cache refresh (have a tmdb_id but no fresh cache
+ * row). Each row carries which work it needs so the batch loop can skip
+ * the TMDB search or the provider fetch independently.
+ */
+export async function selectFullBatch(
+  db: D1Database,
+  n: number,
+): Promise<FullBatchCandidate[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT id, title, kind, release_date, tmdb_id,
+              (needs_enrichment = 1
+               OR poster_url IS NULL OR poster_url = ''
+               OR release_date IS NULL OR release_date = ''
+               OR synopsis IS NULL OR synopsis = '') AS needs_enrich,
+              EXISTS (SELECT 1 FROM watch_provider_cache w
+                       WHERE w.screen_work_id = screen_works.id
+                         AND datetime(w.updated_at, '+7 days') >= datetime('now')
+                     ) AS has_fresh_providers
+         FROM screen_works
+        WHERE needs_enrichment = 1
+           OR poster_url IS NULL OR poster_url = ''
+           OR release_date IS NULL OR release_date = ''
+           OR synopsis IS NULL OR synopsis = ''
+           OR (tmdb_id IS NOT NULL AND NOT EXISTS (
+                 SELECT 1 FROM watch_provider_cache w
+                  WHERE w.screen_work_id = screen_works.id
+                    AND datetime(w.updated_at, '+7 days') >= datetime('now')))
+        ORDER BY needs_enrichment DESC, id ASC
+        LIMIT ?1`,
+    )
+    .bind(n)
+    .all<
+      EnrichmentCandidate & { needs_enrich: number; has_fresh_providers: number }
+    >();
+  return (results ?? []).map((r) => ({
+    id: r.id,
+    title: r.title,
+    kind: r.kind,
+    release_date: r.release_date,
+    tmdb_id: r.tmdb_id,
+    needsEnrich: r.needs_enrich === 1,
+    hasFreshProviders: r.has_fresh_providers === 1,
+  }));
+}
+
+/** How many rows still need full-backfill work (post-batch `remaining`). */
+export async function countRemainingFull(db: D1Database): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS n
+         FROM screen_works
+        WHERE needs_enrichment = 1
+           OR poster_url IS NULL OR poster_url = ''
+           OR release_date IS NULL OR release_date = ''
+           OR synopsis IS NULL OR synopsis = ''
+           OR (tmdb_id IS NOT NULL AND NOT EXISTS (
+                 SELECT 1 FROM watch_provider_cache w
+                  WHERE w.screen_work_id = screen_works.id
+                    AND datetime(w.updated_at, '+7 days') >= datetime('now')))`,
+    )
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+/**
  * Enrich a concrete list of rows. Fetch and throttle are injected for
  * tests; production passes the worker globals and ENRICH_THROTTLE_MS.
+ *
+ * Rows may carry the FullBatchCandidate flags: `needsEnrich: false` skips
+ * the TMDB search (the row only needs providers), and `hasFreshProviders:
+ * true` skips the provider fetch. With `opts.withProviders`, every row
+ * that ends up with a tmdb_id also gets its watch-provider cache
+ * refreshed via fetchAndCacheProviders.
  */
 export async function enrichRows(
   db: D1Database,
   apiKey: string | undefined,
-  rows: EnrichmentCandidate[],
+  rows: (EnrichmentCandidate &
+    Partial<Pick<FullBatchCandidate, 'needsEnrich' | 'hasFreshProviders'>>)[],
   fetcher: TmdbFetcher = fetch,
   throttleMs: number = ENRICH_THROTTLE_MS,
+  opts?: { withProviders?: boolean },
 ): Promise<EnrichBatchResult> {
-  const result: EnrichBatchResult = { done: 0, enriched: 0, failed: 0 };
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]!;
+  const result: EnrichBatchResult = {
+    done: 0,
+    enriched: 0,
+    failed: 0,
+    providers_cached: 0,
+  };
+  const kindOf = (row: { kind: string }): 'film' | 'series' =>
+    row.kind === 'series' ? 'series' : 'film';
+  for (const row of rows) {
     result.done++;
-    try {
-      const hit = await enrichScreenWorkFromEnv(
-        { TMDB_API_KEY: apiKey },
-        {
-          title: row.title,
-          kind: row.kind === 'series' ? 'series' : 'film',
-          year: extractYear(row.release_date),
-        },
-        fetcher,
-      );
-      if (hit) {
-        await applyEnrichment(db, row.id, hit);
-        result.enriched++;
-      } else {
-        // No key, no match, or network/API failure — counted, not fatal.
+    let tmdbId: number | null = row.tmdb_id;
+    if (row.needsEnrich ?? true) {
+      try {
+        const hit = await enrichScreenWorkFromEnv(
+          { TMDB_API_KEY: apiKey },
+          {
+            title: row.title,
+            kind: kindOf(row),
+            year: extractYear(row.release_date),
+          },
+          fetcher,
+        );
+        if (hit) {
+          await applyEnrichment(db, row.id, hit);
+          tmdbId = hit.tmdbId;
+          result.enriched++;
+        } else {
+          // No key, no match, or network/API failure — counted, not fatal.
+          result.failed++;
+        }
+      } catch (e) {
         result.failed++;
+        console.error(
+          `enrichment failed for screen_work ${row.id} (${row.title}):`,
+          (e as Error).message,
+        );
       }
-    } catch (e) {
-      result.failed++;
-      console.error(
-        `enrichment failed for screen_work ${row.id} (${row.title}):`,
-        (e as Error).message,
-      );
+      if (throttleMs > 0) await sleep(throttleMs);
     }
-    if (i < rows.length - 1 && throttleMs > 0) await sleep(throttleMs);
+    if (
+      opts?.withProviders &&
+      apiKey &&
+      tmdbId &&
+      !(row.hasFreshProviders ?? false)
+    ) {
+      const cached = await fetchAndCacheProviders(
+        db,
+        apiKey,
+        row.id,
+        tmdbId,
+        kindOf(row),
+      );
+      if (cached) result.providers_cached++;
+      if (throttleMs > 0) await sleep(throttleMs);
+    }
   }
   return result;
 }
@@ -231,6 +356,23 @@ export async function runEnrichmentBatch(
 ): Promise<EnrichBatchResult> {
   const rows = await selectEnrichmentBatch(deps.DB, n);
   return enrichRows(deps.DB, deps.TMDB_API_KEY, rows, fetcher, throttleMs);
+}
+
+/**
+ * The full-backfill core: select rows needing enrichment and/or a
+ * watch-provider cache refresh, then do both in one pass. Used by
+ * POST /admin/backfill/tmdb-full.
+ */
+export async function runFullBatch(
+  deps: EnrichmentDeps,
+  n: number,
+  fetcher: TmdbFetcher = fetch,
+  throttleMs: number = ENRICH_THROTTLE_MS,
+): Promise<EnrichBatchResult> {
+  const rows = await selectFullBatch(deps.DB, n);
+  return enrichRows(deps.DB, deps.TMDB_API_KEY, rows, fetcher, throttleMs, {
+    withProviders: true,
+  });
 }
 
 /**

@@ -21,6 +21,8 @@ export interface TmdbEnrichment {
   posterUrl: string;
   /** `https://image.tmdb.org/t/p/w1280…` — may be null when TMDB has none. */
   backdropUrl: string | null;
+  /** Real TMDB overview text (trimmed), or null when TMDB has none. */
+  overview: string | null;
   /**
    * TMDB `release_date` (film) / `first_air_date` (series), strictly
    * validated as `YYYY-MM-DD`. May be null when TMDB has no date —
@@ -64,6 +66,7 @@ interface TmdbSearchResult {
   backdrop_path: string | null;
   release_date?: string | null;
   first_air_date?: string | null;
+  overview?: string | null;
 }
 
 /** Strict `YYYY-MM-DD`, the only shape we persist as a release date. */
@@ -149,6 +152,10 @@ export async function searchTmdb(
     backdropUrl: match.backdrop_path
       ? `https://image.tmdb.org/t/p/${BACKDROP_SIZE}${match.backdrop_path}`
       : null,
+    overview:
+      typeof match.overview === 'string' && match.overview.trim()
+        ? match.overview.trim()
+        : null,
     releaseDate:
       input.kind === 'series'
         ? isoDateOrNull(match.first_air_date)

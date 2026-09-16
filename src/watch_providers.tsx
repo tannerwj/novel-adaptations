@@ -255,6 +255,29 @@ async function refreshCache(
   // A null fetch leaves the stale row in place — nothing to do.
 }
 
+/**
+ * Fetch US watch providers for a screen work and persist them to the cache.
+ * Used by the bulk backfill endpoint (src/enrichment.ts). Returns true when
+ * a payload was written, false on any failure (no key, no TMDB match, no US
+ * region, network/API failure). Never throws.
+ */
+export async function fetchAndCacheProviders(
+  db: D1Database,
+  apiKey: string,
+  screenWorkId: number,
+  tmdbId: number,
+  kind: 'film' | 'series',
+): Promise<boolean> {
+  try {
+    const fetched = await fetchWatchProviders(apiKey, tmdbId, kind);
+    if (!fetched) return false;
+    await writeCache(db, screenWorkId, fetched);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** One provider group (Stream / Rent / Buy). */
 function ProviderGroup({
   title,

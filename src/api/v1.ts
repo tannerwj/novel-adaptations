@@ -149,7 +149,7 @@ import {
   listScreenWorksForAdmin,
   validateReleaseDate,
 } from '../news/curation';
-import { countRemaining, parseBatchSize, runEnrichmentBatch } from '../enrichment';
+import { countRemaining, countRemainingFull, parseBatchSize, runEnrichmentBatch, runFullBatch } from '../enrichment';
 import {
   getPopularBooks,
   RESULT_LIMIT,
@@ -1676,6 +1676,29 @@ v1.post('/admin/backfill/tmdb', async (c) => {
   } catch (e) {
     console.error('/api/v1/admin/backfill/tmdb failed:', (e as Error).message);
     return apiError(c, 500, 'internal_error', 'Enrichment batch failed.');
+  }
+});
+
+// Full backfill: TMDB search (poster/backdrop/release date/synopsis) plus
+// watch-provider cache refresh, in small chunks for the catalog build-out.
+// POST /admin/backfill/tmdb-full?n=10 → { done, enriched, failed,
+// providers_cached, remaining }. Same admin gate as the routes above.
+v1.post('/admin/backfill/tmdb-full', async (c) => {
+  const parsed = parseBatchSize(c.req.query('n'));
+  if (!parsed.ok) return validationError(c, parsed.error);
+  try {
+    const batch = await runFullBatch(
+      { DB: c.env.DB, TMDB_API_KEY: c.env.TMDB_API_KEY },
+      parsed.n,
+    );
+    const remaining = await countRemainingFull(c.env.DB);
+    return c.json({ ...batch, remaining });
+  } catch (e) {
+    console.error(
+      '/api/v1/admin/backfill/tmdb-full failed:',
+      (e as Error).message,
+    );
+    return apiError(c, 500, 'internal_error', 'Full backfill batch failed.');
   }
 });
 
