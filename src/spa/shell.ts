@@ -42,7 +42,7 @@ const WEB_ANALYTICS_BEACON =
   `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" ` +
   `data-cf-beacon='{"token": "${WEB_ANALYTICS_TOKEN}"}'></script>`;
 
-export function spaShell(theme: ThemeName): string {
+export function spaShell(theme: ThemeName, headerHtml = '', footerHtml = '') {
   const themeColor = theme === 'dark' ? DARK_BG : LIGHT_BG;
   return (
     `<!DOCTYPE html>` +
@@ -67,7 +67,9 @@ export function spaShell(theme: ThemeName): string {
     `<link rel="stylesheet" href="/styles.css">` +
     `</head>` +
     `<body>` +
+    `<div id="chrome-header">${headerHtml}</div>` +
     `<main id="app"><div class="boot" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Loading…</span></div></main>` +
+    `<div id="chrome-footer">${footerHtml}</div>` +
     `<noscript><p style="text-align:center;font-family:system-ui,sans-serif;padding:2rem">Novel Adaptations needs JavaScript to run.</p></noscript>` +
     `<script type="module" src="/app.js"></script>` +
     `${WEB_ANALYTICS_BEACON}` +

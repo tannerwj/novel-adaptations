@@ -19,6 +19,8 @@ import { mountV1 } from './api/v1';
 import openapiSpec from '../public/openapi.json';
 import { THEME_COOKIE } from './ui';
 import { spaShell, type ThemeName } from './spa/shell';
+import { serverHeaderHtml, serverFooterHtml, type ChromeUser } from './spa/chrome';
+import { getUser } from './auth/session';
 
 export interface Env {
   DB: D1Database;
@@ -45,8 +47,24 @@ const app = new Hono<{ Bindings: Env }>();
 const themeOf = (c: Context): ThemeName =>
   getCookie(c, THEME_COOKIE) === 'dark' ? 'dark' : 'light';
 
-/** Serve the SPA shell. The client router renders the page from /api/v1. */
-const serveShell = (c: Context) => c.html(spaShell(themeOf(c)));
+/**
+ * Serve the SPA shell. The header/footer chrome is server-rendered into the
+ * initial HTML (src/spa/chrome.ts, byte-identical to the client's renderer)
+ * so first paint already has the page chrome — injecting it from JS after
+ * boot was the site's largest layout-shift source. The client still calls
+ * refreshChrome() on navigation; identical HTML means no shift.
+ */
+const serveShell = async (c: Context) => {
+  const theme = themeOf(c);
+  const sessionUser = await getUser(c);
+  const user: ChromeUser | null = sessionUser
+    ? { email: sessionUser.email, isAdmin: sessionUser.isAdmin }
+    : null;
+  const pathname = new URL(c.req.url).pathname;
+  return c.html(
+    spaShell(theme, serverHeaderHtml(pathname, theme, user), serverFooterHtml()),
+  );
+};
 
 // Bookmarkable SPA routes. GET /auth/verify?token=… serves the shell and the
 // SPA consumes the token via POST /api/v1/auth/verify (magic-link emails keep
@@ -107,13 +125,22 @@ app.get('/api/docs', (c) => c.html(apiDocsShell()));
 // SEO: /sitemap.xml + /robots.txt.
 registerSeoRoutes(app);
 
-app.notFound((c) => {
+app.notFound(async (c) => {
   if (c.req.path.startsWith('/api/')) {
     return c.json({ error: { code: 'not_found', message: 'Not found.' } }, 404);
   }
   // Unknown page path → shell with a 404 status; the SPA router renders its
   // own not-found view without a reload.
-  return c.html(spaShell(themeOf(c)), 404);
+  const theme = themeOf(c);
+  const sessionUser = await getUser(c);
+  const user: ChromeUser | null = sessionUser
+    ? { email: sessionUser.email, isAdmin: sessionUser.isAdmin }
+    : null;
+  const pathname = new URL(c.req.url).pathname;
+  return c.html(
+    spaShell(theme, serverHeaderHtml(pathname, theme, user), serverFooterHtml()),
+    404,
+  );
 });
 
 export default {

@@ -309,17 +309,27 @@ export function footerHtml() {
 
 /**
  * Mount the persistent chrome (header + footer) once. #app sits between them.
+ * The worker server-renders the chrome into #chrome-header/#chrome-footer
+ * (see src/spa/chrome.ts) so first paint has no layout shift; when those
+ * divs already exist we reuse them and refreshChrome() fills/refreshes the
+ * inner HTML (a no-op when it matches the server render).
  * Re-call `refreshChrome()` on route change to update the active nav link and
  * on session change to update the user area.
  */
 export function mountChrome() {
   const body = document.body;
-  const headerWrap = document.createElement('div');
-  headerWrap.id = 'chrome-header';
-  const footerWrap = document.createElement('div');
-  footerWrap.id = 'chrome-footer';
-  body.insertBefore(headerWrap, body.firstChild);
-  body.appendChild(footerWrap);
+  let headerWrap = document.getElementById('chrome-header');
+  if (!headerWrap) {
+    headerWrap = document.createElement('div');
+    headerWrap.id = 'chrome-header';
+    body.insertBefore(headerWrap, body.firstChild);
+  }
+  let footerWrap = document.getElementById('chrome-footer');
+  if (!footerWrap) {
+    footerWrap = document.createElement('div');
+    footerWrap.id = 'chrome-footer';
+    body.appendChild(footerWrap);
+  }
   refreshChrome();
   wireChrome();
 }
