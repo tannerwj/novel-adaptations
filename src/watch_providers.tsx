@@ -76,17 +76,20 @@ function toProviders(raw: unknown): WatchProvider[] {
 }
 
 /**
- * Fetch US watch providers for a TMDB movie or TV id. Kind is the
- * screen_works kind ('film' | 'series'). Any failure (no key, network,
- * non-OK, bad JSON, no US region in the payload) → null.
+ * Detailed provider fetch: distinguishes transport/API failure
+ * ({ ok: false }) from a successful TMDB response that simply has no US
+ * providers ({ ok: true, providers: null }). Lets bulk backfills cache a
+ * negative (empty) entry for no-data titles so they converge instead of
+ * retrying forever.
  */
-export async function fetchWatchProviders(
+export async function fetchWatchProvidersDetailed(
   apiKey: string,
   tmdbId: number,
   kind: 'film' | 'series',
   fetcher: TmdbFetcher = fetch,
-): Promise<WatchProviders | null> {
-  if (!apiKey || !Number.isInteger(tmdbId) || tmdbId <= 0) return null;
+): Promise<{ ok: boolean; providers: WatchProviders | null }> {
+  const fail = { ok: false, providers: null } as const;
+  if (!apiKey || !Number.isInteger(tmdbId) || tmdbId <= 0) return { ...fail };
 
   const endpoint = kind === 'series' ? `tv/${tmdbId}` : `movie/${tmdbId}`;
   const params = new URLSearchParams({ api_key: apiKey });
@@ -102,9 +105,9 @@ export async function fetchWatchProviders(
       clearTimeout(timeout);
     }
   } catch {
-    return null; // Network failure / abort → graceful null.
+    return { ...fail }; // Network failure / abort → retry later.
   }
-  if (!res.ok) return null;
+  if (!res.ok) return { ...fail };
 
   let payload: {
     results?: Record<string, unknown>;
@@ -112,7 +115,7 @@ export async function fetchWatchProviders(
   try {
     payload = (await res.json()) as { results?: Record<string, unknown> };
   } catch {
-    return null;
+    return { ...fail };
   }
 
   const us = payload.results?.US as
@@ -123,14 +126,33 @@ export async function fetchWatchProviders(
         buy?: unknown;
       }
     | undefined;
-  if (!us || typeof us !== 'object') return null; // No US region → null.
+  // TMDB answered fine but has no US region → legitimate "no data".
+  if (!us || typeof us !== 'object') return { ok: true, providers: null };
 
   return {
-    flatrate: toProviders(us.flatrate),
-    rent: toProviders(us.rent),
-    buy: toProviders(us.buy),
-    link: typeof us.link === 'string' && us.link ? us.link : null,
+    ok: true,
+    providers: {
+      flatrate: toProviders(us.flatrate),
+      rent: toProviders(us.rent),
+      buy: toProviders(us.buy),
+      link: typeof us.link === 'string' && us.link ? us.link : null,
+    },
   };
+}
+
+/**
+ * Fetch US watch providers for a TMDB movie or TV id. Kind is the
+ * screen_works kind ('film' | 'series'). Any failure (no key, network,
+ * non-OK, bad JSON, no US region in the payload) → null.
+ */
+export async function fetchWatchProviders(
+  apiKey: string,
+  tmdbId: number,
+  kind: 'film' | 'series',
+  fetcher: TmdbFetcher = fetch,
+): Promise<WatchProviders | null> {
+  return (await fetchWatchProvidersDetailed(apiKey, tmdbId, kind, fetcher))
+    .providers;
 }
 
 interface CacheRow {
@@ -258,8 +280,10 @@ async function refreshCache(
 /**
  * Fetch US watch providers for a screen work and persist them to the cache.
  * Used by the bulk backfill endpoint (src/enrichment.ts). Returns true when
- * a payload was written, false on any failure (no key, no TMDB match, no US
- * region, network/API failure). Never throws.
+ * a payload was written, false on transport/API failure (no key, no TMDB
+ * match, network/API failure). A successful TMDB response with no US
+ * providers writes an empty (negative) cache entry so backfills converge
+ * instead of retrying no-data titles forever. Never throws.
  */
 export async function fetchAndCacheProviders(
   db: D1Database,
@@ -269,9 +293,17 @@ export async function fetchAndCacheProviders(
   kind: 'film' | 'series',
 ): Promise<boolean> {
   try {
-    const fetched = await fetchWatchProviders(apiKey, tmdbId, kind);
-    if (!fetched) return false;
-    await writeCache(db, screenWorkId, fetched);
+    const { ok, providers } = await fetchWatchProvidersDetailed(
+      apiKey,
+      tmdbId,
+      kind,
+    );
+    if (!ok) return false;
+    await writeCache(
+      db,
+      screenWorkId,
+      providers ?? { flatrate: [], rent: [], buy: [], link: null },
+    );
     return true;
   } catch {
     return false;
