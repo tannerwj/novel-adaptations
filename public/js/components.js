@@ -387,7 +387,7 @@ export function headerHtml(pathname) {
         `<a class="brand" href="/" aria-label="Novel Adaptations — home"><span class="brand-wordmark">Novel Adaptations</span><span class="brand-arrow">.</span></a>` +
         `<nav class="main-nav" aria-label="Primary">${nav}</nav>` +
         `<button class="mobile-search-toggle" type="button" data-mobile-search aria-label="Search" aria-expanded="false">${SEARCH_SVG}</button>` +
-        `<form class="header-search" data-header-search role="search">` +
+        `<form class="header-search" data-header-search role="search" aria-label="Site search">` +
           `<input type="search" name="q" placeholder="Search books, movies, shows…" aria-label="Search books, movies, and shows" maxlength="100">` +
           `<button class="btn btn-sm" type="submit">Search</button>` +
         `</form>` +

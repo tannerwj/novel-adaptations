@@ -34,7 +34,6 @@ import {
   getNewsItem,
   getScreenWork,
   getScreenWorkNews,
-  listAdaptations,
   listNewsItems,
   nextStatusAfter,
   promoteNewsItem,
@@ -509,37 +508,70 @@ function parseAdaptationListQuery(
 }
 
 async function adaptationListData(c: V1Context) {
-  let adaptations = await listAdaptations(c.env.DB);
   const q = parseAdaptationListQuery(c);
   if (!q.ok) return q;
-  if (q.status) adaptations = adaptations.filter((a) => a.status === q.status);
-  return { ok: true as const, list: paginate(adaptations, q.page, q.per_page) };
+  // Paginate in SQL so D1 ships one page of rows, not the whole catalog.
+  const offset = (q.page - 1) * q.per_page;
+  const listStmt = q.status
+    ? c.env.DB.prepare(
+        `${SELECT_ADAPTATION_SUMMARY} WHERE a.status = ?1 ORDER BY a.id ASC LIMIT ?2 OFFSET ?3`,
+      ).bind(q.status, q.per_page, offset)
+    : c.env.DB.prepare(
+        `${SELECT_ADAPTATION_SUMMARY} ORDER BY a.id ASC LIMIT ?1 OFFSET ?2`,
+      ).bind(q.per_page, offset);
+  const countStmt = q.status
+    ? c.env.DB.prepare('SELECT COUNT(*) AS n FROM adaptations WHERE status = ?1').bind(q.status)
+    : c.env.DB.prepare('SELECT COUNT(*) AS n FROM adaptations');
+  const batchRes = await c.env.DB.batch([listStmt, countStmt]);
+  const listRes = batched(batchRes, 0);
+  const countRes = batched(batchRes, 1);
+  const rows = (listRes.results ?? []) as AdaptationSummary[];
+  const total = (countRes.results?.[0] as { n: number } | undefined)?.n ?? 0;
+  return { ok: true as const, list: { data: rows, page: q.page, per_page: q.per_page, total } };
 }
 
 v1.get('/home', async (c) => {
   const q = parseAdaptationListQuery(c);
   if (!q.ok) return q.response;
   return edgeCached(c, async () => {
-    // One D1 round trip: the full adaptation list + the four stat counts.
-    // (The Promise.all version issued five separate D1 HTTP requests.)
+    // One D1 round trip: a single page of the adaptation list (+ its
+    // filtered total for pagination) and the four stat counts. The list
+    // query is paginated in SQL — D1 ships 24 rows, not all 1,249.
+    const offset = (q.page - 1) * q.per_page;
+    const listStmt = q.status
+      ? c.env.DB.prepare(
+          `${SELECT_ADAPTATION_SUMMARY} WHERE a.status = ?1 ORDER BY a.id ASC LIMIT ?2 OFFSET ?3`,
+        ).bind(q.status, q.per_page, offset)
+      : c.env.DB.prepare(
+          `${SELECT_ADAPTATION_SUMMARY} ORDER BY a.id ASC LIMIT ?1 OFFSET ?2`,
+        ).bind(q.per_page, offset);
+    const listCountStmt = q.status
+      ? c.env.DB.prepare('SELECT COUNT(*) AS n FROM adaptations WHERE status = ?1').bind(q.status)
+      : c.env.DB.prepare('SELECT COUNT(*) AS n FROM adaptations');
     const homeBatch = await c.env.DB.batch([
-      c.env.DB.prepare(`${SELECT_ADAPTATION_SUMMARY} ORDER BY a.id ASC`),
+      listStmt,
+      listCountStmt,
+      // stats.total_adaptations is always the unfiltered catalog size.
       c.env.DB.prepare('SELECT COUNT(*) AS n FROM adaptations'),
       c.env.DB.prepare('SELECT COUNT(*) AS n FROM books'),
       c.env.DB.prepare('SELECT COUNT(*) AS n FROM screen_works'),
       c.env.DB.prepare("SELECT COUNT(*) AS n FROM news_items WHERE status = 'approved'"),
     ]);
     const listRes = batched(homeBatch, 0);
-    const adaptationsRes = batched(homeBatch, 1);
-    const booksRes = batched(homeBatch, 2);
-    const worksRes = batched(homeBatch, 3);
-    const newsRes = batched(homeBatch, 4);
+    const listCountRes = batched(homeBatch, 1);
+    const adaptationsRes = batched(homeBatch, 2);
+    const booksRes = batched(homeBatch, 3);
+    const worksRes = batched(homeBatch, 4);
+    const newsRes = batched(homeBatch, 5);
     const count = (r: D1Result) => (r.results?.[0] as { n: number } | undefined)?.n ?? 0;
-    const adaptations = ((listRes.results ?? []) as AdaptationSummary[]).filter(
-      (a) => !q.status || a.status === q.status,
-    );
+    const adaptations = (listRes.results ?? []) as AdaptationSummary[];
     return c.json({
-      adaptations: paginate(adaptations, q.page, q.per_page),
+      adaptations: {
+        data: adaptations,
+        page: q.page,
+        per_page: q.per_page,
+        total: count(listCountRes),
+      },
       stats: {
         total_adaptations: count(adaptationsRes),
         total_books: count(booksRes),

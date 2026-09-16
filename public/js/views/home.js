@@ -357,7 +357,7 @@ export async function searchView({ query }) {
     html:
       `<p class="kicker">Search</p>` +
       `<h1 class="display-title">${q ? `Results for <span style="font-style:italic">“${esc(q)}”</span>` : 'Search Novel Adaptations'}</h1>` +
-      `<form class="search-form" data-search-form role="search">` +
+      `<form class="search-form" data-search-form role="search" aria-label="Search adaptations">` +
         `<input type="search" name="q" value="${esc(q)}" placeholder="Search books, movies, shows…" aria-label="Search books, movies, and shows" maxlength="100">` +
         `<button class="btn btn-primary" type="submit">Search</button>` +
       `</form>` +

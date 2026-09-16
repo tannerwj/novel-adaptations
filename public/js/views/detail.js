@@ -153,7 +153,7 @@ function whereToWatch(data) {
         `<ul style="list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:0.75rem">` +
         providers.map((p) =>
           `<li class="wtw-provider" style="display:flex;align-items:center;gap:0.5rem">` +
-            `<img src="${esc(p.logo)}" alt="${esc(p.name)}" width="36" height="36" loading="lazy" style="border-radius:6px">` +
+            `<img src="${esc(p.logo)}" alt="" width="36" height="36" loading="lazy" style="border-radius:6px">` +
             `<span>${esc(p.name)}</span>` +
           `</li>`
         ).join('') +
