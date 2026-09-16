@@ -34,6 +34,8 @@ registerRoutes([
   { pattern: /^\/lists\/(?<slug>[^/]+)\/?$/, view: lazyView('./js/views/lists.js', 'listDetailView') },
   { pattern: /^\/shelves\/?$/, view: lazyView('./js/views/lists.js', 'shelvesView'), auth: true },
   { pattern: /^\/feedback\/?$/, view: lazyView('./js/views/feedback.js', 'feedbackView') },
+  { pattern: /^\/privacy\/?$/, view: lazyView('./js/views/legal.js', 'privacyView') },
+  { pattern: /^\/terms\/?$/, view: lazyView('./js/views/legal.js', 'termsView') },
   { pattern: /^\/auth\/login\/?$/, view: lazyView('./js/views/auth.js', 'loginView') },
   { pattern: /^\/auth\/verify\/?$/, view: lazyView('./js/views/auth.js', 'verifyView') },
   { pattern: /^\/admin\/news\/?$/, view: lazyView('./js/views/admin.js', 'adminNewsView'), admin: true },

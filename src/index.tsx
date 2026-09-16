@@ -68,13 +68,15 @@ const serveShell = async (c: Context) => {
   const user: ChromeUser | null = sessionUser
     ? { email: sessionUser.email, isAdmin: sessionUser.isAdmin }
     : null;
-  const pathname = new URL(c.req.url).pathname;
+  const url = new URL(c.req.url);
+  const pathname = url.pathname;
   return c.html(
     spaShell(
       theme,
-      serverHeaderHtml(pathname, theme, user, new URL(c.req.url).search),
+      serverHeaderHtml(pathname, theme, user, url.search),
       serverFooterHtml(),
       bootUserJson(sessionUser),
+      url.origin,
     ),
   );
 };
@@ -110,6 +112,8 @@ app.get('/lists', servePage);
 app.get('/lists/:slug', servePage);
 app.get('/shelves', servePage);
 app.get('/feedback', servePage);
+app.get('/privacy', servePage);
+app.get('/terms', servePage);
 app.get('/auth/login', servePage);
 app.get('/auth/verify', servePage);
 app.get('/admin/news', servePage);
@@ -166,13 +170,15 @@ app.notFound(async (c) => {
   const user: ChromeUser | null = sessionUser
     ? { email: sessionUser.email, isAdmin: sessionUser.isAdmin }
     : null;
-  const pathname = new URL(c.req.url).pathname;
+  const url = new URL(c.req.url);
+  const pathname = url.pathname;
   return c.html(
     spaShell(
       theme,
-      serverHeaderHtml(pathname, theme, user, new URL(c.req.url).search),
+      serverHeaderHtml(pathname, theme, user, url.search),
       serverFooterHtml(),
       bootUserJson(sessionUser),
+      url.origin,
     ),
     404,
   );

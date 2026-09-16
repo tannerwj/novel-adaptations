@@ -81,6 +81,7 @@ export function spaShell(
   headerHtml = '',
   footerHtml = '',
   bootUserJson = 'null',
+  origin = 'https://noveladaptations.com',
 ) {
   const themeColor = theme === 'dark' ? DARK_BG : LIGHT_BG;
   return (
@@ -96,6 +97,11 @@ export function spaShell(
     `<meta property="og:title" content="Novel Adaptations">` +
     `<meta property="og:description" content="Every book's journey to the screen — from whispered rumors to opening night.">` +
     `<meta property="og:type" content="website">` +
+    `<meta property="og:image" content="${origin}/og-card.jpg">` +
+    `<meta property="og:image:width" content="1200">` +
+    `<meta property="og:image:height" content="630">` +
+    `<meta name="twitter:card" content="summary_large_image">` +
+    `<meta name="twitter:image" content="${origin}/og-card.jpg">` +
     `<link rel="icon" type="image/png" href="/favicon.png">` +
     `<link rel="apple-touch-icon" href="/apple-touch-icon.png">` +
     `<script>${THEME_SCRIPT}</script>` +

@@ -887,6 +887,17 @@ table.admin-table th {
 }
 .footer-wordmark .brand-arrow { color: var(--accent-deep); }
 .copyright { font-size: .8rem; }
+.footer-legal { font-size: .8rem; margin-top: -.25rem; }
+.footer-legal a { color: var(--muted); }
+.footer-legal a:hover { color: var(--text); }
+/* Legal pages: draft placeholder banner until the owner finalizes copy. */
+.draft-banner {
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  background: var(--accent-tint); color: var(--text);
+  padding: .9rem 1.1rem; margin: 1.25rem 0; font-size: .9rem;
+}
+.legal-page h2 { margin-top: 1.75rem; }
+.legal-page ul { padding-left: 1.25rem; display: grid; gap: .5rem; }
 .footer-heading {
   font-size: .72rem; font-weight: 700; text-transform: uppercase;
   letter-spacing: .14em; color: var(--text); margin: 0 0 .75rem;

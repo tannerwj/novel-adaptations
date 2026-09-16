@@ -370,6 +370,7 @@ export function footerHtml() {
           `<span class="footer-wordmark">Novel Adaptations<span class="brand-arrow">.</span></span>` +
           `<p>Tracking every book's journey to the screen.</p>` +
           `<p class="copyright">© 2026 Novel Adaptations.</p>` +
+          `<p class="footer-legal"><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>` +
         `</div>` +
         `<nav aria-label="Footer">` +
           `<h2 class="footer-heading">Explore</h2>` +

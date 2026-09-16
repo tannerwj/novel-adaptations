@@ -114,7 +114,7 @@ function artOrFallback(origin: string, ...urls: (string | null)[]): string {
   for (const u of urls) {
     if (u && /^https?:\/\//.test(u)) return u;
   }
-  return `${origin}/favicon.png`;
+  return `${origin}/og-card.jpg`;
 }
 
 // ---------------------------------------------------------------------------
@@ -180,6 +180,20 @@ const STATIC_ROUTES: Record<string, { title: string; description: string; body: 
       `<h1>Feedback</h1>` +
       `<p>Suggest a book adaptation we’re missing or report a correction.</p>`,
   },
+  '/privacy': {
+    title: 'Privacy Policy — Novel Adaptations',
+    description: 'How Novel Adaptations collects, uses, and protects your data.',
+    body:
+      `<h1>Privacy Policy</h1>` +
+      `<p>How Novel Adaptations collects, uses, and protects your data.</p>`,
+  },
+  '/terms': {
+    title: 'Terms of Service — Novel Adaptations',
+    description: 'The rules for using Novel Adaptations.',
+    body:
+      `<h1>Terms of Service</h1>` +
+      `<p>The rules for using Novel Adaptations.</p>`,
+  },
 };
 
 function staticRoute(path: string, origin: string): Prerendered {
@@ -190,7 +204,7 @@ function staticRoute(path: string, origin: string): Prerendered {
       title: r.title,
       description: r.description,
       canonical: origin + path,
-      image: `${origin}/favicon.png`,
+      image: `${origin}/og-card.jpg`,
       body: r.body,
     }),
   };
@@ -297,7 +311,7 @@ async function listRoute(db: D1Database, origin: string, slug: string): Promise<
       title,
       description,
       canonical: `${origin}/lists/${esc(l.slug)}`,
-      image: `${origin}/favicon.png`,
+      image: `${origin}/og-card.jpg`,
       body,
     }),
   };

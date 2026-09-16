@@ -25,10 +25,10 @@ function backfillHtml(loading, message) {
   return (
     `<section class="panel" style="margin-top:2rem">` +
       `<h2>Poster backfill</h2>` +
-      `<p class="meta">Fetches missing posters and metadata from TMDB (25 screen works per run). Results appear below after each run.</p>` +
+      `<p class="meta">Fetches missing posters, backdrops, and release dates from TMDB (10 screen works per run — the API batch cap). Results appear below after each run.</p>` +
       (message ? `<div class="${message.ok ? 'auth-success' : 'auth-error'}" role="status">${esc(message.text)}</div>` : '') +
       `<form data-backfill style="display:flex;gap:.75rem;align-items:center;margin-top:.75rem">` +
-        `<button class="btn btn-primary" type="submit"${loading ? ' disabled' : ''}>${loading ? 'Running…' : 'Run backfill (25 works)'}</button>` +
+        `<button class="btn btn-primary" type="submit"${loading ? ' disabled' : ''}>${loading ? 'Running…' : 'Run backfill (10 works)'}</button>` +
       `</form>` +
     `</section>`
   );
@@ -41,9 +41,9 @@ function wireBackfill(mount) {
     e.preventDefault();
     mount.innerHTML = backfillHtml(true, null);
     wireBackfill(mount);
-    const r = await api('/api/v1/admin/backfill/tmdb?n=25', { method: 'POST' });
+    const r = await api('/api/v1/admin/backfill/tmdb?n=10', { method: 'POST' });
     mount.innerHTML = backfillHtml(false, r.ok
-      ? { ok: true, text: `Backfill complete: ${r.data.enriched} enriched, ${r.data.failed} failed, ${r.data.done} processed — ${r.data.remaining} still missing posters.` }
+      ? { ok: true, text: `Backfill complete: ${r.data.enriched} enriched, ${r.data.failed} failed, ${r.data.done} processed — ${r.data.remaining} still missing posters/dates.` }
       : { ok: false, text: errMsg(r) });
     wireBackfill(mount);
   });

@@ -30,7 +30,7 @@ export interface SeoHeadOptions {
  */
 export function seoHead(origin: string, opts: SeoHeadOptions) {
   const description = opts.description ?? DEFAULT_DESCRIPTION;
-  const image = opts.image ?? `${origin}/favicon.png`;
+  const image = opts.image ?? `${origin}/og-card.jpg`;
   const canonical = origin + (opts.path ?? '/');
   return jsx(Fragment, {
     children: [
@@ -60,7 +60,7 @@ export interface SitemapEntry {
 }
 
 /** Static pages that always exist. Ordered for a stable, readable sitemap. */
-const STATIC_PATHS = ['/', '/calendar', '/most-wanted', '/feedback', '/search'];
+const STATIC_PATHS = ['/', '/calendar', '/most-wanted', '/feedback', '/search', '/privacy', '/terms'];
 
 /** Minimal XML escaping for URL strings (loc) and dates. */
 export function escapeXml(value: string): string {
