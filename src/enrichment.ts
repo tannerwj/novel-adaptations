@@ -137,7 +137,8 @@ export async function selectEnrichmentBatch(
         WHERE enrichment_attempts < 3
           AND (needs_enrichment = 1
                OR poster_url IS NULL OR poster_url = ''
-               OR release_date IS NULL OR release_date = '')
+               OR release_date IS NULL OR release_date = ''
+               OR release_date GLOB '[0-9][0-9][0-9][0-9]')
         ORDER BY needs_enrichment DESC, id ASC
         LIMIT ?1`,
     )
@@ -155,7 +156,8 @@ export async function countRemaining(db: D1Database): Promise<number> {
         WHERE enrichment_attempts < 3
           AND (needs_enrichment = 1
                OR poster_url IS NULL OR poster_url = ''
-               OR release_date IS NULL OR release_date = '')`,
+               OR release_date IS NULL OR release_date = ''
+               OR release_date GLOB '[0-9][0-9][0-9][0-9]')`,
     )
     .first<{ n: number }>();
   return row?.n ?? 0;
@@ -182,7 +184,10 @@ async function applyEnrichment(
               backdrop_url = CASE WHEN backdrop_url IS NULL OR backdrop_url = ''
                                   THEN ?2 ELSE backdrop_url END,
               tmdb_id = COALESCE(tmdb_id, ?3),
+              -- A year-only 'YYYY' placeholder (catalog build-out) is refined
+              -- when TMDB knows the exact date; full dates are never touched.
               release_date = CASE WHEN release_date IS NULL OR release_date = ''
+                                       OR release_date GLOB '[0-9][0-9][0-9][0-9]'
                                   THEN ?4 ELSE release_date END,
               synopsis = CASE WHEN synopsis IS NULL OR synopsis = ''
                               THEN ?5 ELSE synopsis END
@@ -220,6 +225,7 @@ export async function selectFullBatch(
               (needs_enrichment = 1
                OR poster_url IS NULL OR poster_url = ''
                OR release_date IS NULL OR release_date = ''
+               OR release_date GLOB '[0-9][0-9][0-9][0-9]'
                OR synopsis IS NULL OR synopsis = '') AS needs_enrich,
               EXISTS (SELECT 1 FROM watch_provider_cache w
                        WHERE w.screen_work_id = screen_works.id
@@ -230,6 +236,7 @@ export async function selectFullBatch(
           AND (needs_enrichment = 1
                OR poster_url IS NULL OR poster_url = ''
                OR release_date IS NULL OR release_date = ''
+               OR release_date GLOB '[0-9][0-9][0-9][0-9]'
                OR synopsis IS NULL OR synopsis = ''
                OR (tmdb_id IS NOT NULL AND NOT EXISTS (
                      SELECT 1 FROM watch_provider_cache w
@@ -264,6 +271,7 @@ export async function countRemainingFull(db: D1Database): Promise<number> {
           AND (needs_enrichment = 1
                OR poster_url IS NULL OR poster_url = ''
                OR release_date IS NULL OR release_date = ''
+               OR release_date GLOB '[0-9][0-9][0-9][0-9]'
                OR synopsis IS NULL OR synopsis = ''
                OR (tmdb_id IS NOT NULL AND NOT EXISTS (
                      SELECT 1 FROM watch_provider_cache w
