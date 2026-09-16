@@ -473,13 +473,15 @@ def flow_search_flow(page, c):
 
 
 def flow_redirects(page, c):
-    # Numeric page URLs are legacy: they 301 to the slug permalinks.
+    # Numeric page URLs are legacy: they 301 to the slug permalinks. The 301
+    # status itself is asserted in the Node suite; here we confirm the browser
+    # lands on the slug URL. Uses page.goto rather than page.request because
+    # the latter bypasses the sandbox egress proxy.
     for path, slug in (("/books/38", BOOK_SLUG), ("/watch/38", WATCH_SLUG), ("/adaptations/38", ADAPT_SLUG)):
-        resp = page.request.get(c.base + path, max_redirects=0)
-        assert resp.status == 301, f"{path} -> {resp.status}, expected 301"
+        page.goto(c.base + path, wait_until="domcontentloaded")
+        wait_spa_booted(page)
         expected = f"{c.base}{path.rsplit('/', 1)[0]}/{slug}"
-        assert resp.headers.get("location") == expected, \
-            f"{path} Location {resp.headers.get('location')!r} != {expected!r}"
+        assert page.url.rstrip("/") == expected, f"{path} landed on {page.url}, expected {expected}"
 
 
 def flow_detail_meta(page, c):
