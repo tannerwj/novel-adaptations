@@ -144,12 +144,33 @@ def assert_no_reload(page, what):
     assert alive == "yes", f"full-page reload during {what} (SPA must not reload)"
 
 
+def wait_spa_booted(page, timeout=30000):
+    """Wait until the SPA entry module has finished booting.
+
+    The server-rendered chrome (header search, theme toggle, menus) is
+    visible before app.js loads and wires its handlers, so interacting with
+    it immediately after goto() races module load + session fetch: a submit
+    click can fall through to a native form GET on the wrong URL. The app
+    sets documentElement.dataset.spaBooted once the router and chrome
+    wiring are attached — wait for that signal instead of guessing.
+    """
+    page.wait_for_function(
+        "document.documentElement.dataset.spaBooted === 'true'",
+        timeout=timeout,
+    )
+
+
+def spa_goto(page, url, timeout=30000):
+    page.goto(url, wait_until="domcontentloaded")
+    wait_spa_booted(page, timeout=timeout)
+
+
 # --------------------------------------------------------------------------
 # Flows — desktop, logged in
 # --------------------------------------------------------------------------
 
 def flow_auth_header(page, c):
-    page.goto(c.base + "/", wait_until="domcontentloaded")
+    spa_goto(page, c.base + "/")
     expect(page.locator("[data-user-menu-btn]")).to_be_visible(timeout=30000)
     assert page.locator('.site-header a[href="/auth/login"]').count() == 0, "login link visible while authed"
     page.locator("[data-user-menu-btn]").click()
@@ -161,7 +182,7 @@ def flow_auth_header(page, c):
 
 
 def flow_home_load_more(page, c):
-    page.goto(c.base + "/", wait_until="domcontentloaded")
+    spa_goto(page, c.base + "/")
     grid = page.locator("[data-home-grid]")
     expect(grid.locator(".poster-card")).to_have_count(24, timeout=30000)
     btn = page.locator("[data-load-more]")
@@ -204,7 +225,7 @@ def flow_home_load_more(page, c):
 
 
 def flow_book_vote(page, c):
-    page.goto(c.base + "/most-wanted", wait_until="domcontentloaded")
+    spa_goto(page, c.base + "/most-wanted")
     row = page.locator(".rank-row").first
     expect(row).to_be_visible(timeout=30000)
     vote_btn = row.locator("[data-vote-btn]")
@@ -221,7 +242,7 @@ def flow_book_vote(page, c):
 
 
 def flow_watch_rate(page, c):
-    page.goto(c.base + "/watch/38", wait_until="domcontentloaded")
+    spa_goto(page, c.base + "/watch/38")
     widget = page.locator("[data-rating-widget]")
     expect(widget).to_be_visible(timeout=30000)
     assert widget.get_attribute("data-user-rating") == "0", "fresh test user should have no rating yet"
@@ -240,7 +261,7 @@ def flow_watch_rate(page, c):
 
 
 def flow_adaptation_poll(page, c):
-    page.goto(c.base + "/adaptations/38", wait_until="domcontentloaded")
+    spa_goto(page, c.base + "/adaptations/38")
     widget = page.locator("[data-poll-widget]")
     expect(widget).to_be_visible(timeout=30000)
     count_el = widget.locator('[data-poll-row="book"] .poll-count')
@@ -256,7 +277,7 @@ def flow_adaptation_poll(page, c):
 
 def flow_spoiler_review(page, c):
     marker = "BROWSER-REVIEW-" + uuid.uuid4().hex[:8]
-    page.goto(c.base + "/watch/38", wait_until="domcontentloaded")
+    spa_goto(page, c.base + "/watch/38")
     form = page.locator("form[data-review-form]")
     expect(form).to_be_visible(timeout=30000)
     form.locator('textarea[name="body"]').fill(
@@ -280,7 +301,7 @@ def flow_spoiler_review(page, c):
 
 def flow_lists(page, c):
     name = "Browser Suite List " + uuid.uuid4().hex[:8]
-    page.goto(c.base + "/lists", wait_until="domcontentloaded")
+    spa_goto(page, c.base + "/lists")
     form = page.locator("form[data-create-list]")
     expect(form).to_be_visible(timeout=30000)
     form.locator('input[name="title"]').fill(name)
@@ -302,7 +323,7 @@ def flow_lists(page, c):
     # poster art rendered for the item
     assert page.locator('[data-item-row] .thumb img, [data-item-row] .thumb .poster-art').count() >= 1
     page.screenshot(path=str(c.shots / "list-detail.png"))
-    page.goto(c.base + "/lists", wait_until="domcontentloaded")
+    spa_goto(page, c.base + "/lists")
     expect(page.locator("[data-list-row]", has_text=name)).to_be_visible(timeout=30000)
 
 
@@ -321,7 +342,7 @@ def _shelf_change(page, value):
 
 
 def flow_shelf(page, c):
-    page.goto(c.base + "/books/38", wait_until="domcontentloaded")
+    spa_goto(page, c.base + "/books/38")
     sel = page.locator("[data-shelf-select]")
     expect(sel).to_be_visible(timeout=30000)
     mark_alive(page)
@@ -335,18 +356,18 @@ def flow_shelf(page, c):
     page.reload(wait_until="domcontentloaded")
     sel = page.locator("[data-shelf-select]")
     expect(sel).to_have_value("read", timeout=30000)
-    page.goto(c.base + "/shelves", wait_until="domcontentloaded")
+    spa_goto(page, c.base + "/shelves")
     group = page.locator(".shelf-group", has_text="Read")
     expect(group.locator('a[href="/books/38"]')).to_be_visible(timeout=30000)
 
 
 def flow_logout(page, c):
-    page.goto(c.base + "/", wait_until="domcontentloaded")
+    spa_goto(page, c.base + "/")
     expect(page.locator("[data-user-menu-btn]")).to_be_visible(timeout=30000)
     page.locator("[data-user-menu-btn]").click()
     page.locator("[data-user-menu] [data-logout]").click()
     expect(page.locator('.site-header a[href="/auth/login"]')).to_be_visible(timeout=30000)
-    page.goto(c.base + "/lists", wait_until="domcontentloaded")
+    spa_goto(page, c.base + "/lists")
     page.wait_for_url(re.compile(r"/auth/login"), timeout=30000)
     assert "next=" in page.url and "lists" in page.url, f"missing next param: {page.url}"
 
@@ -356,7 +377,7 @@ def flow_logout(page, c):
 # --------------------------------------------------------------------------
 
 def flow_mobile_tabs(page, c):
-    page.goto(c.base + "/", wait_until="domcontentloaded")
+    spa_goto(page, c.base + "/")
     bar = page.locator(".tab-bar")
     expect(bar).to_be_visible(timeout=30000)
     labels = [t.strip() for t in bar.locator(".tab-label").all_inner_texts()]
@@ -371,7 +392,7 @@ def flow_mobile_tabs(page, c):
 
 
 def flow_mobile_more_sheet(page, c):
-    page.goto(c.base + "/", wait_until="domcontentloaded")
+    spa_goto(page, c.base + "/")
     expect(page.locator(".tab-bar")).to_be_visible(timeout=30000)
     mark_alive(page)
     page.locator("[data-more-btn]").click()
@@ -397,11 +418,11 @@ def flow_mobile_layout(page, c):
         ("/watch/38", ".hero h1"),
     ]
     for path, probe in checks:
-        page.goto(c.base + path, wait_until="domcontentloaded")
+        spa_goto(page, c.base + path)
         expect(page.locator(probe).first).to_be_visible(timeout=30000)
         overflow = page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
         assert not overflow, f"horizontal overflow on {path}"
-    page.goto(c.base + "/", wait_until="domcontentloaded")
+    spa_goto(page, c.base + "/")
     tabs = page.locator(".tab-bar .tab-link").all()
     assert len(tabs) == 5, f"expected 5 tab targets, found {len(tabs)}"
     for t in tabs:
@@ -415,7 +436,7 @@ def flow_mobile_layout(page, c):
 # --------------------------------------------------------------------------
 
 def flow_theme_toggle(page, c):
-    page.goto(c.base + "/", wait_until="domcontentloaded")
+    spa_goto(page, c.base + "/")
     meta = page.locator('meta[name="theme-color"]')
     before = page.evaluate("document.documentElement.getAttribute('data-theme')")
     before_meta = meta.get_attribute("content")
@@ -436,7 +457,7 @@ def flow_theme_toggle(page, c):
 
 
 def flow_search_flow(page, c):
-    page.goto(c.base + "/", wait_until="domcontentloaded")
+    spa_goto(page, c.base + "/")
     form = page.locator(".site-header [data-header-search]")
     expect(form).to_be_visible(timeout=30000)
     form.locator('input[name="q"]').fill("dune")

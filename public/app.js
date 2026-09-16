@@ -45,3 +45,8 @@ registerRoutes([
 ]);
 
 startRouter();
+
+// Deterministic "SPA booted" signal: chrome wiring (header search, theme
+// toggle, menus) and the router are attached by this point. E2E waits on
+// this instead of racing module load + session fetch.
+document.documentElement.dataset.spaBooted = 'true';
