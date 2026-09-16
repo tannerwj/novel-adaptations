@@ -345,6 +345,29 @@ export function nextStatusAfter(current: string): string | null {
 }
 
 /**
+ * Invariant: an adaptation may only be 'released' when its screen work has a
+ * release_date on or before today. Dependency-free so unit tests can import it
+ * directly (same pattern as src/news/gate.ts).
+ *
+ * Guards the Dune Part Three class of error: the catalog expansion seeded the
+ * row as 'released' with a future release_date (2026-12-15) and nothing checked.
+ * The DB triggers in migration 0021 enforce the same rule as a backstop; this
+ * throws a clear error before the write so callers get a usable message.
+ */
+export function assertReleasedStatusAllowed(releaseDate: string | null | undefined): void {
+  if (releaseDate == null || releaseDate === '') {
+    throw new Error("Cannot mark 'released': screen work has no release_date");
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  // Lexicographic compare works for 'YYYY-MM-DD' and year-only 'YYYY' dates.
+  if (releaseDate > today) {
+    throw new Error(
+      `Cannot mark 'released': release_date ${releaseDate} is in the future`,
+    );
+  }
+}
+
+/**
  * Promote a news item: mark it approved, advance (or set) the linked
  * adaptation's status, and write an audit row. All in one D1 batch so the
  * three writes stay consistent.
@@ -358,11 +381,19 @@ export async function promoteNewsItem(
   changedBy = 'owner',
 ): Promise<{ oldStatus: string; newStatus: string }> {
   const adaptation = await db
-    .prepare('SELECT status FROM adaptations WHERE id = ?1')
+    .prepare('SELECT status, screen_work_id FROM adaptations WHERE id = ?1')
     .bind(adaptationId)
-    .first<{ status: string }>();
+    .first<{ status: string; screen_work_id: number }>();
   if (!adaptation) throw new Error('adaptation not found');
   const oldStatus = adaptation.status;
+
+  if (newStatus === 'released') {
+    const work = await db
+      .prepare('SELECT release_date FROM screen_works WHERE id = ?1')
+      .bind(adaptation.screen_work_id)
+      .first<{ release_date: string | null }>();
+    assertReleasedStatusAllowed(work?.release_date);
+  }
 
   const batch: D1PreparedStatement[] = [
     db
