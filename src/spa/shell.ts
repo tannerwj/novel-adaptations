@@ -42,7 +42,12 @@ const WEB_ANALYTICS_BEACON =
   `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" ` +
   `data-cf-beacon='{"token": "${WEB_ANALYTICS_TOKEN}"}'></script>`;
 
-export function spaShell(theme: ThemeName, headerHtml = '', footerHtml = '') {
+export function spaShell(
+  theme: ThemeName,
+  headerHtml = '',
+  footerHtml = '',
+  bootUserJson = 'null',
+) {
   const themeColor = theme === 'dark' ? DARK_BG : LIGHT_BG;
   return (
     `<!DOCTYPE html>` +
@@ -59,9 +64,6 @@ export function spaShell(theme: ThemeName, headerHtml = '', footerHtml = '') {
     `<meta property="og:type" content="website">` +
     `<link rel="icon" type="image/png" href="/favicon.png">` +
     `<link rel="apple-touch-icon" href="/apple-touch-icon.png">` +
-    `<link rel="preconnect" href="https://fonts.googleapis.com">` +
-    `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>` +
-    `<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">` +
     `<script>${THEME_SCRIPT}</script>` +
     `<style>${CRITICAL_CSS}</style>` +
     `<link rel="stylesheet" href="/styles.css">` +
@@ -71,6 +73,12 @@ export function spaShell(theme: ThemeName, headerHtml = '', footerHtml = '') {
     `<main id="app"><div class="boot" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Loading…</span></div></main>` +
     `<div id="chrome-footer">${footerHtml}</div>` +
     `<noscript><p style="text-align:center;font-family:system-ui,sans-serif;padding:2rem">Novel Adaptations needs JavaScript to run.</p></noscript>` +
+    // Boot user, resolved server-side for the header render. The client
+    // picks this up (public/js/store.js) and skips its /api/v1/auth/me round
+    // trip on first paint — same {id, email, is_admin} shape as that API.
+    // `<` is unicode-escaped so an email address can never break out of the
+    // script tag.
+    `<script>window.__naUser=${bootUserJson};</script>` +
     `<script type="module" src="/app.js"></script>` +
     `${WEB_ANALYTICS_BEACON}` +
     `</body>` +

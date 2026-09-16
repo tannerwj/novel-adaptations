@@ -15,6 +15,7 @@ import { getCookie } from 'hono/cookie';
 import type { AdaptationSummary, Book, NewsItem, NewsStatus, SourceRow } from './db';
 // Round 3 (SEO): per-page meta/OG/Twitter tags; no-op when origin is absent.
 import { seoHead } from './seo';
+import { FONT_FACE_CSS } from './spa/fonts';
 // Round 4 (community): rating stars, spoiler-safe reviews, book-vs-screen
 // polls, shareable-list controls.
 import { RatingWidget } from './ratings/ui';
@@ -811,14 +812,11 @@ export function Layout({
         <meta name="theme-color" content={activeTheme === 'dark' ? '#0b0c10' : '#faf9f6'} />
         <link rel="icon" type="image/png" href="/favicon.png" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        {/* Track A: Fraunces (literary-cinematic display) + Inter (clean body).
-            System fallbacks keep pages legible if Google Fonts is unreachable. */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
+        {/* Fraunces (literary-cinematic display) + Inter (clean body), self-hosted
+            (public/fonts/, byte-identical to the Google Fonts latin subsets).
+            Inlined @font-face replaces the render-blocking Google Fonts
+            stylesheet; font-display: swap keeps text non-blocking. */}
+        <style dangerouslySetInnerHTML={{ __html: FONT_FACE_CSS }} />
         <style dangerouslySetInnerHTML={{ __html: GLOBAL_CSS }} />
       </head>
       <body>

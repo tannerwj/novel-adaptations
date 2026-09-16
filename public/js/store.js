@@ -60,8 +60,21 @@ export async function toggleTheme() {
   return r;
 }
 
-/** Load (or reload) the session user. Never redirects; 401 just means logged out. */
+/**
+ * Load (or reload) the session user. Never redirects; 401 just means logged
+ * out. On the first boot after a full page load the worker embeds the
+ * session user as window.__naUser (src/spa/shell.ts) — use it and skip the
+ * /api/v1/auth/me round trip on the critical path. Explicit reloads (e.g.
+ * after login) still hit the API.
+ */
 export async function loadSession() {
+  if (!store.sessionLoaded && typeof window !== 'undefined' && window.__naUser !== undefined) {
+    const boot = window.__naUser;
+    delete window.__naUser;
+    store.user = boot && typeof boot === 'object' ? boot : null;
+    store.sessionLoaded = true;
+    return store.user;
+  }
   const r = await api('/api/v1/auth/me', { loginRedirect: false });
   store.user = r.ok && r.data && r.data.user ? r.data.user : null;
   store.sessionLoaded = true;

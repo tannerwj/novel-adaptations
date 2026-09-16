@@ -20,7 +20,7 @@ import openapiSpec from '../public/openapi.json';
 import { THEME_COOKIE } from './ui';
 import { spaShell, type ThemeName } from './spa/shell';
 import { serverHeaderHtml, serverFooterHtml, type ChromeUser } from './spa/chrome';
-import { getUser } from './auth/session';
+import { getUser, type SessionUser } from './auth/session';
 
 export interface Env {
   DB: D1Database;
@@ -47,6 +47,13 @@ const app = new Hono<{ Bindings: Env }>();
 const themeOf = (c: Context): ThemeName =>
   getCookie(c, THEME_COOKIE) === 'dark' ? 'dark' : 'light';
 
+/** Serialize the session user for the shell's window.__naUser boot payload. */
+const bootUserJson = (u: SessionUser | null) =>
+  JSON.stringify(u ? { id: u.id, email: u.email, is_admin: u.isAdmin } : null).replace(
+    /</g,
+    '\\u003c',
+  );
+
 /**
  * Serve the SPA shell. The header/footer chrome is server-rendered into the
  * initial HTML (src/spa/chrome.ts, byte-identical to the client's renderer)
@@ -62,7 +69,12 @@ const serveShell = async (c: Context) => {
     : null;
   const pathname = new URL(c.req.url).pathname;
   return c.html(
-    spaShell(theme, serverHeaderHtml(pathname, theme, user), serverFooterHtml()),
+    spaShell(
+      theme,
+      serverHeaderHtml(pathname, theme, user),
+      serverFooterHtml(),
+      bootUserJson(sessionUser),
+    ),
   );
 };
 
@@ -138,7 +150,12 @@ app.notFound(async (c) => {
     : null;
   const pathname = new URL(c.req.url).pathname;
   return c.html(
-    spaShell(theme, serverHeaderHtml(pathname, theme, user), serverFooterHtml()),
+    spaShell(
+      theme,
+      serverHeaderHtml(pathname, theme, user),
+      serverFooterHtml(),
+      bootUserJson(sessionUser),
+    ),
     404,
   );
 });
