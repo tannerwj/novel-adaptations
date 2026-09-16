@@ -145,6 +145,33 @@ export const tests = [
     eq(p2.data.total, t0 + 1, 'total stays the same on vote change');
   }),
 
+  test('hype: vote, tally moves, change vote, invalid level rejected', async (ctx) => {
+    const before = await apiGet(`/api/v1/hype?screen_work_id=${WATCH_ID}`, { session: ctx.token });
+    eq(before.status, 200, 'GET /api/v1/hype status');
+    const c0 = before.data.count ?? 0;
+
+    const h1 = await apiPost('/api/v1/hype', {
+      session: ctx.token,
+      body: { screen_work_id: WATCH_ID, level: 5 },
+    });
+    eq(h1.status, 200, 'POST /api/v1/hype status');
+    eq(h1.data.user_level, 5, 'hype level 5 is stored');
+    eq(h1.data.count, c0 + 1, 'hype count increments');
+
+    const h2 = await apiPost('/api/v1/hype', {
+      session: ctx.token,
+      body: { screen_work_id: WATCH_ID, level: 2 },
+    });
+    eq(h2.data.user_level, 2, 'hype vote changes to 2');
+    eq(h2.data.count, c0 + 1, 'hype count stays the same on vote change');
+
+    const bad = await apiPost('/api/v1/hype', {
+      session: ctx.token,
+      body: { screen_work_id: WATCH_ID, level: 9 },
+    });
+    eq(bad.status, 422, 'out-of-range hype level is rejected');
+  }),
+
   test('lists: create, add item, detail view, delete', async (ctx) => {
     const title = `E2E list ${RUN}`;
     const created = await apiPost('/api/v1/lists', {

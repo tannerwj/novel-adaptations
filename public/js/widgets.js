@@ -202,6 +202,11 @@ export function wirePolls(root) {
 
 // ---------------------------------------------------------------------------
 // Hype meter (unreleased works only)
+//
+// Design: prediction-market style read-out — a big community percentage, an
+// animated temperature-gradient bar (cool → hot as the score climbs), and
+// count-up social proof. Voting is a single fused strip with hover/focus
+// preview; your vote persists as a marker on the strip.
 // ---------------------------------------------------------------------------
 
 const HYPE_LABELS = {
@@ -212,72 +217,148 @@ const HYPE_LABELS = {
   5: '5/5 — Must-see day one',
 };
 
+function hypePct(average) {
+  return Math.round((Math.max(0, Math.min(5, Number(average) || 0)) / 5) * 100);
+}
+
+function hypeMood(pct) {
+  if (pct >= 90) return 'Off the charts';
+  if (pct >= 70) return 'Running hot';
+  if (pct >= 50) return 'Warming up';
+  if (pct > 0) return 'Simmering';
+  return 'No votes yet';
+}
+
 export function hypeWidget(screenWorkId, average, count, userLevel, signedIn) {
-  const filled = Math.max(0, Math.min(5, Math.round(average || 0)));
-  const avg = Number(average || 0).toFixed(1);
+  const avg = Number(average || 0);
+  const n = Number(count || 0);
+  const pct = hypePct(avg);
+  const mood = hypeMood(pct);
+  const gaugeLabel = `Community hype ${pct} percent${n === 1 ? ', from 1 vote' : `, from ${n} votes`}`;
   return (
     `<section class="hype-widget" data-hype-widget data-screen-work-id="${screenWorkId}">` +
-      `<div class="hype-head">` +
-        `<span class="hype-title">🔥 Hype meter</span>` +
-        `<span class="hype-stats"><strong data-hype-average>${avg}</strong>/5 · <span data-hype-count>${count}</span> votes</span>` +
+      `<div class="hype-top">` +
+        `<div class="hype-score">` +
+          `<strong data-hype-pct data-hype-average="${avg.toFixed(1)}">${pct}%</strong>` +
+          `<span class="hype-score-meta"><span class="hype-score-label">community hype</span>` +
+          `<span class="hype-mood" data-hype-mood>${esc(mood)}</span></span>` +
+        `</div>` +
+        `<p class="hype-count"><span data-hype-count>${n}</span> ${n === 1 ? 'vote' : 'votes'}</p>` +
       `</div>` +
-      `<div class="hype-gauge" data-hype-gauge role="img" aria-label="Average hype ${avg} out of 5 from ${count} votes">` +
-      [0, 1, 2, 3, 4].map((i) => `<span class="hype-cell${i < filled ? ' on' : ''}"></span>`).join('') +
+      `<div class="hype-bar" data-hype-gauge role="img" aria-label="${esc(gaugeLabel)}">` +
+        `<div class="hype-fill" data-hype-fill style="width:${pct}%"></div>` +
       `</div>` +
+      `<div class="hype-scale" aria-hidden="true"><span>Not hyped</span><span>Must-see day one</span></div>` +
       (signedIn
         ? `<div class="hype-vote">` +
-            `<span class="hype-ask">Your hype:</span>` +
-            `<div class="hype-segs" role="radiogroup" aria-label="Your hype level">` +
-            [1, 2, 3, 4, 5].map((level) =>
-              `<button type="button" class="hype-seg${userLevel === level ? ' mine' : ''}" data-hype-level="${level}" ` +
-              `aria-pressed="${userLevel === level}" aria-label="${esc(HYPE_LABELS[level])}" title="${esc(HYPE_LABELS[level])}">` +
-              `${userLevel === level ? '🔥' : ''}${level}</button>`
-            ).join('') +
+            `<span class="hype-ask">Your hype</span>` +
+            `<div class="hype-strip" role="radiogroup" aria-label="Your hype level" data-hype-strip>` +
+              `<div class="hype-strip-fill" data-hype-strip-fill style="width:${userLevel ? (userLevel / 5) * 100 : 0}%"></div>` +
+              [1, 2, 3, 4, 5].map((level) =>
+                `<button type="button" class="hype-stop${userLevel === level ? ' mine' : ''}" data-hype-level="${level}" ` +
+                `aria-pressed="${userLevel === level}" aria-label="${esc(HYPE_LABELS[level])}" title="${esc(HYPE_LABELS[level])}">` +
+                `<span>${level}</span></button>`
+              ).join('') +
             `</div>` +
-            `<p class="hype-hint" data-hype-hint>${userLevel ? `You voted ${userLevel}/5 — tap to change` : 'Tap a number to vote'}</p>` +
+            `<p class="hype-hint" data-hype-hint>${userLevel ? `You voted ${userLevel}/5 — tap to change` : (n === 0 ? 'Be the first to vote' : 'Tap to add your vote')}</p>` +
           `</div>`
         : `<p class="hype-signin"><a href="/auth/login">Sign in</a> to vote your hype.</p>`) +
     `</section>`
   );
 }
 
+function tweenNumber(el, from, to, format, duration = 450) {
+  if (from === to) { el.textContent = format(to); return; }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = format(to); return; }
+  const start = performance.now();
+  const step = (now) => {
+    const t = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = format(from + (to - from) * eased);
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
 export function wireHype(root) {
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   root.querySelectorAll('[data-hype-widget]').forEach((w) => {
     if (w.dataset.wired) return;
     w.dataset.wired = '1';
     const screenWorkId = Number(w.dataset.screenWorkId);
     const gauge = w.querySelector('[data-hype-gauge]');
-    const avgEl = w.querySelector('[data-hype-average]');
+    const fill = w.querySelector('[data-hype-fill]');
+    const pctEl = w.querySelector('[data-hype-pct]');
+    const moodEl = w.querySelector('[data-hype-mood]');
     const countEl = w.querySelector('[data-hype-count]');
+    const countWrap = w.querySelector('.hype-count');
     const hint = w.querySelector('[data-hype-hint]');
-    const render = (avg, count, level) => {
-      const full = Math.max(0, Math.min(5, Math.round(avg)));
-      if (gauge) {
-        gauge.querySelectorAll('.hype-cell').forEach((cell, i) => cell.classList.toggle('on', i < full));
-        gauge.setAttribute('aria-label', `Average hype ${avg.toFixed(1)} out of 5 from ${count} ratings`);
+    const strip = w.querySelector('[data-hype-strip]');
+    const stripFill = w.querySelector('[data-hype-strip-fill]');
+    const stops = [...w.querySelectorAll('[data-hype-level]')];
+    let level = stops.some((b) => b.classList.contains('mine'))
+      ? Number(stops.find((b) => b.classList.contains('mine')).dataset.hypeLevel)
+      : null;
+
+    const render = (avg, count, newLevel) => {
+      const pct = hypePct(avg);
+      const prevPct = Number(pctEl?.dataset.pct ?? pct);
+      if (pctEl) {
+        pctEl.dataset.pct = String(pct);
+        pctEl.dataset.hypeAverage = Number(avg || 0).toFixed(1);
+        tweenNumber(pctEl, prevPct, pct, (v) => `${Math.round(v)}%`);
       }
-      if (avgEl) avgEl.textContent = avg.toFixed(1);
-      if (countEl) countEl.textContent = String(count);
-      w.querySelectorAll('[data-hype-level]').forEach((btn) => {
+      if (moodEl) moodEl.textContent = hypeMood(pct);
+      if (fill) fill.style.width = `${pct}%`;
+      if (gauge) {
+        const n = Number(count || 0);
+        gauge.setAttribute('aria-label', `Community hype ${pct} percent${n === 1 ? ', from 1 vote' : `, from ${n} votes`}`);
+      }
+      if (countEl) tweenNumber(countEl, Number(countEl.textContent) || 0, Number(count || 0), (v) => `${Math.round(v)}`);
+      if (countWrap) {
+        const nodes = [...countWrap.childNodes];
+        const last = nodes[nodes.length - 1];
+        if (last && last.nodeType === 3) last.textContent = ` ${Number(count) === 1 ? 'vote' : 'votes'}`;
+      }
+      level = newLevel;
+      stops.forEach((btn) => {
         const mine = Number(btn.dataset.hypeLevel) === level;
         btn.classList.toggle('mine', mine);
         btn.setAttribute('aria-pressed', String(mine));
-        btn.innerHTML = `${mine ? '🔥' : ''}${btn.dataset.hypeLevel}`;
       });
-      if (hint) hint.textContent = level ? `You voted ${level}/5 — tap to change` : 'Tap a number to vote';
+      if (stripFill && !strip.matches(':hover') && document.activeElement?.closest('[data-hype-strip]') !== strip) {
+        stripFill.style.width = `${level ? (level / 5) * 100 : 0}%`;
+      }
+      if (hint) hint.textContent = level ? `You voted ${level}/5 — tap to change` : 'Tap to add your vote';
     };
-    w.querySelectorAll('[data-hype-level]').forEach((btn) => {
+
+    // Animate the bar in on first paint.
+    if (fill && !reduceMotion) {
+      const target = fill.style.width;
+      fill.style.width = '0%';
+      requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = target; }));
+    }
+    if (pctEl) pctEl.dataset.pct = String(hypePct(Number(pctEl.dataset.hypeAverage) || 0));
+
+    // Hover / focus preview on the vote strip.
+    const preview = (stopLevel) => { if (stripFill) stripFill.style.width = `${(stopLevel / 5) * 100}%`; };
+    const unpreview = () => { if (stripFill) stripFill.style.width = `${level ? (level / 5) * 100 : 0}%`; };
+    stops.forEach((btn) => {
+      const lv = Number(btn.dataset.hypeLevel);
+      btn.addEventListener('mouseenter', () => preview(lv));
+      btn.addEventListener('focus', () => preview(lv));
+      btn.addEventListener('mouseleave', unpreview);
+      btn.addEventListener('blur', unpreview);
       btn.addEventListener('click', async () => {
-        const level = Number(btn.dataset.hypeLevel);
         btn.disabled = true;
         try {
-          const r = await api('/api/v1/hype', { method: 'POST', body: { screen_work_id: screenWorkId, level } });
+          const r = await api('/api/v1/hype', { method: 'POST', body: { screen_work_id: screenWorkId, level: lv } });
           if (!r.ok) {
             if (r.code === 'rate_limited') alert('Slow down — hype changes are rate-limited.');
             else if (r.status !== 401) alert(errMsg(r));
             return;
           }
-          render(Number(r.data.average) || 0, Number(r.data.count) || 0, level);
+          render(Number(r.data.average) || 0, Number(r.data.count) || 0, lv);
         } finally {
           btn.disabled = false;
         }

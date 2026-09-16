@@ -216,8 +216,7 @@ export function serverFooterHtml(): string {
           `</ul>` +
         `</div>` +
         `<p class="footer-attribution tmdb-attribution">` +
-          `This product uses the TMDB API but is not endorsed or certified by TMDB. ` +
-          `Data and images via <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">The Movie Database</a>.` +
+          `This product uses the TMDB API but is not endorsed or certified by TMDB.` +
         `</p>` +
       `</div>` +
     `</footer>`

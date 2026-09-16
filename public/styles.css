@@ -370,7 +370,7 @@ body.sheet-open { overflow: hidden; }
 @media (max-width: 719px) {
   .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
   .duel-alt-btn { min-height: 44px; }
-  .hype-seg { min-height: 44px; }
+  .hype-stop { min-height: 44px; }
   select.shelf-select { min-height: 44px; }
   .back-link { display: inline-flex; align-items: center; min-height: 44px; }
   .menu-item { min-height: 44px; }
@@ -1139,25 +1139,36 @@ textarea.f-input { min-height: 4.5rem; resize: vertical; }
 
 /* --- hype meter (public/js/widgets.js hypeWidget) --- */
 
-
-.hype-widget { border: 1px solid var(--border); background: var(--bg-soft); border-radius: var(--radius); padding: 0.8rem 1rem; max-width: 34rem; }
-.hype-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
-.hype-title { font-family: var(--serif); font-size: 1rem; font-weight: 700; color: var(--text); white-space: nowrap; }
-.hype-stats { margin: 0; color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
-.hype-stats strong { color: var(--text); font-size: 1rem; }
-.hype-gauge { display: flex; gap: 4px; margin: 0.55rem 0 0.15rem; }
-.hype-cell { flex: 1 1 0; height: 10px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--border); }
-.hype-cell.on { background: linear-gradient(90deg, #ff9a3c, #ff5e3a, #e5383b); border-color: transparent; }
-.hype-vote { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
-.hype-ask { margin: 0; color: var(--text); font-weight: 600; font-size: 0.85rem; }
-.hype-segs { display: flex; gap: 4px; flex: 1 1 auto; min-width: 12rem; }
-.hype-seg { flex: 1 1 0; appearance: none; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--muted); border-radius: 8px; padding: 0.4rem 0; font: inherit; font-size: 0.8rem; font-weight: 700; }
-.hype-seg:hover { border-color: #ff9a3c; color: var(--text); transform: translateY(-1px); }
-.hype-seg.mine { background: linear-gradient(180deg, rgba(255,154,60,.3), rgba(229,56,59,.3)); border-color: #ff9a3c; color: var(--text); box-shadow: 0 0 0 1px #ff9a3c inset; }
-.hype-seg:disabled { opacity: 0.6; cursor: wait; }
-.hype-hint { margin: 0.45rem 0 0; color: var(--faint); font-size: 0.75rem; width: 100%; }
-.hype-signin { margin: 0.6rem 0 0; color: var(--muted); font-size: 0.85rem; }
+.hype-widget { border: 1px solid var(--border); background: var(--bg-soft); border-radius: var(--radius); padding: 1rem 1.1rem; max-width: 34rem; }
+.hype-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.75rem; }
+.hype-score { display: flex; align-items: baseline; gap: 0.6rem; }
+.hype-score strong { font-family: var(--serif); font-size: 2.1rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; color: var(--text); font-variant-numeric: tabular-nums; }
+.hype-score-meta { display: flex; flex-direction: column; gap: 0.1rem; }
+.hype-score-label { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; }
+.hype-mood { color: var(--text); font-size: 0.85rem; font-weight: 600; }
+.hype-count { margin: 0; color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
+.hype-count span { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+.hype-bar { position: relative; height: 12px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); margin-top: 0.75rem; overflow: hidden; }
+.hype-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7c8cf8, #ffb020 52%, #e5383b); transition: width 0.8s cubic-bezier(0.22, 0.8, 0.3, 1); }
+.hype-scale { display: flex; justify-content: space-between; margin-top: 0.3rem; color: var(--faint); font-size: 0.72rem; }
+.hype-vote { margin-top: 0.85rem; }
+.hype-ask { color: var(--muted); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; }
+.hype-strip { position: relative; display: flex; margin-top: 0.45rem; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; background: var(--surface-2); }
+.hype-strip-fill { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, #7c8cf8, #ffb020 52%, #e5383b); opacity: 0.45; transition: width 0.18s ease-out; pointer-events: none; }
+.hype-stop { position: relative; flex: 1 1 0; appearance: none; background: transparent; border: 0; border-left: 1px solid var(--border); padding: 0.5rem 0; cursor: pointer; color: var(--faint); font: inherit; font-size: 0.78rem; font-weight: 700; }
+.hype-stop:first-child { border-left: 0; }
+.hype-stop span { position: relative; z-index: 1; }
+.hype-stop:hover, .hype-stop:focus-visible { color: var(--text); outline: none; }
+.hype-stop:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.hype-stop.mine { color: var(--text); }
+.hype-stop.mine::after { content: ""; position: absolute; left: 50%; bottom: 5px; transform: translateX(-50%); width: 6px; height: 6px; border-radius: 50%; background: #e5383b; z-index: 1; }
+.hype-stop:disabled { cursor: wait; }
+.hype-hint { margin: 0.45rem 0 0; color: var(--faint); font-size: 0.75rem; }
+.hype-signin { margin: 0.8rem 0 0; color: var(--muted); font-size: 0.85rem; }
 .hype-signin a { color: var(--link); }
+@media (prefers-reduced-motion: reduce) {
+  .hype-fill, .hype-strip-fill { transition: none; }
+}
 
 /* --- where to watch (compact provider chips, public/js/views/detail.js) --- */
 .wtw h2 { margin-bottom: 0.5rem; }
