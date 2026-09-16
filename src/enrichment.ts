@@ -21,6 +21,9 @@
  *     separate statement).
  *   - Idempotent: re-running enriches only flagged or still-missing rows
  *     (posters, backdrops, tmdb_id, release_date).
+ *   - Retry-capped: enrichment_attempts counts search attempts per row and
+ *     selection requires attempts < 3, so unmatchable rows stop being
+ *     retried and the bulk-backfill loop always converges (migration 0019).
  *   - Throttled: ~300 ms between TMDB calls (≈33 req/10 s, under the free
  *     tier's ~40/10 s cap).
  *   - Fail-soft: per-item try/catch — a bad title, API error, or timeout is
@@ -131,9 +134,10 @@ export async function selectEnrichmentBatch(
     .prepare(
       `SELECT id, title, kind, release_date, tmdb_id
          FROM screen_works
-        WHERE needs_enrichment = 1
-           OR poster_url IS NULL OR poster_url = ''
-           OR release_date IS NULL OR release_date = ''
+        WHERE enrichment_attempts < 3
+          AND (needs_enrichment = 1
+               OR poster_url IS NULL OR poster_url = ''
+               OR release_date IS NULL OR release_date = '')
         ORDER BY needs_enrichment DESC, id ASC
         LIMIT ?1`,
     )
@@ -148,9 +152,10 @@ export async function countRemaining(db: D1Database): Promise<number> {
     .prepare(
       `SELECT COUNT(*) AS n
          FROM screen_works
-        WHERE needs_enrichment = 1
-           OR poster_url IS NULL OR poster_url = ''
-           OR release_date IS NULL OR release_date = ''`,
+        WHERE enrichment_attempts < 3
+          AND (needs_enrichment = 1
+               OR poster_url IS NULL OR poster_url = ''
+               OR release_date IS NULL OR release_date = '')`,
     )
     .first<{ n: number }>();
   return row?.n ?? 0;
@@ -221,14 +226,16 @@ export async function selectFullBatch(
                          AND datetime(w.updated_at, '+7 days') >= datetime('now')
                      ) AS has_fresh_providers
          FROM screen_works
-        WHERE needs_enrichment = 1
-           OR poster_url IS NULL OR poster_url = ''
-           OR release_date IS NULL OR release_date = ''
-           OR synopsis IS NULL OR synopsis = ''
-           OR (tmdb_id IS NOT NULL AND NOT EXISTS (
-                 SELECT 1 FROM watch_provider_cache w
-                  WHERE w.screen_work_id = screen_works.id
-                    AND datetime(w.updated_at, '+7 days') >= datetime('now')))
+        WHERE enrichment_attempts < 3
+          AND (needs_enrichment = 1
+               OR poster_url IS NULL OR poster_url = ''
+               OR release_date IS NULL OR release_date = ''
+               OR synopsis IS NULL OR synopsis = ''
+               OR (tmdb_id IS NOT NULL AND NOT EXISTS (
+                     SELECT 1 FROM watch_provider_cache w
+                      WHERE w.screen_work_id = screen_works.id
+                        AND datetime(w.updated_at, '+7 days') >= datetime('now')))
+              )
         ORDER BY needs_enrichment DESC, id ASC
         LIMIT ?1`,
     )
@@ -253,14 +260,16 @@ export async function countRemainingFull(db: D1Database): Promise<number> {
     .prepare(
       `SELECT COUNT(*) AS n
          FROM screen_works
-        WHERE needs_enrichment = 1
-           OR poster_url IS NULL OR poster_url = ''
-           OR release_date IS NULL OR release_date = ''
-           OR synopsis IS NULL OR synopsis = ''
-           OR (tmdb_id IS NOT NULL AND NOT EXISTS (
-                 SELECT 1 FROM watch_provider_cache w
-                  WHERE w.screen_work_id = screen_works.id
-                    AND datetime(w.updated_at, '+7 days') >= datetime('now')))`,
+        WHERE enrichment_attempts < 3
+          AND (needs_enrichment = 1
+               OR poster_url IS NULL OR poster_url = ''
+               OR release_date IS NULL OR release_date = ''
+               OR synopsis IS NULL OR synopsis = ''
+               OR (tmdb_id IS NOT NULL AND NOT EXISTS (
+                     SELECT 1 FROM watch_provider_cache w
+                      WHERE w.screen_work_id = screen_works.id
+                        AND datetime(w.updated_at, '+7 days') >= datetime('now')))
+              )`,
     )
     .first<{ n: number }>();
   return row?.n ?? 0;
@@ -322,6 +331,16 @@ export async function enrichRows(
           (e as Error).message,
         );
       }
+      // Count the attempt even on a miss: after 3 attempts the row stops
+      // being selected, so the backfill loop always converges.
+      await db
+        .prepare(
+          `UPDATE screen_works
+              SET enrichment_attempts = enrichment_attempts + 1
+            WHERE id = ?1`,
+        )
+        .bind(row.id)
+        .run();
       if (throttleMs > 0) await sleep(throttleMs);
     }
     if (
