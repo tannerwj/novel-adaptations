@@ -514,7 +514,7 @@ def flow_search_keyboard(page, c):
 
     # No-result state offers the adaptation suggestion CTA.
     spa_goto(page, c.base + "/search?q=zzqxplork")
-    cta = page.locator('a[href^="/feedback?type=adaptation_tip"]')
+    cta = page.locator('[data-search-results] a[href^="/feedback?type=adaptation_tip"]')
     expect(cta).to_be_visible(timeout=30000)
     expect(cta).to_contain_text("Suggest an adaptation")
 
