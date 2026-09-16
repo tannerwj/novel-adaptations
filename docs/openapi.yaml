@@ -1548,8 +1548,11 @@ paths:
       summary: Release calendar feed
       description: |
         Screen works bucketed by release date: `coming_soon` (today or later),
-        `recently_released` (trailing 120 days), `earlier_releases` (dated but
-        older than the window, newest first), and `tba` (no usable date).
+        `recently_released` (trailing 120 days), `earlier_years` (year
+        summaries for older dated releases, newest year first), `tba` (no
+        usable date), and `earlier_releases` (only the newest year's items,
+        shipped inline for first paint). Older years lazy-load via
+        /api/v1/calendar/year/{year}.
       responses:
         '200':
           description: Calendar feed.
@@ -1557,7 +1560,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [today, coming_soon, recently_released, earlier_releases, tba]
+                required: [today, coming_soon, recently_released, earlier_years, earlier_releases, tba]
                 properties:
                   today: { type: string, format: date, example: '2026-09-15' }
                   coming_soon:
@@ -1566,12 +1569,50 @@ paths:
                   recently_released:
                     type: array
                     items: { $ref: '#/components/schemas/CalendarWork' }
+                  earlier_years:
+                    type: array
+                    items:
+                      type: object
+                      required: [year, count]
+                      properties:
+                        year: { type: string, example: '2025' }
+                        count: { type: integer, example: 42 }
                   earlier_releases:
                     type: array
+                    description: Items for the newest earlier year only.
                     items: { $ref: '#/components/schemas/CalendarWork' }
                   tba:
                     type: array
                     items: { $ref: '#/components/schemas/CalendarWork' }
+
+  /api/v1/calendar/year/{year}:
+    get:
+      tags: [Calendar]
+      summary: One earlier-release year
+      description: |
+        Works released in the given year that fall outside the recent window
+        (the same set counted in /api/v1/calendar's `earlier_years`),
+        newest first. Powers lazy-loading of collapsed calendar year groups.
+      parameters:
+        - name: year
+          in: path
+          required: true
+          schema: { type: string, pattern: '^\d{4}$', example: '1994' }
+      responses:
+        '200':
+          description: The year's earlier releases.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [year, works]
+                properties:
+                  year: { type: string, example: '1994' }
+                  works:
+                    type: array
+                    items: { $ref: '#/components/schemas/CalendarWork' }
+        '400':
+          description: Malformed year.
 
   /api/v1/feedback:
     post:
