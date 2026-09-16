@@ -27,6 +27,18 @@ html[data-theme="dark"] .boot{color:#8b93a3}
  */
 const THEME_SCRIPT = `(function(){try{var m=document.cookie.match(/(?:^|;\\s*)theme=(light|dark)/);document.documentElement.setAttribute('data-theme',m?m[1]:'light')}catch(e){document.documentElement.setAttribute('data-theme','light')}})();`;
 
+/**
+ * Phase 4 (observability): Cloudflare Web Analytics (RUM) beacon. The
+ * site_tag is a PUBLIC identifier (it ships in every page source) — not a
+ * secret. Created via the Cloudflare API on 2026-09-15 for
+ * noveladaptations.com. Privacy-friendly: no cookies, no fingerprinting.
+ */
+const WEB_ANALYTICS_TOKEN = '09461fe85155427cb0bcb85a04cb9385';
+
+const WEB_ANALYTICS_BEACON =
+  `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" ` +
+  `data-cf-beacon='{"token": "${WEB_ANALYTICS_TOKEN}"}'></script>`;
+
 export function spaShell(theme: ThemeName): string {
   const themeColor = theme === 'dark' ? DARK_BG : LIGHT_BG;
   return (
@@ -55,6 +67,7 @@ export function spaShell(theme: ThemeName): string {
     `<div id="app"><div class="boot" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Loading…</span></div></div>` +
     `<noscript><p style="text-align:center;font-family:system-ui,sans-serif;padding:2rem">Novel Adaptations needs JavaScript to run.</p></noscript>` +
     `<script type="module" src="/app.js"></script>` +
+    `${WEB_ANALYTICS_BEACON}` +
     `</body>` +
     `</html>`
   );

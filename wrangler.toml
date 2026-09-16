@@ -18,6 +18,10 @@ database_name = "novel-adaptations"
 database_id = "c5b38c69-8695-4841-8191-d004b323fdd6"
 migrations_dir = "migrations"
 
+# Phase 4 (observability): Workers Logs + Traces. Sampling left at defaults.
+[observability]
+enabled = true
+
 # Outbound email (magic-link sign-in) via Cloudflare Email Service.
 # Per https://developers.cloudflare.com/email-service/api/send-emails/workers-api/
 # the sender address must belong to a domain onboarded for Email Sending.
