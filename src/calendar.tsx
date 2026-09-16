@@ -61,9 +61,26 @@ function isIsoDate(s: string | null | undefined): s is string {
   return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.trim());
 }
 
+function isYearOnly(s: string | undefined): boolean {
+  return typeof s === 'string' && /^\d{4}$/.test(s.trim());
+}
+
 function cleanDate(w: CalendarWork): string | null {
   const d = w.release_date?.trim();
-  return isIsoDate(d) ? d.trim() : null;
+  return isIsoDate(d) || isYearOnly(d) ? (d as string).trim() : null;
+}
+
+/**
+ * Year-only dates (honest imprecision: we know the year, not the day)
+ * compare as the start of that year for bucketing/sorting. Displayed as
+ * just the year — never inflated into a fabricated month/day.
+ */
+function comparableDate(d: string): string {
+  return d.length === 4 ? `${d}-01-01` : d;
+}
+
+function displayDate(d: string): string {
+  return d.length === 4 ? d : formatDate(d);
 }
 
 export interface CalendarBuckets {
@@ -87,9 +104,9 @@ function bucketWorks(
     const d = cleanDate(w);
     if (!d) {
       tba.push(w);
-    } else if (d >= today) {
+    } else if (comparableDate(d) >= today) {
       comingSoon.push(w);
-    } else if (d >= windowStart) {
+    } else if (comparableDate(d) >= windowStart) {
       recentlyReleased.push(w);
     } else {
       // Dated works older than the window get their own section rather than
@@ -98,8 +115,10 @@ function bucketWorks(
     }
   }
   const byDateAsc = (a: CalendarWork, b: CalendarWork) =>
-    (cleanDate(a) ?? '').localeCompare(cleanDate(b) ?? '') ||
-    a.title.localeCompare(b.title);
+    (comparableDate(cleanDate(a) ?? '').localeCompare(
+      comparableDate(cleanDate(b) ?? ''),
+    ) ||
+      a.title.localeCompare(b.title));
   const byDateDesc = (a: CalendarWork, b: CalendarWork) => -byDateAsc(a, b);
   comingSoon.sort(byDateAsc);
   recentlyReleased.sort(byDateDesc);
@@ -145,6 +164,11 @@ function kindLabelCal(kind: string): string {
 
 function CalendarItem({ work, today }: { work: CalendarWork; today: string }) {
   const d = cleanDate(work);
+  const dateLabel = !d
+    ? 'TBA'
+    : d.length === 4
+      ? displayDate(d)
+      : `${formatDate(d)} · ${relativeLabel(d, today)}`;
   return (
     <li>
       <a
@@ -162,7 +186,7 @@ function CalendarItem({ work, today }: { work: CalendarWork; today: string }) {
         >
           {work.title}
         </a>
-        <span class="meta">{d ? `${formatDate(d)} · ${relativeLabel(d, today)}` : 'TBA'}</span>
+        <span class="meta">{dateLabel}</span>
       </div>
       <span class="shelf-kind kind-pill">{kindLabelCal(work.kind)}</span>
     </li>

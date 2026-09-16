@@ -91,7 +91,12 @@ const DAY_MS = 86400000;
 
 function cleanDate(w) {
   const d = (w.release_date || '').trim();
-  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) || /^\d{4}$/.test(d) ? d : null;
+}
+// Year-only dates (honest imprecision) display as just the year — never
+// inflated into a fabricated month/day.
+function displayDate(d) {
+  return d.length === 4 ? d : formatDate(d);
 }
 function formatDate(iso) {
   const [y, m, d] = iso.split('-').map(Number);
@@ -111,6 +116,7 @@ function relativeLabel(iso, today) {
 }
 function calendarItem(w, today) {
   const d = cleanDate(w);
+  const dateLabel = !d ? 'TBA' : d.length === 4 ? displayDate(d) : `${esc(formatDate(d))} · ${esc(relativeLabel(d, today))}`;
   return (
     `<li>` +
       `<a class="thumb-sm" href="/watch/${w.id}" tabindex="-1" aria-hidden="true" style="width:44px;flex-shrink:0;display:block">` +
@@ -118,7 +124,7 @@ function calendarItem(w, today) {
       `</a>` +
       `<div style="min-width:0">` +
         `<a href="/watch/${w.id}" style="color:var(--text);font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.title)}</a>` +
-        `<span class="meta">${d ? `${esc(formatDate(d))} · ${esc(relativeLabel(d, today))}` : 'TBA'}</span>` +
+        `<span class="meta">${dateLabel}</span>` +
       `</div>` +
       `<span class="shelf-kind kind-pill">${esc(w.kind === 'series' ? 'Series' : 'Film')}</span>` +
     `</li>`
