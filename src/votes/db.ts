@@ -13,6 +13,7 @@ export interface MostWantedRow {
   title: string;
   authors: string;
   coverUrl: string | null;
+  slug: string | null;
   votes: number;
   userVoted: boolean;
 }
@@ -21,6 +22,8 @@ export interface ShelfEntry {
   targetType: ShelfTargetType;
   targetId: number;
   title: string;
+  /** SEO slug for the target (migration 0020); null until backfilled. */
+  slug: string | null;
   shelf: ShelfName;
 }
 
@@ -88,6 +91,7 @@ export interface MostWantedRawRow {
   title: string;
   authors: string;
   coverUrl: string | null;
+  slug: string | null;
   votes: number;
   userVoted: number | null;
 }
@@ -105,7 +109,7 @@ export function mostWantedStatements(
     db
       .prepare(
         `SELECT b.id AS bookId, b.title AS title, b.authors AS authors,
-                b.cover_url AS coverUrl, COUNT(v.id) AS votes,
+                b.cover_url AS coverUrl, b.slug AS slug, COUNT(v.id) AS votes,
                 MAX(CASE WHEN v.user_id = ?1 THEN 1 ELSE 0 END) AS userVoted
            FROM books b
            LEFT JOIN votes v ON v.book_id = b.id
@@ -126,6 +130,7 @@ export function mostWantedFromRows(results: MostWantedRawRow[]): MostWantedRow[]
     title: r.title,
     authors: r.authors,
     coverUrl: r.coverUrl,
+    slug: r.slug,
     votes: r.votes,
     userVoted: r.userVoted === 1,
   }));
@@ -223,30 +228,30 @@ export async function getShelf(
   return row?.shelf ?? null;
 }
 
-async function resolveShelfTitle(
+async function resolveShelfTarget(
   db: D1Database,
   targetType: ShelfTargetType,
   targetId: number,
-): Promise<string | null> {
+): Promise<{ title: string; slug: string | null } | null> {
   if (targetType === 'book') {
     const row = await db
-      .prepare('SELECT title FROM books WHERE id = ?1')
+      .prepare('SELECT title, slug FROM books WHERE id = ?1')
       .bind(targetId)
-      .first<{ title: string }>();
-    return row?.title ?? null;
+      .first<{ title: string; slug: string | null }>();
+    return row ? { title: row.title, slug: row.slug } : null;
   }
   // Adaptation: "Book title → Screen title".
   const row = await db
     .prepare(
-      `SELECT b.title AS book_title, s.title AS screen_title
+      `SELECT a.slug, b.title AS book_title, s.title AS screen_title
          FROM adaptations a
          JOIN books b ON b.id = a.book_id
          JOIN screen_works s ON s.id = a.screen_work_id
         WHERE a.id = ?1`,
     )
     .bind(targetId)
-    .first<{ book_title: string; screen_title: string }>();
-  return row ? `${row.book_title} → ${row.screen_title}` : null;
+    .first<{ slug: string | null; book_title: string; screen_title: string }>();
+  return row ? { title: `${row.book_title} → ${row.screen_title}`, slug: row.slug } : null;
 }
 
 /** The user's shelf entries with human-readable titles, newest first. */
@@ -263,9 +268,15 @@ export async function listShelves(db: D1Database, userId: number): Promise<Shelf
 
   const entries: ShelfEntry[] = [];
   for (const r of results ?? []) {
-    const title = await resolveShelfTitle(db, r.targetType, r.targetId);
-    if (title === null) continue; // target was deleted — skip stale rows
-    entries.push({ targetType: r.targetType, targetId: r.targetId, title, shelf: r.shelf });
+    const target = await resolveShelfTarget(db, r.targetType, r.targetId);
+    if (target === null) continue; // target was deleted — skip stale rows
+    entries.push({
+      targetType: r.targetType,
+      targetId: r.targetId,
+      title: target.title,
+      slug: target.slug,
+      shelf: r.shelf,
+    });
   }
   return entries;
 }

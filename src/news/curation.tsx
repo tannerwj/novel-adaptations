@@ -301,6 +301,7 @@ export interface ReleaseDateRow {
   kind: string;
   release_date: string | null;
   tmdb_id: number | null;
+  slug: string | null;
 }
 
 /**
@@ -310,7 +311,7 @@ export interface ReleaseDateRow {
 export async function listScreenWorksForAdmin(db: D1Database): Promise<ReleaseDateRow[]> {
   const { results } = await db
     .prepare(
-      `SELECT id, title, kind, release_date, tmdb_id
+      `SELECT id, title, kind, release_date, tmdb_id, slug
          FROM screen_works
         ORDER BY (release_date IS NULL) DESC, release_date ASC, title ASC`,
     )
@@ -430,7 +431,7 @@ function ScreenWorksAdminPage({
             {works.map((w) => (
               <tr key={w.id}>
                 <td>
-                  <a href={`/watch/${w.id}`}>{w.title}</a>
+                  <a href={`/watch/${w.slug ?? w.id}`}>{w.title}</a>
                 </td>
                 <td>{w.kind === 'series' ? 'Series' : 'Film'}</td>
                 <td class="meta">{w.tmdb_id ?? '—'}</td>

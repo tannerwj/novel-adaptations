@@ -1,12 +1,17 @@
 // src/search.tsx — Track 3: site-wide search.
 //
 //   GET /search?q= — one page, results grouped by type:
-//     • Books — title + authors → /books/:id
-//     • Films & series — poster thumbnail, title, kind pill → /watch/:id
-//     • Adaptation stories — book → screen title, status badge → /adaptations/:id
+//     • Books — title + authors → /books/:slug
+//     • Films & series — poster thumbnail, title, kind pill → /watch/:slug
+//     • Adaptation stories — book → screen title, status badge → /adaptations/:slug
 //
 // Implementation: parameterized LIKE queries (case-insensitive substring
 // match on title/authors), one query per result group, LIMIT 12 each.
+// Results are ranked in SQL by a CASE-based relevance tier — exact title
+// match, then title-prefix, then word-start, then substring, with exact and
+// prefix author matches ranked well too; titles starting with "The " are
+// normalized for exact/prefix comparisons. The WHERE clause only admits
+// genuine matches, so ranking reorders but never invents results.
 // FTS5 was deliberately NOT used — decision documented in TRACK3_NOTES.md.
 //
 // XSS: Hono JSX auto-escapes every interpolated value; the query is passed
@@ -24,10 +29,29 @@ const POPULAR_LIMIT = 8;
 
 // --- SQL (track-local; src/db.ts is owned by other tracks — DO NOT EDIT it) ---
 
+// Relevance ranking (best-practice tiers, computed in SQL so D1 returns
+// rows already ordered — one round trip per group, same as before):
+//
+//   rank 0 — exact title match
+//   rank 1 — exact title match ignoring a leading "The "
+//   rank 2 — title starts with the query
+//   rank 3 — title starts with the query after a leading "The "
+//   rank 4 — query starts a word inside the title ("… <q>…")
+//   rank 5 — exact author match (books/adaptations)
+//   rank 6 — author starts with the query
+//   rank 7 — plain substring match (the WHERE clause below)
+//
+// Ties within a rank break alphabetically (books/works) or by recency
+// (adaptation stories). The WHERE clause still only admits rows that
+// actually contain the query — ranking reorders, never invents.
+
 export interface BookHit {
   id: number;
   title: string;
   authors: string;
+  slug: string | null;
+  /** 0 = exact title match … 7 = substring; lower is a better match. */
+  rank?: number;
 }
 
 export interface ScreenWorkHit {
@@ -35,15 +59,23 @@ export interface ScreenWorkHit {
   title: string;
   kind: 'film' | 'series';
   poster_url: string | null;
+  slug: string | null;
+  /** 0 = exact title match … 5 = substring; lower is a better match. */
+  rank?: number;
 }
 
 export interface AdaptationHit {
   id: number;
   status: string;
+  slug: string | null;
   book_title: string;
   book_authors: string;
+  book_slug: string | null;
   screen_title: string;
   screen_kind: 'film' | 'series';
+  screen_slug: string | null;
+  /** 0 = exact title match … 7 = substring; lower is a better match. */
+  rank?: number;
 }
 
 export interface PopularBook {
@@ -51,12 +83,28 @@ export interface PopularBook {
   title: string;
   authors: string;
   cover_url: string | null;
+  slug: string | null;
   votes: number;
+}
+
+/** Escape LIKE wildcards in user input. */
+function escapedLike(q: string): string {
+  return q.replace(/[\\%_]/g, (ch) => `\\${ch}`);
 }
 
 /** Escape LIKE wildcards in user input, then wrap for a substring match. */
 function likePattern(q: string): string {
-  return `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+  return `%${escapedLike(q)}%`;
+}
+
+/** `q%` — title/authors start with the query. */
+function prefixPattern(q: string): string {
+  return `${escapedLike(q)}%`;
+}
+
+/** `% q%` — the query starts a word somewhere inside the title. */
+function wordPattern(q: string): string {
+  return `% ${escapedLike(q)}%`;
 }
 
 export async function searchBooks(db: D1Database, q: string): Promise<BookHit[]> {
@@ -79,44 +127,97 @@ export async function searchAdaptations(db: D1Database, q: string): Promise<Adap
  * adaptations] order, so callers can run them in one D1 round trip via
  * db.batch() (see src/api/v1.ts). SQL identical to the single-shot helpers
  * above — they delegate to this.
+ *
+ * Binds per statement: ?1 = trimmed query (exact matches), ?2 = prefix
+ * pattern (`q%`), ?3 = word-start pattern (`% q%`), ?4 = substring pattern
+ * (`%q%`), ?5 = limit. The WHERE clause admits only genuine substring
+ * matches; the CASE rank only orders them.
  */
 export function searchStatements(
   db: D1Database,
   q: string,
 ): [D1PreparedStatement, D1PreparedStatement, D1PreparedStatement] {
-  const pattern = likePattern(q);
+  const query = q.trim().slice(0, QUERY_MAX_LEN);
+  const exact = query;
+  const prefix = prefixPattern(query);
+  const word = wordPattern(query);
+  const substr = likePattern(query);
   return [
     db
       .prepare(
-        `SELECT id, title, authors FROM books
-          WHERE title LIKE ?1 ESCAPE '\\' OR authors LIKE ?2 ESCAPE '\\'
-          ORDER BY title ASC
-          LIMIT ?3`,
+        `SELECT id, title, authors, slug,
+                CASE
+                  WHEN title = ?1 COLLATE NOCASE THEN 0
+                  WHEN stripped = ?1 COLLATE NOCASE THEN 1
+                  WHEN title LIKE ?2 ESCAPE '\\' THEN 2
+                  WHEN stripped LIKE ?2 ESCAPE '\\' THEN 3
+                  WHEN title LIKE ?3 ESCAPE '\\' THEN 4
+                  WHEN authors = ?1 COLLATE NOCASE THEN 5
+                  WHEN authors LIKE ?2 ESCAPE '\\' THEN 6
+                  ELSE 7
+                END AS rank
+           FROM (
+             SELECT id, title, authors, slug,
+                    CASE WHEN title LIKE 'The %' THEN SUBSTR(title, 5) ELSE title END AS stripped
+               FROM books
+              WHERE title LIKE ?4 ESCAPE '\\' OR authors LIKE ?4 ESCAPE '\\'
+           )
+          ORDER BY rank ASC, title ASC
+          LIMIT ?5`,
       )
-      .bind(pattern, pattern, RESULT_LIMIT),
+      .bind(exact, prefix, word, substr, RESULT_LIMIT),
     db
       .prepare(
-        `SELECT id, title, kind, poster_url FROM screen_works
-          WHERE title LIKE ?1 ESCAPE '\\'
-          ORDER BY title ASC
-          LIMIT ?2`,
+        `SELECT id, title, kind, poster_url, slug,
+                CASE
+                  WHEN title = ?1 COLLATE NOCASE THEN 0
+                  WHEN stripped = ?1 COLLATE NOCASE THEN 1
+                  WHEN title LIKE ?2 ESCAPE '\\' THEN 2
+                  WHEN stripped LIKE ?2 ESCAPE '\\' THEN 3
+                  WHEN title LIKE ?3 ESCAPE '\\' THEN 4
+                  ELSE 5
+                END AS rank
+           FROM (
+             SELECT id, title, kind, poster_url, slug,
+                    CASE WHEN title LIKE 'The %' THEN SUBSTR(title, 5) ELSE title END AS stripped
+               FROM screen_works
+              WHERE title LIKE ?4 ESCAPE '\\'
+           )
+          ORDER BY rank ASC, title ASC
+          LIMIT ?5`,
       )
-      .bind(pattern, RESULT_LIMIT),
+      .bind(exact, prefix, word, substr, RESULT_LIMIT),
     db
       .prepare(
-        `SELECT a.id, a.status,
-                b.title AS book_title, b.authors AS book_authors,
-                s.title AS screen_title, s.kind AS screen_kind
-           FROM adaptations a
-           JOIN books b ON b.id = a.book_id
-           JOIN screen_works s ON s.id = a.screen_work_id
-          WHERE b.title LIKE ?1 ESCAPE '\\'
-             OR b.authors LIKE ?2 ESCAPE '\\'
-             OR s.title LIKE ?3 ESCAPE '\\'
-          ORDER BY a.id DESC
-          LIMIT ?4`,
+        `SELECT id, status, slug, book_title, book_authors, book_slug,
+                screen_title, screen_kind, screen_slug,
+                CASE
+                  WHEN book_title = ?1 COLLATE NOCASE OR screen_title = ?1 COLLATE NOCASE THEN 0
+                  WHEN book_stripped = ?1 COLLATE NOCASE OR screen_stripped = ?1 COLLATE NOCASE THEN 1
+                  WHEN book_title LIKE ?2 ESCAPE '\\' OR screen_title LIKE ?2 ESCAPE '\\' THEN 2
+                  WHEN book_stripped LIKE ?2 ESCAPE '\\' OR screen_stripped LIKE ?2 ESCAPE '\\' THEN 3
+                  WHEN book_title LIKE ?3 ESCAPE '\\' OR screen_title LIKE ?3 ESCAPE '\\' THEN 4
+                  WHEN book_authors = ?1 COLLATE NOCASE THEN 5
+                  WHEN book_authors LIKE ?2 ESCAPE '\\' THEN 6
+                  ELSE 7
+                END AS rank
+           FROM (
+             SELECT a.id, a.status, a.slug AS slug,
+                    b.title AS book_title, b.authors AS book_authors, b.slug AS book_slug,
+                    s.title AS screen_title, s.kind AS screen_kind, s.slug AS screen_slug,
+                    CASE WHEN b.title LIKE 'The %' THEN SUBSTR(b.title, 5) ELSE b.title END AS book_stripped,
+                    CASE WHEN s.title LIKE 'The %' THEN SUBSTR(s.title, 5) ELSE s.title END AS screen_stripped
+               FROM adaptations a
+               JOIN books b ON b.id = a.book_id
+               JOIN screen_works s ON s.id = a.screen_work_id
+              WHERE b.title LIKE ?4 ESCAPE '\\'
+                 OR b.authors LIKE ?4 ESCAPE '\\'
+                 OR s.title LIKE ?4 ESCAPE '\\'
+           )
+          ORDER BY rank ASC, id DESC
+          LIMIT ?5`,
       )
-      .bind(pattern, pattern, pattern, RESULT_LIMIT),
+      .bind(exact, prefix, word, substr, RESULT_LIMIT),
   ];
 }
 
@@ -130,7 +231,7 @@ export function searchStatements(
 export async function getPopularBooks(db: D1Database): Promise<PopularBook[]> {
   const { results } = await db
     .prepare(
-      `SELECT b.id, b.title, b.authors, b.cover_url,
+      `SELECT b.id, b.title, b.authors, b.cover_url, b.slug,
               COUNT(DISTINCT v.id) AS votes
          FROM books b
          LEFT JOIN votes v ON v.book_id = b.id
@@ -210,7 +311,7 @@ function PopularBooks({ books, heading }: { books: PopularBook[]; heading?: stri
             <BookThumb title={b.title} coverUrl={b.cover_url} />
             <div class="rank-info">
               <p class="rank-title">
-                <a href={`/books/${b.id}`}>{b.title}</a>
+                <a href={`/books/${b.slug ?? b.id}`}>{b.title}</a>
               </p>
               <p class="rank-authors">{b.authors}</p>
             </div>
@@ -284,7 +385,7 @@ function SearchPage({
               <ul class="search-result-list">
                 {books.map((b) => (
                   <li key={b.id}>
-                    <a href={`/books/${b.id}`}>{b.title}</a>
+                    <a href={`/books/${b.slug ?? b.id}`}>{b.title}</a>
                     <span class="sub"> by {b.authors}</span>
                   </li>
                 ))}
@@ -302,7 +403,7 @@ function SearchPage({
                   <article class="poster-card" key={w.id}>
                     <a
                       class="poster-link"
-                      href={`/watch/${w.id}`}
+                      href={`/watch/${w.slug ?? w.id}`}
                       aria-label={`${w.title} — ${kindLabel(w.kind)}`}
                     >
                       <PosterArt
@@ -313,7 +414,7 @@ function SearchPage({
                     </a>
                     <div class="card-body">
                       <h3 class="card-title">
-                        <a href={`/watch/${w.id}`}>{w.title}</a>
+                        <a href={`/watch/${w.slug ?? w.id}`}>{w.title}</a>
                       </h3>
                       <div class="card-badges">
                         <span class="kind-pill">{kindLabel(w.kind)}</span>
@@ -333,7 +434,7 @@ function SearchPage({
               <ul class="search-result-list">
                 {stories.map((s) => (
                   <li key={s.id} class="adapt-story">
-                    <a href={`/adaptations/${s.id}`}>
+                    <a href={`/adaptations/${s.slug ?? s.id}`}>
                       {s.book_title} → {s.screen_title}
                     </a>
                     <span class="sub">

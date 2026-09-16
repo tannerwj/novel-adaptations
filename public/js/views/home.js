@@ -1,85 +1,141 @@
 // public/js/views/home.js — Home, Calendar, Most Wanted, Search.
 
 import { esc, debounce, posterArt } from '../utils.js';
+import { bookUrl, watchUrl, adaptationUrl } from '../links.js';
 import { api, errMsg } from '../api.js';
-import { replaceQuery } from '../router.js';
+import { navigate, replaceQuery } from '../router.js';
 import { adaptationCard, statusBadge, kindPill, voteButton, wireUserControls } from '../components.js';
 
 // ---------------------------------------------------------------------------
 // Home
 // ---------------------------------------------------------------------------
 
-export async function homeView() {
-  const r = await api('/api/v1/home', { loginRedirect: false });
-  if (!r.ok) throw new Error(errMsg(r));
-  // /api/v1/home returns a paged list ({data, page, per_page, total}); the
-  // grid starts with page 1 and a "Load more" button pages through the rest
-  // via the same endpoint — instant, no reload, router-safe.
-  const list = r.data.adaptations;
-  const items = list.data;
-  const total = list.total;
-  const perPage = list.per_page;
-  const remaining = total - items.length;
-  return {
-    title: 'Browse',
-    html:
-      `<p class="kicker">The adaptation tracker</p>` +
-      `<h1 class="display-title">Every book's journey to the screen.</h1>` +
-      `<p class="lede">Follow novels as they're optioned, filmed, and released as movies and series.</p>` +
-      (items.length === 0
-        ? `<p class="empty">No adaptations tracked yet. Check back soon.</p>`
-        : `<div class="poster-grid" data-home-grid>${items.map((a, i) => adaptationCard(a, { eager: i < 2 })).join('')}</div>` +
-          (remaining > 0
-            ? `<div class="load-more-wrap"><button type="button" class="btn" data-load-more ` +
-              `data-next-page="${list.page + 1}" data-per-page="${perPage}" data-total="${total}">` +
-              `Load more <span class="meta" data-remaining>(${remaining} of ${total} remaining)</span></button></div>`
-            : '')),
-    after(root) { wireUserControls(root); wireLoadMore(root); },
-  };
+/** Rail / grid / radar sizes: small fixed limits, so no endpoint ever ships
+ * the catalog to the client. Pagination still happens in SQL on every call. */
+const FEATURED_RAIL_SIZE = 12;
+const RECENT_GRID_SIZE = 8;
+const RADAR_LIMIT = 6;
+
+function chip(href, label) {
+  return `<a class="chip" href="${href}">${esc(label)}</a>`;
 }
 
-/**
- * "Load more" for the home grid: appends the next /api/v1/home page to the
- * grid in place. Appended cards are lazy (only the first two cards of the
- * initial page are eager), so below-fold images never regress LCP.
- */
-function wireLoadMore(root) {
-  const btn = root.querySelector('[data-load-more]');
-  if (!btn) return;
-  btn.addEventListener('click', async () => {
-    if (btn.disabled) return;
-    btn.disabled = true;
-    const label = btn.innerHTML;
-    btn.textContent = 'Loading…';
-    const nextPage = Number(btn.dataset.nextPage);
-    const perPage = Number(btn.dataset.perPage);
-    const total = Number(btn.dataset.total);
-    const pr = await api(`/api/v1/home?page=${nextPage}&per_page=${perPage}`, { loginRedirect: false });
-    if (!pr.ok) {
-      btn.disabled = false;
-      btn.innerHTML = label;
-      btn.insertAdjacentHTML('afterend', `<p class="inline-error" role="alert">${esc(errMsg(pr))}</p>`);
-      return;
-    }
-    const page = pr.data.adaptations;
-    const grid = root.querySelector('[data-home-grid]');
-    if (grid) {
-      // Below-fold cards stay lazy — same as the initial page's tail.
-      grid.insertAdjacentHTML('beforeend', page.data.map((a) => adaptationCard(a)).join(''));
-      wireUserControls(grid);
-    }
-    const shown = grid ? grid.querySelectorAll('.poster-card').length : 0;
-    const left = total - shown;
-    const err = btn.parentElement.querySelector('.inline-error');
-    if (err) err.remove();
-    if (left > 0 && page.data.length > 0) {
-      btn.dataset.nextPage = String(nextPage + 1);
-      btn.disabled = false;
-      btn.innerHTML = `Load more <span class="meta" data-remaining>(${left} of ${total} remaining)</span>`;
-    } else {
-      btn.closest('.load-more-wrap')?.remove();
-    }
+function sectionHead(title, sub, viewAllHref, viewAllLabel) {
+  return (
+    `<div class="section-head">` +
+      `<div>` +
+        `<h2 class="home-section-title">${esc(title)}</h2>` +
+        (sub ? `<p class="section-sub">${sub}</p>` : '') +
+      `</div>` +
+      (viewAllHref
+        ? `<a class="view-all" href="${viewAllHref}">${esc(viewAllLabel)}</a>`
+        : '') +
+    `</div>`
+  );
+}
+
+/** The hero search form navigates to the search page client-side — instant,
+ * no full-page reload (router intercepts pushState + render). */
+function wireHeroSearch(root) {
+  const form = root.querySelector('[data-hero-search]');
+  if (!form) return;
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const q = new FormData(form).get('q');
+    const query = typeof q === 'string' ? q.trim().slice(0, 100) : '';
+    navigate(query ? `/search?q=${encodeURIComponent(query)}` : '/search');
   });
+}
+
+export async function homeView() {
+  // Three small, SQL-paginated requests in parallel: featured rail (fixed
+  // LIMIT 12), newest 8, and the calendar buckets (already bucketed in SQL).
+  // The unfiltered catalog total rides on the adaptations page response —
+  // no extra call, and no endpoint ships more than one page of rows.
+  const [featuredRes, recentRes, calendarRes] = await Promise.all([
+    api(`/api/v1/home/featured?limit=${FEATURED_RAIL_SIZE}`, { loginRedirect: false }),
+    api(`/api/v1/adaptations?sort=newest&per_page=${RECENT_GRID_SIZE}`, { loginRedirect: false }),
+    api('/api/v1/calendar', { loginRedirect: false }),
+  ]);
+  const failed = [featuredRes, recentRes, calendarRes].some((r) => !r.ok);
+  const featured = featuredRes.ok ? (featuredRes.data.data ?? []) : [];
+  const recent = recentRes.ok ? (recentRes.data.data ?? []) : [];
+  const total = recentRes.ok ? Number(recentRes.data.total ?? 0) : 0;
+  const cal = calendarRes.ok ? calendarRes.data : null;
+  const today = cal ? cal.today : null;
+  const coming = cal ? (cal.coming_soon ?? []).slice(0, RADAR_LIMIT) : [];
+  const landed = cal ? (cal.recently_released ?? []).slice(0, RADAR_LIMIT) : [];
+  const totalFmt = total.toLocaleString('en-US');
+
+  return {
+    title: 'Home',
+    html:
+      `<section class="home-hero">` +
+        `<p class="kicker">The adaptation tracker</p>` +
+        `<h1 class="display-title">From the page to the screen.</h1>` +
+        `<p class="lede">${total > 0 ? `${esc(totalFmt)} adaptations` : 'Adaptations'} tracked from rumor to release — search the catalog, see what's coming, and vote for the books you want adapted next.</p>` +
+        `<form class="search-form home-search" data-hero-search role="search" aria-label="Search adaptations">` +
+          `<input type="search" name="q" placeholder="Search books, movies, shows…" aria-label="Search books, movies, and shows" maxlength="100" autocomplete="off">` +
+          `<button class="btn btn-primary" type="submit">Search</button>` +
+        `</form>` +
+        `<nav class="chip-row" aria-label="Browse">` +
+          chip('/search?kind=film', 'Films') +
+          chip('/search?kind=series', 'Series') +
+          chip('/search?status=released', 'Released') +
+          chip('/search?status=upcoming', 'Upcoming') +
+          chip('/most-wanted', 'Most wanted') +
+          chip('/calendar', 'Release calendar') +
+        `</nav>` +
+      `</section>` +
+      (featured.length > 0
+        ? `<section aria-label="Featured adaptations">` +
+            sectionHead(
+              'Featured',
+              'The adaptations readers vote for most — ranked by community votes.',
+            ) +
+            `<div class="rail">${featured.map((a, i) => adaptationCard(a, { eager: i < 2 })).join('')}</div>` +
+          `</section>`
+        : '') +
+      (recent.length > 0
+        ? `<section aria-label="Recently added">` +
+            sectionHead(
+              'Recently added',
+              'The newest additions to the catalog.',
+              '/search',
+              `Browse all ${esc(totalFmt)} →`,
+            ) +
+            `<div class="poster-grid">${recent.map((a) => adaptationCard(a)).join('')}</div>` +
+          `</section>`
+        : '') +
+      `<section aria-label="Release radar">` +
+        sectionHead('Release radar', 'What just landed and what is on its way.', '/calendar', 'Full calendar →') +
+        `<div class="two-col">` +
+          `<div>` +
+            `<h3 class="cal-month">Coming soon</h3>` +
+            (coming.length > 0
+              ? `<ul class="shelf-list">${coming.map((w) => calendarItem(w, today)).join('')}</ul>`
+              : `<p class="empty">No dated releases on the horizon yet.</p>`) +
+          `</div>` +
+          `<div>` +
+            `<h3 class="cal-month">Recently released</h3>` +
+            (landed.length > 0
+              ? `<ul class="shelf-list">${landed.map((w) => calendarItem(w, today)).join('')}</ul>`
+              : `<p class="empty">Nothing landed in the last 120 days.</p>`) +
+          `</div>` +
+        `</div>` +
+      `</section>` +
+      (total > 0
+        ? `<section class="catalog-cta" aria-label="Browse the full catalog">` +
+            `<h2 class="home-section-title">The whole shelf, one search away</h2>` +
+            `<p class="section-sub">${esc(totalFmt)} adaptations — every film, series, and work in progress. Start typing above, or browse them all.</p>` +
+            `<p><a class="btn btn-primary" href="/search">Browse all ${esc(totalFmt)} adaptations</a></p>` +
+          `</section>`
+        : '') +
+      (failed
+        ? `<p class="inline-error" role="alert">Some sections couldn't load. Check your connection and refresh.</p>`
+        : ''),
+    after(root) { wireUserControls(root); wireHeroSearch(root); },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -119,11 +175,11 @@ function calendarItem(w, today) {
   const dateLabel = !d ? 'TBA' : d.length === 4 ? displayDate(d) : `${esc(formatDate(d))} · ${esc(relativeLabel(d, today))}`;
   return (
     `<li>` +
-      `<a class="thumb-sm" href="/watch/${w.id}" tabindex="-1" aria-hidden="true" style="width:44px;flex-shrink:0;display:block">` +
+      `<a class="thumb-sm" href="${watchUrl(w)}" tabindex="-1" aria-hidden="true" style="width:44px;flex-shrink:0;display:block">` +
         posterArt(w.poster_url, w.title) +
       `</a>` +
       `<div style="min-width:0">` +
-        `<a href="/watch/${w.id}" style="color:var(--text);font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.title)}</a>` +
+        `<a href="${watchUrl(w)}" style="color:var(--text);font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.title)}</a>` +
         `<span class="meta">${dateLabel}</span>` +
       `</div>` +
       `<span class="shelf-kind kind-pill">${esc(w.kind === 'series' ? 'Series' : 'Film')}</span>` +
@@ -236,7 +292,7 @@ function rankRow(item, i) {
         (b.cover_url && b.cover_url.trim() ? `<img src="${esc(b.cover_url.trim())}" alt="" loading="lazy" onerror="this.remove()">` : '') +
       `</div>` +
       `<div class="rank-info">` +
-        `<p class="rank-title"><a href="/books/${b.book_id}">${esc(b.title)}</a></p>` +
+        `<p class="rank-title"><a href="${bookUrl(b)}">${esc(b.title)}</a></p>` +
         `<p class="rank-authors">${esc(b.authors)}</p>` +
       `</div>` +
       `<div class="rank-votes">` +
@@ -266,7 +322,54 @@ export async function mostWantedView() {
 
 // ---------------------------------------------------------------------------
 // Search (live, no reload)
+//
+// Query params honored: ?q= (initial query), ?kind=film|series (filters
+// films & series results), ?status=<adaptation status> (filters adaptation
+// stories, and the browse catalog server-side). Empty query = browse the
+// full adaptation catalog, paged through the SQL-paginated
+// /api/v1/adaptations endpoint (24 rows at a time — never the whole
+// catalog at once).
 // ---------------------------------------------------------------------------
+
+const SEARCH_MAX = 100;
+const SEARCH_DEBOUNCE_MS = 250;
+const BROWSE_PER_PAGE = 24;
+
+const KIND_FILTERS = [
+  { value: '', label: 'All' },
+  { value: 'film', label: 'Films' },
+  { value: 'series', label: 'Series' },
+];
+const STATUS_FILTERS = [
+  { value: '', label: 'Any status' },
+  { value: 'upcoming', label: 'Upcoming' },
+  { value: 'rumored', label: 'Rumored' },
+  { value: 'optioned', label: 'Optioned' },
+  { value: 'in_development', label: 'In development' },
+  { value: 'filming', label: 'Filming' },
+  { value: 'post_production', label: 'Post-production' },
+  { value: 'released', label: 'Released' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+const STATUS_LABELS = Object.fromEntries(STATUS_FILTERS.map((o) => [o.value, o.label]));
+
+/**
+ * "Upcoming" is a virtual filter (the home page links /search?status=upcoming):
+ * everything still in the pipeline, i.e. not yet released or cancelled.
+ */
+const UPCOMING_STATUSES = ['rumored', 'optioned', 'in_development', 'filming', 'post_production'];
+function statusMatches(filter, status) {
+  if (!filter) return true;
+  if (filter === 'upcoming') return UPCOMING_STATUSES.includes(status);
+  return status === filter;
+}
+
+function validKind(v) {
+  return KIND_FILTERS.some((o) => o.value === v) ? v : '';
+}
+function validStatus(v) {
+  return STATUS_FILTERS.some((o) => o.value === v) ? v : '';
+}
 
 function bookThumb(title, coverUrl) {
   let h = 0;
@@ -290,7 +393,7 @@ function popularHtml(books, heading) {
         `<li class="rank-row">` +
           `<div class="rank-num" aria-label="Rank ${i + 1}">${i + 1}</div>` +
           bookThumb(b.title, b.cover_url) +
-          `<div class="rank-info"><p class="rank-title"><a href="/books/${b.id}">${esc(b.title)}</a></p><p class="rank-authors">${esc(b.authors)}</p></div>` +
+          `<div class="rank-info"><p class="rank-title"><a href="${bookUrl(b)}">${esc(b.title)}</a></p><p class="rank-authors">${esc(b.authors)}</p></div>` +
           `<div class="rank-votes"><div><div class="votes">${b.votes}</div><div class="votes-label">votes</div></div></div>` +
         `</li>`
       ).join('') +
@@ -299,24 +402,54 @@ function popularHtml(books, heading) {
   );
 }
 
-function resultsHtml(q, data) {
-  const books = data.books.data, works = data.screen_works.data, stories = data.adaptations.data;
-  const total = books.length + works.length + stories.length;
-  if (!q) {
-    return data.popular.length > 0
-      ? popularHtml(data.popular)
-      : `<p class="empty">No books tracked yet. Check back soon.</p>`;
-  }
-  if (total === 0) {
-    return `<p class="empty">No results for “${esc(q)}”. Try a different title or author spelling.</p>` +
-      popularHtml(data.popular, 'Popular right now');
-  }
+/** Split the search API payload into kind/status-filtered groups. Books have
+ *  no kind or status, so they always pass through. */
+function filterGroups(data, kind, status) {
+  return {
+    books: data.books?.data ?? [],
+    works: (data.screen_works?.data ?? []).filter((w) => !kind || w.kind === kind),
+    stories: (data.adaptations?.data ?? []).filter(
+      (s) => (!kind || s.screen_kind === kind) && statusMatches(status, s.status),
+    ),
+  };
+}
+
+/**
+ * "Suggest an adaptation" empty state. Links to /feedback with
+ * type=adaptation_tip (the "this book has an adaptation" flavor) and the
+ * query pre-filled as the subject — the feedback form reads both from the
+ * query string. The router intercepts the link, so there's no reload.
+ */
+function noResultsHtml(q, popular) {
+  const suggest = `/feedback?type=adaptation_tip&subject=${encodeURIComponent(q)}`;
+  return (
+    `<div class="empty-state">` +
+      `<p class="kicker">No matches</p>` +
+      `<h2>No results for “${esc(q)}”.</h2>` +
+      `<p>Try a shorter title, check the spelling, or search by the author’s last name.</p>` +
+      `<p><a class="btn btn-primary" href="${esc(suggest)}">Can’t find it? Suggest an adaptation</a></p>` +
+    `</div>` +
+    popularHtml(popular, 'Popular right now')
+  );
+}
+
+/**
+ * Grouped results with keyboard-navigable options: every result is
+ * role="option" inside the listbox, and the combobox tracks the active one
+ * via aria-activedescendant (wired in searchView's after()).
+ */
+function resultsHtml(groups) {
+  const { books, works, stories } = groups;
+  let n = 0;
+  const optAttrs = () => `role="option" id="search-option-${n++}" aria-selected="false" tabindex="-1"`;
   let html = '';
   if (books.length > 0) {
     html += `<section aria-label="Books" style="margin-bottom:2.5rem">` +
       `<h2 class="section-title">Books <span class="count">${books.length}</span></h2>` +
       `<ul class="search-result-list">` +
-      books.map((b) => `<li><a href="/books/${b.id}">${esc(b.title)}</a><span class="sub"> by ${esc(b.authors)}</span></li>`).join('') +
+      books.map((b) =>
+        `<li ${optAttrs()}><a href="${bookUrl(b)}">${esc(b.title)}</a><span class="sub"> by ${esc(b.authors)}</span></li>`
+      ).join('') +
       `</ul></section>`;
   }
   if (works.length > 0) {
@@ -324,11 +457,11 @@ function resultsHtml(q, data) {
       `<h2 class="section-title">Films &amp; series <span class="count">${works.length}</span></h2>` +
       `<div class="poster-grid">` +
       works.map((w) =>
-        `<article class="poster-card">` +
-          `<a class="poster-link" href="/watch/${w.id}" aria-label="${esc(w.title)} — ${w.kind === 'film' ? 'Film' : 'Series'}">` +
+        `<article class="poster-card" ${optAttrs()}>` +
+          `<a class="poster-link" href="${watchUrl(w)}" aria-label="${esc(w.title)} — ${w.kind === 'film' ? 'Film' : 'Series'}">` +
             posterArt(w.poster_url, w.title, w.kind === 'film' ? 'Film' : 'Series') +
           `</a>` +
-          `<div class="card-body"><h3 class="card-title"><a href="/watch/${w.id}">${esc(w.title)}</a></h3>` +
+          `<div class="card-body"><h3 class="card-title"><a href="${watchUrl(w)}">${esc(w.title)}</a></h3>` +
           `<div class="card-badges">${kindPill(w.kind)}</div></div>` +
         `</article>`
       ).join('') +
@@ -339,7 +472,7 @@ function resultsHtml(q, data) {
       `<h2 class="section-title">Adaptation stories <span class="count">${stories.length}</span></h2>` +
       `<ul class="search-result-list">` +
       stories.map((s) =>
-        `<li class="adapt-story"><a href="/adaptations/${s.id}">${esc(s.book_title)} → ${esc(s.screen_title)}</a>` +
+        `<li class="adapt-story" ${optAttrs()}><a href="${adaptationUrl(s)}">${esc(s.book_title)} → ${esc(s.screen_title)}</a>` +
         `<span class="sub">${s.screen_kind === 'film' ? 'Film' : 'Series'} · by ${esc(s.book_authors)}</span>` +
         statusBadge(s.status) + `</li>`
       ).join('') +
@@ -348,45 +481,313 @@ function resultsHtml(q, data) {
   return html;
 }
 
+function browseHeading(kind, status) {
+  const what = kind === 'film' ? 'films' : kind === 'series' ? 'series' : 'adaptations';
+  const scope = status ? STATUS_LABELS[status].toLowerCase() : 'all';
+  return `Browse ${scope} ${what}`;
+}
+
+function browseCountText(state) {
+  const b = state.browse;
+  const what = state.kind === 'film' ? 'films' : state.kind === 'series' ? 'series' : 'adaptations';
+  // The server total is only exact when every active filter went to the
+  // server; kind and the virtual "upcoming" filter are client-side, so the
+  // honest label there is "so far".
+  const exactTotal = !state.kind && (!state.status || state.status !== 'upcoming');
+  return exactTotal ? `Showing ${b.shown} of ${b.total} ${what}` : `Showing ${b.shown} ${what} so far`;
+}
+
+function filtersHtml(kind, status) {
+  return (
+    `<div class="search-filters" data-search-filters role="group" aria-label="Filter results">` +
+      `<span class="meta">Filter:</span>` +
+      KIND_FILTERS.map((o) =>
+        `<button type="button" class="filter-pill${o.value === kind ? ' active' : ''}" data-kind="${o.value}" aria-pressed="${o.value === kind}">${o.label}</button>`
+      ).join('') +
+      `<label class="filter-status">Status ` +
+        `<select data-status-filter aria-label="Filter by adaptation status">` +
+        STATUS_FILTERS.map((o) => `<option value="${o.value}"${o.value === status ? ' selected' : ''}>${o.label}</option>`).join('') +
+        `</select></label>` +
+    `</div>`
+  );
+}
+
 export async function searchView({ query }) {
-  const q = (query.q || '').trim().slice(0, 100);
-  const r = await api(`/api/v1/search?q=${encodeURIComponent(q)}&limit=12`, { loginRedirect: false });
-  if (!r.ok) throw new Error(errMsg(r));
+  const q = (query.q || '').trim().slice(0, SEARCH_MAX);
+  const state = {
+    q,
+    kind: validKind(query.kind),
+    status: validStatus(query.status),
+    seq: 0,
+    active: -1,
+    browse: null,
+  };
+
+  const headingFor = () =>
+    state.q
+      ? `Results for <span style="font-style:italic">“${esc(state.q)}”</span>`
+      : esc(browseHeading(state.kind, state.status));
+  const titleFor = () => (state.q ? `Results for “${state.q}”` : browseHeading(state.kind, state.status));
+  const pathFor = () => {
+    const p = new URLSearchParams();
+    if (state.q) p.set('q', state.q);
+    if (state.kind) p.set('kind', state.kind);
+    if (state.status) p.set('status', state.status);
+    const s = p.toString();
+    return s ? `/search?${s}` : '/search';
+  };
+
+  /**
+   * Fetch the next browse page(s) from the SQL-paginated adaptations
+   * endpoint — D1 ships BROWSE_PER_PAGE rows per request, never the whole
+   * catalog. With a kind filter (client-side), keep paging until the page
+   * yields at least one card, so "Load more" never appends an empty page.
+   */
+  const loadBrowsePage = async () => {
+    const b = state.browse;
+    let added = [];
+    let fetched = 0;
+    while (added.length === 0 && !b.exhausted && fetched < 8) {
+      const params = new URLSearchParams({ page: String(b.page + 1), per_page: String(BROWSE_PER_PAGE) });
+      // 'upcoming' is a virtual filter (pre-release pipeline) — it can't go
+      // to the server's single-status param, so it filters client-side below.
+      if (state.status && state.status !== 'upcoming') params.set('status', state.status);
+      const r = await api(`/api/v1/adaptations?${params}`, { loginRedirect: false });
+      if (!r.ok) throw new Error(errMsg(r));
+      b.page = r.data.page;
+      b.total = r.data.total;
+      const items = (r.data.data ?? []).filter(
+        (a) => (!state.kind || a.screen_kind === state.kind) && statusMatches(state.status, a.status),
+      );
+      added = added.concat(items);
+      fetched += 1;
+      if (b.page * r.data.per_page >= b.total || (r.data.data ?? []).length === 0) b.exhausted = true;
+    }
+    b.shown += added.length;
+    return added;
+  };
+
+  const browseShell = (cardsHtml) => {
+    const b = state.browse;
+    return (
+      (b.shown === 0
+        ? `<p class="empty">Nothing here matches those filters yet. Try widening them — or ` +
+          `<a href="/feedback?type=adaptation_tip">suggest an adaptation</a> we’re missing.</p>`
+        : `<div class="poster-grid" data-browse-grid>${cardsHtml}</div>`) +
+      `<p class="meta" data-browse-count>${esc(browseCountText(state))}</p>` +
+      (!b.exhausted && b.shown > 0
+        ? `<div class="load-more-wrap"><button type="button" class="btn" data-browse-more>Load more</button></div>`
+        : '')
+    );
+  };
+
+  let initialHtml;
+  if (q) {
+    const r = await api(`/api/v1/search?q=${encodeURIComponent(q)}&limit=12`, { loginRedirect: false });
+    if (!r.ok) throw new Error(errMsg(r));
+    const groups = filterGroups(r.data, state.kind, state.status);
+    const total = groups.books.length + groups.works.length + groups.stories.length;
+    initialHtml = total === 0 ? noResultsHtml(q, r.data.popular) : resultsHtml(groups);
+  } else {
+    state.browse = { page: 0, total: 0, shown: 0, exhausted: false };
+    const first = await loadBrowsePage();
+    initialHtml = browseShell(first.map((a) => adaptationCard(a)).join(''));
+  }
+
   return {
-    title: q ? `Results for “${q}”` : 'Search',
+    title: titleFor(),
     html:
       `<p class="kicker">Search</p>` +
-      `<h1 class="display-title">${q ? `Results for <span style="font-style:italic">“${esc(q)}”</span>` : 'Search Novel Adaptations'}</h1>` +
-      `<form class="search-form" data-search-form role="search" aria-label="Search adaptations">` +
-        `<input type="search" name="q" value="${esc(q)}" placeholder="Search books, movies, shows…" aria-label="Search books, movies, and shows" maxlength="100">` +
+      `<h1 class="display-title" data-search-heading>${headingFor()}</h1>` +
+      `<form class="search-form" data-search-form role="search" aria-label="Site search">` +
+        `<input type="search" name="q" value="${esc(q)}" placeholder="Search books, movies, shows…" ` +
+          `aria-label="Search books, movies, and shows" maxlength="${SEARCH_MAX}" ` +
+          `role="combobox" aria-expanded="false" aria-controls="search-results" aria-autocomplete="list">` +
         `<button class="btn btn-primary" type="submit">Search</button>` +
       `</form>` +
-      `<div data-search-results aria-live="polite">${resultsHtml(q, r.data)}</div>`,
+      filtersHtml(state.kind, state.status) +
+      `<div data-search-results id="search-results" aria-live="polite">${initialHtml}</div>`,
     after(root) {
       const form = root.querySelector('[data-search-form]');
       const input = form.querySelector('input[name="q"]');
       const slot = root.querySelector('[data-search-results]');
-      let seq = 0;
-      const run = async (qq) => {
-        const my = ++seq;
-        const res = await api(`/api/v1/search?q=${encodeURIComponent(qq)}&limit=12`, { loginRedirect: false });
-        if (my !== seq || !res.ok) return;
-        slot.innerHTML = resultsHtml(qq, res.data);
-        wireUserControls(slot);
-        document.title = `${qq ? `Results for “${qq}”` : 'Search'} — Novel Adaptations`;
+      const heading = root.querySelector('[data-search-heading]');
+
+      const options = () => Array.from(slot.querySelectorAll('[role="option"]'));
+
+      const setActive = (i) => {
+        const opts = options();
+        opts.forEach((o) => o.setAttribute('aria-selected', 'false'));
+        state.active = i;
+        if (i >= 0 && opts[i]) {
+          opts[i].setAttribute('aria-selected', 'true');
+          input.setAttribute('aria-activedescendant', opts[i].id);
+          opts[i].scrollIntoView({ block: 'nearest' });
+        } else {
+          input.removeAttribute('aria-activedescendant');
+        }
       };
-      const debounced = debounce(run, 300);
-      input.addEventListener('input', () => {
-        const qq = input.value.trim().slice(0, 100);
-        replaceQuery(qq ? '/search?q=' + encodeURIComponent(qq) : '/search');
-        debounced(qq);
-      });
+
+      /** Keep the combobox/listbox ARIA in sync with what's rendered. */
+      const syncA11y = () => {
+        const has = options().length > 0;
+        input.setAttribute('aria-expanded', has ? 'true' : 'false');
+        if (has) slot.setAttribute('role', 'listbox');
+        else slot.removeAttribute('role');
+      };
+
+      const refreshChrome = () => {
+        replaceQuery(pathFor());
+        if (heading) heading.innerHTML = headingFor();
+        document.title = `${titleFor()} — Novel Adaptations`;
+      };
+
+      const renderSearchResults = async (qq) => {
+        const my = ++state.seq;
+        const res = await api(`/api/v1/search?q=${encodeURIComponent(qq)}&limit=12`, { loginRedirect: false });
+        if (my !== state.seq || !res.ok) return;
+        const groups = filterGroups(res.data, state.kind, state.status);
+        const total = groups.books.length + groups.works.length + groups.stories.length;
+        slot.innerHTML = total === 0 ? noResultsHtml(qq, res.data.popular) : resultsHtml(groups);
+        setActive(-1);
+        syncA11y();
+        wireUserControls(slot);
+      };
+
+      const renderBrowse = async (fresh) => {
+        const my = ++state.seq;
+        try {
+          const added = await loadBrowsePage();
+          if (my !== state.seq) return;
+          const cards = added.map((a) => adaptationCard(a)).join('');
+          if (fresh) {
+            slot.innerHTML = browseShell(cards);
+          } else {
+            const grid = slot.querySelector('[data-browse-grid]');
+            if (grid && cards) {
+              grid.insertAdjacentHTML('beforeend', cards);
+              wireUserControls(grid);
+            }
+            const countEl = slot.querySelector('[data-browse-count]');
+            if (countEl) countEl.textContent = browseCountText(state);
+            if (state.browse.exhausted) slot.querySelector('[data-browse-more]')?.closest('.load-more-wrap')?.remove();
+          }
+          syncA11y();
+        } catch (e) {
+          if (my === state.seq) slot.innerHTML = `<p class="inline-error" role="alert">${esc(errMsg(e))}</p>`;
+        }
+      };
+
+      /** Re-run after the query or filters change: no reload, URL updated. */
+      const rerun = () => {
+        refreshChrome();
+        setActive(-1);
+        if (state.q) {
+          state.browse = null;
+          renderSearchResults(state.q);
+        } else {
+          state.browse = { page: 0, total: 0, shown: 0, exhausted: false };
+          renderBrowse(true);
+        }
+      };
+
+      const debounced = debounce(() => {
+        const qq = input.value.trim().slice(0, SEARCH_MAX);
+        if (qq === state.q) return;
+        state.q = qq;
+        rerun();
+      }, SEARCH_DEBOUNCE_MS);
+
+      input.addEventListener('input', debounced);
       form.addEventListener('submit', (e) => {
         e.preventDefault();
-        const qq = input.value.trim().slice(0, 100);
-        replaceQuery(qq ? '/search?q=' + encodeURIComponent(qq) : '/search');
-        run(qq);
+        const qq = input.value.trim().slice(0, SEARCH_MAX);
+        if (qq === state.q && state.q) return;
+        state.q = qq;
+        rerun();
       });
+
+      // Keyboard: arrows move through results, Enter opens, Escape clears.
+      input.addEventListener('keydown', (e) => {
+        const opts = options();
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          if (opts.length === 0) return;
+          e.preventDefault();
+          const dir = e.key === 'ArrowDown' ? 1 : -1;
+          setActive(state.active < 0 ? (dir > 0 ? 0 : opts.length - 1) : (state.active + dir + opts.length) % opts.length);
+        } else if (e.key === 'Home' && opts.length > 0) {
+          e.preventDefault();
+          setActive(0);
+        } else if (e.key === 'End' && opts.length > 0) {
+          e.preventDefault();
+          setActive(opts.length - 1);
+        } else if (e.key === 'Enter') {
+          const opt = state.active >= 0 ? opts[state.active] : null;
+          const a = opt && opt.querySelector('a[href]');
+          if (a) {
+            e.preventDefault();
+            navigate(a.getAttribute('href'));
+          }
+        } else if (e.key === 'Escape') {
+          if (input.value) {
+            input.value = '';
+            state.q = '';
+            rerun();
+          }
+          setActive(-1);
+          input.blur();
+        }
+      });
+
+      // Kind pills + status select: update filters, URL, and results in place.
+      root.querySelector('[data-search-filters]').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-kind]');
+        if (!btn || btn.dataset.kind === state.kind) return;
+        state.kind = btn.dataset.kind;
+        root.querySelectorAll('[data-kind]').forEach((pill) => {
+          const on = pill.dataset.kind === state.kind;
+          pill.classList.toggle('active', on);
+          pill.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        rerun();
+      });
+      root.querySelector('[data-status-filter]').addEventListener('change', (e) => {
+        state.status = e.target.value;
+        rerun();
+      });
+
+      // Browse "Load more" (event delegation — the button is re-created).
+      slot.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-browse-more]');
+        if (!btn || btn.disabled || state.q) return;
+        btn.disabled = true;
+        const label = btn.textContent;
+        btn.textContent = 'Loading…';
+        const my = state.seq;
+        try {
+          const added = await loadBrowsePage();
+          if (my !== state.seq) return;
+          const grid = slot.querySelector('[data-browse-grid]');
+          if (grid && added.length > 0) {
+            grid.insertAdjacentHTML('beforeend', added.map((a) => adaptationCard(a)).join(''));
+            wireUserControls(grid);
+          }
+          const countEl = slot.querySelector('[data-browse-count]');
+          if (countEl) countEl.textContent = browseCountText(state);
+          if (state.browse.exhausted) btn.closest('.load-more-wrap')?.remove();
+          else {
+            btn.disabled = false;
+            btn.textContent = label;
+          }
+        } catch (err) {
+          btn.disabled = false;
+          btn.textContent = label;
+          btn.insertAdjacentHTML('afterend', `<p class="inline-error" role="alert">${esc(errMsg(err))}</p>`);
+        }
+      });
+
+      syncA11y();
+      wireUserControls(slot);
     },
   };
 }

@@ -12,7 +12,7 @@
 // Prerendered documents are cached at the edge via the Cache API with
 // s-maxage ~1h. Fail-soft: any error falls through to the shell.
 
-import { getAdaptationSummary, getBook, getScreenWork } from './db';
+import { getAdaptationSummaryBySlug, getBookBySlug, getScreenWorkBySlug } from './db';
 import { getListBySlug } from './lists/db';
 import { DEFAULT_DESCRIPTION } from './seo';
 
@@ -210,8 +210,8 @@ function staticRoute(path: string, origin: string): Prerendered {
   };
 }
 
-async function watchRoute(db: D1Database, origin: string, id: number): Promise<Prerendered | null> {
-  const w = await getScreenWork(db, id);
+async function watchRoute(db: D1Database, origin: string, slug: string): Promise<Prerendered | null> {
+  const w = await getScreenWorkBySlug(db, slug);
   if (!w) return null;
   const year = yearOf(w.release_date);
   const title = `${w.title}${year ? ` (${year})` : ''} — Novel Adaptations`;
@@ -228,7 +228,7 @@ async function watchRoute(db: D1Database, origin: string, id: number): Promise<P
       : '') +
     (w.adaptations.length
       ? `<h2>Adaptations</h2><ul>${w.adaptations
-          .map((a) => `<li><a href="/adaptations/${a.id}">${esc(a.title)}</a> — ${esc(STATUS_LABEL[a.status] ?? a.status)}</li>`)
+          .map((a) => `<li><a href="/adaptations/${a.slug ?? a.id}">${esc(a.title)}</a> — ${esc(STATUS_LABEL[a.status] ?? a.status)}</li>`)
           .join('')}</ul>`
       : '');
   return {
@@ -236,15 +236,15 @@ async function watchRoute(db: D1Database, origin: string, id: number): Promise<P
     html: prerenderDoc({
       title,
       description,
-      canonical: `${origin}/watch/${w.id}`,
+      canonical: `${origin}/watch/${w.slug ?? w.id}`,
       image: artOrFallback(origin, w.poster_url, w.backdrop_url),
       body,
     }),
   };
 }
 
-async function adaptationRoute(db: D1Database, origin: string, id: number): Promise<Prerendered | null> {
-  const a = await getAdaptationSummary(db, id);
+async function adaptationRoute(db: D1Database, origin: string, slug: string): Promise<Prerendered | null> {
+  const a = await getAdaptationSummaryBySlug(db, slug);
   if (!a) return null;
   const year = yearOf(a.screen_release_date);
   const title = `${a.screen_title}: ${a.book_title} adaptation — Novel Adaptations`;
@@ -259,21 +259,21 @@ async function adaptationRoute(db: D1Database, origin: string, id: number): Prom
       ? `<img src="${esc((a.screen_poster_url ?? a.book_cover_url)!)}" alt="${esc(a.screen_title)} artwork" width="500">`
       : '') +
     `<p>Status: ${esc(status)}</p>` +
-    `<p><a href="/books/${a.book_id}">${esc(a.book_title)}</a> · <a href="/watch/${a.screen_work_id}">${esc(a.screen_title)}</a></p>`;
+    `<p><a href="/books/${a.book_slug ?? a.book_id}">${esc(a.book_title)}</a> · <a href="/watch/${a.screen_slug ?? a.screen_work_id}">${esc(a.screen_title)}</a></p>`;
   return {
     status: 200,
     html: prerenderDoc({
       title,
       description,
-      canonical: `${origin}/adaptations/${a.id}`,
+      canonical: `${origin}/adaptations/${a.adaptation_slug ?? a.id}`,
       image: artOrFallback(origin, a.screen_poster_url, a.book_cover_url),
       body,
     }),
   };
 }
 
-async function bookRoute(db: D1Database, origin: string, id: number): Promise<Prerendered | null> {
-  const b = await getBook(db, id);
+async function bookRoute(db: D1Database, origin: string, slug: string): Promise<Prerendered | null> {
+  const b = await getBookBySlug(db, slug);
   if (!b) return null;
   const title = `${b.title} by ${b.authors} — Novel Adaptations`;
   const description = `${b.title} by ${b.authors}${b.pub_date ? ` (${yearOf(b.pub_date) ?? b.pub_date})` : ''} — see its film and TV adaptations.`;
@@ -288,7 +288,7 @@ async function bookRoute(db: D1Database, origin: string, id: number): Promise<Pr
     html: prerenderDoc({
       title,
       description,
-      canonical: `${origin}/books/${b.id}`,
+      canonical: `${origin}/books/${b.slug ?? b.id}`,
       image: artOrFallback(origin, b.cover_url),
       body,
     }),
@@ -332,14 +332,17 @@ export async function prerender(
   if (Object.hasOwn(STATIC_ROUTES, path)) return staticRoute(path, origin);
 
   let m: RegExpMatchArray | null;
-  if ((m = /^\/watch\/([^/]+)$/.exec(path)) && ID_RE.test(m[1]!)) {
-    return watchRoute(db, origin, Number(m[1]));
+  if ((m = /^\/watch\/([^/]+)$/.exec(path))) {
+    if (ID_RE.test(m[1]!)) return null; // numeric → the page route 301s to the slug
+    return watchRoute(db, origin, decodeURIComponent(m[1]!));
   }
-  if ((m = /^\/adaptations\/([^/]+)$/.exec(path)) && ID_RE.test(m[1]!)) {
-    return adaptationRoute(db, origin, Number(m[1]));
+  if ((m = /^\/adaptations\/([^/]+)$/.exec(path))) {
+    if (ID_RE.test(m[1]!)) return null;
+    return adaptationRoute(db, origin, decodeURIComponent(m[1]!));
   }
-  if ((m = /^\/books\/([^/]+)$/.exec(path)) && ID_RE.test(m[1]!)) {
-    return bookRoute(db, origin, Number(m[1]));
+  if ((m = /^\/books\/([^/]+)$/.exec(path))) {
+    if (ID_RE.test(m[1]!)) return null;
+    return bookRoute(db, origin, decodeURIComponent(m[1]!));
   }
   if ((m = /^\/lists\/([^/]+)$/.exec(path))) {
     return listRoute(db, origin, decodeURIComponent(m[1]!));

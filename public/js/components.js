@@ -4,6 +4,7 @@
 // server-rendered pages it replaces.
 
 import { esc, safeUrl, statusLabel, kindLabel, shelfLabel, tierLabel, posterArt, initialsFor } from './utils.js';
+import { bookUrl, watchUrl, adaptationUrl } from './links.js';
 import { store, toggleTheme } from './store.js';
 import { navigate } from './router.js';
 import { api } from './api.js';
@@ -44,12 +45,12 @@ export function adaptationCard(a, opts) {
   const eager = !!(opts && opts.eager);
   return (
     `<article class="poster-card">` +
-      `<a class="poster-link" href="/watch/${a.screen_work_id}">` +
+      `<a class="poster-link" href="${watchUrl(a)}">` +
         posterArt(a.screen_poster_url ?? a.book_cover_url, a.screen_title, `${kindLabel(a.screen_kind)} · ${a.book_authors}`, eager ? { eager: true, fetchpriority: 'high' } : null) +
       `</a>` +
       `<div class="card-body">` +
-        `<h2 class="card-title"><a href="/adaptations/${a.id}">${esc(a.screen_title)}</a></h2>` +
-        `<p class="card-meta">from <a href="/books/${a.book_id}">${esc(a.book_title)}</a> by ${esc(a.book_authors)}</p>` +
+        `<h2 class="card-title"><a href="${adaptationUrl(a)}">${esc(a.screen_title)}</a></h2>` +
+        `<p class="card-meta">from <a href="${bookUrl(a)}">${esc(a.book_title)}</a> by ${esc(a.book_authors)}</p>` +
         `<div class="card-badges">${kindPill(a.screen_kind)}${statusBadge(a.status)}</div>` +
       `</div>` +
     `</article>`

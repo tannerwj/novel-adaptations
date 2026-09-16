@@ -137,10 +137,6 @@ export function releaseYear(releaseDate) {
   return /^\d{4}$/.test(y) ? y : null;
 }
 
-export function tmdbUrl(kind, tmdbId) {
-  return `https://www.themoviedb.org/${kind === 'film' ? 'movie' : 'tv'}/${tmdbId}`;
-}
-
 /** "2026-09-15 08:01:22" → "2026-09-15". */
 export function dateOnly(ts) {
   return typeof ts === 'string' ? ts.slice(0, 10) : '—';

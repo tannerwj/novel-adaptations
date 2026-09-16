@@ -174,6 +174,9 @@ components:
         screen_release_date: { type: [string, 'null'], format: date, example: '2024-03-01' }
         screen_poster_url: { type: [string, 'null'], example: 'https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg' }
         screen_backdrop_url: { type: [string, 'null'] }
+        adaptation_slug: { type: [string, 'null'], example: 'dune-part-two-2024', description: 'SEO permalink slug for /adaptations/:slug.' }
+        book_slug: { type: [string, 'null'], example: 'dune-frank-herbert', description: 'SEO permalink slug for /books/:slug.' }
+        screen_slug: { type: [string, 'null'], example: 'dune-part-two-2024', description: 'SEO permalink slug for /watch/:slug.' }
 
     AdaptationStatus:
       type: string
@@ -191,6 +194,7 @@ components:
         isbn: { type: [string, 'null'] }
         openlibrary_id: { type: [string, 'null'] }
         googlebooks_id: { type: [string, 'null'] }
+        slug: { type: [string, 'null'], example: 'dune-frank-herbert', description: 'SEO permalink slug for /books/:slug.' }
 
     ScreenWork:
       type: object
@@ -206,6 +210,7 @@ components:
         release_date: { type: [string, 'null'], format: date }
         synopsis: { type: [string, 'null'] }
         purchase_url_screen: { type: [string, 'null'], description: 'Affiliate URL column; no UI reads it yet.' }
+        slug: { type: [string, 'null'], example: 'dune-part-two-2024', description: 'SEO permalink slug for /watch/:slug.' }
 
     ReviewV1:
       type: object
@@ -303,6 +308,8 @@ components:
         id: { type: integer }
         title: { type: string }
         authors: { type: string }
+        slug: { type: [string, 'null'], description: 'SEO permalink slug for /books/:slug.' }
+        rank: { type: integer, description: 'Relevance tier, 0 = exact title match … 7 = substring; lower is better.' }
 
     ScreenWorkHit:
       type: object
@@ -312,6 +319,8 @@ components:
         title: { type: string }
         kind: { type: string, enum: [film, series] }
         poster_url: { type: [string, 'null'] }
+        slug: { type: [string, 'null'], description: 'SEO permalink slug for /watch/:slug.' }
+        rank: { type: integer, description: 'Relevance tier, 0 = exact title match … 5 = substring; lower is better.' }
 
     AdaptationHit:
       type: object
@@ -323,6 +332,10 @@ components:
         book_authors: { type: string }
         screen_title: { type: string }
         screen_kind: { type: string, enum: [film, series] }
+        slug: { type: [string, 'null'], description: 'SEO permalink slug for /adaptations/:slug.' }
+        book_slug: { type: [string, 'null'], description: 'SEO permalink slug for /books/:slug.' }
+        screen_slug: { type: [string, 'null'], description: 'SEO permalink slug for /watch/:slug.' }
+        rank: { type: integer, description: 'Relevance tier, 0 = exact title match … 7 = substring; lower is better.' }
 
     WatchProvider:
       type: object
@@ -685,6 +698,10 @@ paths:
           in: query
           schema: { $ref: '#/components/schemas/AdaptationStatus' }
           description: Filter adaptations by status. 422 on any other value.
+        - name: sort
+          in: query
+          schema: { type: string, enum: [newest] }
+          description: "Opt-in sort: `newest` orders newest catalog records first (id DESC). Default is oldest first. 422 on any other value."
       responses:
         '200':
           description: Paginated adaptation summaries.
@@ -693,15 +710,55 @@ paths:
               schema: { $ref: '#/components/schemas/PagedAdaptations' }
         '422': { $ref: '#/components/responses/Unprocessable' }
 
-  /api/v1/adaptations/{id}:
+  /api/v1/home/featured:
+    get:
+      tags: [Home]
+      summary: Featured adaptation rail
+      description: >-
+        A small, fixed-size rail for the home landing page — derived from real
+        data only (no curation): adaptations whose screen work has actual
+        poster art (TMDB enrichment), ordered by the community vote count on
+        the source book, then newest release date, then newest record. `limit`
+        defaults to 12 and is clamped to 24.
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 24, default: 12 }
+          description: Rail size. 12 by default, 24 max.
+      responses:
+        '200':
+          description: Featured adaptation summaries.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, limit, total]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      allOf:
+                        - { $ref: '#/components/schemas/AdaptationSummary' }
+                        - type: object
+                          required: [book_votes]
+                          properties:
+                            book_votes:
+                              type: integer
+                              example: 42
+                              description: Community vote count on the source book (drives the ranking).
+                  limit: { type: integer, example: 12 }
+                  total: { type: integer, example: 12 }
+
+  /api/v1/adaptations/{idOrSlug}:
     get:
       tags: [Adaptations]
       summary: Adaptation detail
       parameters:
-        - name: id
+        - name: idOrSlug
           in: path
           required: true
-          schema: { type: integer, minimum: 1 }
+          description: Numeric id (legacy) or SEO permalink slug.
+          schema: { type: string }
       responses:
         '200':
           description: Adaptation with status timeline, personal state, and poll.
@@ -723,15 +780,16 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Unprocessable' }
 
-  /api/v1/books/{id}:
+  /api/v1/books/{idOrSlug}:
     get:
       tags: [Books]
       summary: Book detail
       parameters:
-        - name: id
+        - name: idOrSlug
           in: path
           required: true
-          schema: { type: integer, minimum: 1 }
+          description: Numeric id (legacy) or SEO permalink slug.
+          schema: { type: string }
         - $ref: '#/components/parameters/pageParam'
         - $ref: '#/components/parameters/perPageParam'
       responses:
@@ -771,15 +829,16 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Unprocessable' }
 
-  /api/v1/watch/{id}:
+  /api/v1/watch/{idOrSlug}:
     get:
       tags: [ScreenWorks]
       summary: Screen-work detail
       parameters:
-        - name: id
+        - name: idOrSlug
           in: path
           required: true
-          schema: { type: integer, minimum: 1 }
+          description: Numeric id (legacy) or SEO permalink slug.
+          schema: { type: string }
         - $ref: '#/components/parameters/pageParam'
         - $ref: '#/components/parameters/perPageParam'
       responses:

@@ -34,7 +34,7 @@ export interface ListItemView {
   title: string;
   subtitle: string;
   imageUrl: string | null;
-  /** Detail-page path for the target (/books/:id or /watch/:id). */
+  /** Detail-page path for the target (/books/:slug or /watch/:slug). */
   href: string;
 }
 
@@ -154,7 +154,7 @@ async function resolveListItemTarget(
       title: book.title,
       subtitle: `Book · ${book.authors}`,
       imageUrl: book.cover_url,
-      href: `/books/${book.id}`,
+      href: `/books/${book.slug ?? book.id}`,
     };
   }
   const work = await getScreenWork(db, targetId);
@@ -163,7 +163,7 @@ async function resolveListItemTarget(
     title: work.title,
     subtitle: work.kind === 'film' ? 'Film' : 'Series',
     imageUrl: work.poster_url,
-    href: `/watch/${work.id}`,
+    href: `/watch/${work.slug ?? work.id}`,
   };
 }
 

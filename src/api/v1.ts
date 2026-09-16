@@ -34,6 +34,7 @@ import {
   getNewsItem,
   getScreenWork,
   getScreenWorkNews,
+  idForSlug,
   listNewsItems,
   nextStatusAfter,
   promoteNewsItem,
@@ -220,6 +221,24 @@ function toInt(v: unknown): number | null {
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+
+/**
+ * Resolve a detail-route `:idOrSlug` param to a numeric row id. All-digit
+ * params are legacy numeric URLs; anything else is looked up as a slug.
+ * Returns null when the param is neither (→ 404 downstream).
+ */
+async function resolveDetailId(
+  db: D1Database,
+  table: 'books' | 'screen_works' | 'adaptations',
+  param: string,
+): Promise<number | null> {
+  if (/^\d+$/.test(param)) {
+    const id = Number(param);
+    return Number.isSafeInteger(id) && id >= 1 ? id : null;
+  }
+  if (!/^[a-z0-9-]{1,120}$/.test(param)) return null;
+  return idForSlug(db, table, param);
+}
 
 /** ?page=&per_page= → { page, per_page, offset }. Clamps per_page to 100. */
 function pagination(
@@ -491,7 +510,7 @@ v1.post('/auth/logout', async (c) => {
 function parseAdaptationListQuery(
   c: V1Context,
 ):
-  | { ok: true; page: number; per_page: number; status?: string }
+  | { ok: true; page: number; per_page: number; status?: string; newest: boolean }
   | { ok: false; response: Response } {
   const { page, per_page } = pagination(c, 24);
   const rawStatus = c.req.query('status');
@@ -504,7 +523,22 @@ function parseAdaptationListQuery(
       ),
     };
   }
-  return { ok: true, page, per_page, status: rawStatus || undefined };
+  // Additive, opt-in sort: `sort=newest` orders newest records first.
+  // Anything else is a 422 — the query is part of the public API contract.
+  const rawSort = c.req.query('sort');
+  if (rawSort && rawSort !== 'newest') {
+    return {
+      ok: false,
+      response: validationError(c, "sort must be 'newest'."),
+    };
+  }
+  return {
+    ok: true,
+    page,
+    per_page,
+    status: rawStatus || undefined,
+    newest: rawSort === 'newest',
+  };
 }
 
 async function adaptationListData(c: V1Context) {
@@ -512,12 +546,13 @@ async function adaptationListData(c: V1Context) {
   if (!q.ok) return q;
   // Paginate in SQL so D1 ships one page of rows, not the whole catalog.
   const offset = (q.page - 1) * q.per_page;
+  const orderBy = q.newest ? 'ORDER BY a.id DESC' : 'ORDER BY a.id ASC';
   const listStmt = q.status
     ? c.env.DB.prepare(
-        `${SELECT_ADAPTATION_SUMMARY} WHERE a.status = ?1 ORDER BY a.id ASC LIMIT ?2 OFFSET ?3`,
+        `${SELECT_ADAPTATION_SUMMARY} WHERE a.status = ?1 ${orderBy} LIMIT ?2 OFFSET ?3`,
       ).bind(q.status, q.per_page, offset)
     : c.env.DB.prepare(
-        `${SELECT_ADAPTATION_SUMMARY} ORDER BY a.id ASC LIMIT ?1 OFFSET ?2`,
+        `${SELECT_ADAPTATION_SUMMARY} ${orderBy} LIMIT ?1 OFFSET ?2`,
       ).bind(q.per_page, offset);
   const countStmt = q.status
     ? c.env.DB.prepare('SELECT COUNT(*) AS n FROM adaptations WHERE status = ?1').bind(q.status)
@@ -538,12 +573,13 @@ v1.get('/home', async (c) => {
     // filtered total for pagination) and the four stat counts. The list
     // query is paginated in SQL — D1 ships 24 rows, not all 1,249.
     const offset = (q.page - 1) * q.per_page;
+    const orderBy = q.newest ? 'ORDER BY a.id DESC' : 'ORDER BY a.id ASC';
     const listStmt = q.status
       ? c.env.DB.prepare(
-          `${SELECT_ADAPTATION_SUMMARY} WHERE a.status = ?1 ORDER BY a.id ASC LIMIT ?2 OFFSET ?3`,
+          `${SELECT_ADAPTATION_SUMMARY} WHERE a.status = ?1 ${orderBy} LIMIT ?2 OFFSET ?3`,
         ).bind(q.status, q.per_page, offset)
       : c.env.DB.prepare(
-          `${SELECT_ADAPTATION_SUMMARY} ORDER BY a.id ASC LIMIT ?1 OFFSET ?2`,
+          `${SELECT_ADAPTATION_SUMMARY} ${orderBy} LIMIT ?1 OFFSET ?2`,
         ).bind(q.per_page, offset);
     const listCountStmt = q.status
       ? c.env.DB.prepare('SELECT COUNT(*) AS n FROM adaptations WHERE status = ?1').bind(q.status)
@@ -588,10 +624,45 @@ v1.get('/adaptations', async (c) => {
   return c.json(data.list);
 });
 
-v1.get('/adaptations/:id', async (c) => {
-  const id = toInt(c.req.param('id'));
-  if (id === null || id < 1) {
-    return validationError(c, 'Adaptation id must be a positive integer.');
+/**
+ * Featured rail for the home landing page. No curation data exists on the
+ * site — this is derived from REAL signals only: adaptations whose screen
+ * work has actual poster art (TMDB enrichment backfill), ordered by the
+ * community vote count on the source book, then newest release date, then
+ * newest catalog record. Fixed small LIMIT in SQL (clamped to 24), so the
+ * client never pulls the catalog. Identical for every visitor — edge-cached.
+ */
+v1.get('/home/featured', async (c) => {
+  const rawLimit = Number(c.req.query('limit'));
+  let limit = Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : 12;
+  limit = Math.min(limit, 24);
+  return edgeCached(c, async () => {
+    // SELECT_ADAPTATION_SUMMARY ends with its FROM/JOINs, so wrap it and
+    // project the vote count on top — the shared constant stays intact.
+    const { results } = await c.env.DB
+      .prepare(
+        `SELECT x.*, COALESCE(v.votes, 0) AS book_votes
+         FROM (${SELECT_ADAPTATION_SUMMARY}) x
+         LEFT JOIN (SELECT book_id, COUNT(*) AS votes FROM votes GROUP BY book_id) v
+           ON v.book_id = x.book_id
+         WHERE x.screen_poster_url IS NOT NULL AND x.screen_poster_url != ''
+         ORDER BY book_votes DESC,
+                  x.screen_release_date IS NULL,
+                  x.screen_release_date DESC,
+                  x.id DESC
+         LIMIT ?1`,
+      )
+      .bind(limit)
+      .all<AdaptationSummary & { book_votes: number }>();
+    const data = results ?? [];
+    return c.json({ data, limit, total: data.length });
+  });
+});
+
+v1.get('/adaptations/:idOrSlug', async (c) => {
+  const id = await resolveDetailId(c.env.DB, 'adaptations', c.req.param('idOrSlug'));
+  if (id === null) {
+    return validationError(c, 'Adaptation not found.');
   }
   // One D1 round trip for the three anonymous queries (was: 1 + 2 more).
   const detailBatch = await c.env.DB.batch([
@@ -654,10 +725,10 @@ v1.get('/adaptations/:id', async (c) => {
 
 // --- books -------------------------------------------------------------------
 
-v1.get('/books/:id', async (c) => {
-  const id = toInt(c.req.param('id'));
-  if (id === null || id < 1) {
-    return validationError(c, 'Book id must be a positive integer.');
+v1.get('/books/:idOrSlug', async (c) => {
+  const id = await resolveDetailId(c.env.DB, 'books', c.req.param('idOrSlug'));
+  if (id === null) {
+    return validationError(c, 'Book not found.');
   }
   const book = await getBook(c.env.DB, id);
   if (!book) return apiError(c, 404, 'not_found', 'Book not found.');
@@ -692,10 +763,10 @@ v1.get('/books/:id', async (c) => {
 
 // --- screen works ("watch") --------------------------------------------------
 
-v1.get('/watch/:id', async (c) => {
-  const id = toInt(c.req.param('id'));
-  if (id === null || id < 1) {
-    return validationError(c, 'Screen work id must be a positive integer.');
+v1.get('/watch/:idOrSlug', async (c) => {
+  const id = await resolveDetailId(c.env.DB, 'screen_works', c.req.param('idOrSlug'));
+  if (id === null) {
+    return validationError(c, 'Screen work not found.');
   }
   const work = await getScreenWork(c.env.DB, id);
   if (!work) return apiError(c, 404, 'not_found', 'Screen work not found.');
@@ -764,6 +835,7 @@ v1.get('/most-wanted', async (c) => {
         title: r.title,
         authors: r.authors,
         cover_url: r.coverUrl,
+        slug: r.slug,
         votes: r.votes,
         user_voted: r.userVoted,
       })),
@@ -1377,6 +1449,7 @@ v1.get('/shelves', async (c) => {
       target_type: s.targetType,
       target_id: s.targetId,
       title: s.title,
+      slug: s.slug,
       shelf: s.shelf,
     })),
   });

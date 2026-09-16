@@ -214,24 +214,29 @@ const HYPE_LABELS = {
 
 export function hypeWidget(screenWorkId, average, count, userLevel, signedIn) {
   const filled = Math.max(0, Math.min(5, Math.round(average || 0)));
+  const avg = Number(average || 0).toFixed(1);
   return (
     `<section class="hype-widget" data-hype-widget data-screen-work-id="${screenWorkId}">` +
-      `<div class="hype-title">🔥 Hype meter</div>` +
-      `<div class="hype-gauge" data-hype-gauge role="img" aria-label="Average hype ${Number(average || 0).toFixed(1)} out of 5 from ${count} ratings">` +
+      `<div class="hype-head">` +
+        `<span class="hype-title">🔥 Hype meter</span>` +
+        `<span class="hype-stats"><strong data-hype-average>${avg}</strong>/5 · <span data-hype-count>${count}</span> votes</span>` +
+      `</div>` +
+      `<div class="hype-gauge" data-hype-gauge role="img" aria-label="Average hype ${avg} out of 5 from ${count} votes">` +
       [0, 1, 2, 3, 4].map((i) => `<span class="hype-cell${i < filled ? ' on' : ''}"></span>`).join('') +
       `</div>` +
-      `<p class="hype-stats"><strong data-hype-average>${Number(average || 0).toFixed(1)}</strong>/5 · <span data-hype-count>${count}</span> hyped</p>` +
       (signedIn
-        ? `<p class="hype-ask">How hyped are you?</p>` +
-          `<div class="hype-segs" role="radiogroup" aria-label="Your hype level">` +
-          [1, 2, 3, 4, 5].map((level) =>
-            `<button type="button" class="hype-seg${userLevel === level ? ' mine' : ''}" data-hype-level="${level}" ` +
-            `aria-pressed="${userLevel === level}" aria-label="${esc(HYPE_LABELS[level])}" title="${esc(HYPE_LABELS[level])}">` +
-            `${userLevel === level ? '● ' : ''}${level}</button>`
-          ).join('') +
-          `</div>` +
-          `<p class="hype-hint" data-hype-hint>${userLevel ? `You are at ${userLevel}/5 — tap to change` : 'Tap a segment to set your hype'}</p>`
-        : `<p class="hype-signin"><a href="/auth/login">Sign in</a> to add your hype.</p>`) +
+        ? `<div class="hype-vote">` +
+            `<span class="hype-ask">Your hype:</span>` +
+            `<div class="hype-segs" role="radiogroup" aria-label="Your hype level">` +
+            [1, 2, 3, 4, 5].map((level) =>
+              `<button type="button" class="hype-seg${userLevel === level ? ' mine' : ''}" data-hype-level="${level}" ` +
+              `aria-pressed="${userLevel === level}" aria-label="${esc(HYPE_LABELS[level])}" title="${esc(HYPE_LABELS[level])}">` +
+              `${userLevel === level ? '🔥' : ''}${level}</button>`
+            ).join('') +
+            `</div>` +
+            `<p class="hype-hint" data-hype-hint>${userLevel ? `You voted ${userLevel}/5 — tap to change` : 'Tap a number to vote'}</p>` +
+          `</div>`
+        : `<p class="hype-signin"><a href="/auth/login">Sign in</a> to vote your hype.</p>`) +
     `</section>`
   );
 }
@@ -257,9 +262,9 @@ export function wireHype(root) {
         const mine = Number(btn.dataset.hypeLevel) === level;
         btn.classList.toggle('mine', mine);
         btn.setAttribute('aria-pressed', String(mine));
-        btn.innerHTML = `${mine ? '● ' : ''}${btn.dataset.hypeLevel}`;
+        btn.innerHTML = `${mine ? '🔥' : ''}${btn.dataset.hypeLevel}`;
       });
-      if (hint) hint.textContent = level ? `You are at ${level}/5 — tap to change` : 'Tap a segment to set your hype';
+      if (hint) hint.textContent = level ? `You voted ${level}/5 — tap to change` : 'Tap a number to vote';
     };
     w.querySelectorAll('[data-hype-level]').forEach((btn) => {
       btn.addEventListener('click', async () => {

@@ -30,6 +30,16 @@ export async function getPage(path, opts = {}) {
   return { status: res.status, text: await res.text() };
 }
 
+/** Redirect check: follows nothing, returns {status, location}. */
+export async function getRedirect(path, opts = {}) {
+  const res = await fetch(BASE + path, {
+    headers: buildHeaders(opts),
+    redirect: 'manual',
+  });
+  await res.text().catch(() => {});
+  return { status: res.status, location: res.headers.get('location') };
+}
+
 /** JSON API fetch: returns {status, data}. Never throws on HTTP errors. */
 export async function api(method, path, { session, body, query } = {}) {
   const url = BASE + path + (query ? '?' + new URLSearchParams(query).toString() : '');

@@ -1,6 +1,7 @@
 // public/js/views/detail.js — Adaptation story, Book, and Screen-work pages.
 
-import { esc, safeUrl, kindLabel, posterArt, releaseYear, tmdbUrl, HERO_SIZES } from '../utils.js';
+import { esc, safeUrl, kindLabel, posterArt, releaseYear, HERO_SIZES } from '../utils.js';
+import { bookUrl, watchUrl, adaptationUrl } from '../links.js';
 import { api, errMsg } from '../api.js';
 import { renderNotFound } from '../router.js';
 import { isAuthedResolved } from '../store.js';
@@ -15,9 +16,9 @@ import { ratingWidget, pollWidget, hypeWidget, reviewsSection, addToListControl,
 // ---------------------------------------------------------------------------
 
 export async function adaptationView({ params }) {
-  const id = Number(params.id);
-  if (!Number.isInteger(id) || id < 1) { renderNotFound(); return { title: 'Not found', html: '' }; }
-  const r = await api(`/api/v1/adaptations/${id}`, { loginRedirect: false });
+  const slug = String(params.slug ?? '').trim();
+  if (!slug) { renderNotFound(); return { title: 'Not found', html: '' }; }
+  const r = await api(`/api/v1/adaptations/${encodeURIComponent(slug)}`, { loginRedirect: false });
   if (!r.ok) {
     if (r.status === 404 || r.status === 422) { renderNotFound(); return { title: 'Not found', html: '' }; }
     throw new Error(errMsg(r));
@@ -35,7 +36,7 @@ export async function adaptationView({ params }) {
         `<div>` +
           `<p class="kicker">${esc(kindLabel(a.screen_kind))} adaptation</p>` +
           `<h1>${esc(a.screen_title)}</h1>` +
-          `<p class="byline">Based on <a href="/books/${a.book_id}"><em>${esc(a.book_title)}</em></a> by ${esc(a.book_authors)}</p>` +
+          `<p class="byline">Based on <a href="${bookUrl(a)}"><em>${esc(a.book_title)}</em></a> by ${esc(a.book_authors)}</p>` +
           `<div class="hero-badges">${statusBadge(a.status)}` +
           (a.screen_release_date ? `<span class="kind-pill">📅 ${esc(a.screen_release_date)}</span>` : '') +
           `</div>` +
@@ -58,11 +59,11 @@ export async function adaptationView({ params }) {
       `</section>` +
       `<div class="detail-grid two">` +
         `<section class="panel"><h2>The book</h2><dl class="facts">` +
-          `<dt>Title</dt><dd><a href="/books/${a.book_id}">${esc(a.book_title)}</a></dd>` +
+          `<dt>Title</dt><dd><a href="${bookUrl(a)}">${esc(a.book_title)}</a></dd>` +
           `<dt>Authors</dt><dd>${esc(a.book_authors)}</dd>` +
         `</dl></section>` +
         `<section class="panel"><h2>The screen work</h2><dl class="facts">` +
-          `<dt>Title</dt><dd><a href="/watch/${a.screen_work_id}">${esc(a.screen_title)}</a></dd>` +
+          `<dt>Title</dt><dd><a href="${watchUrl(a)}">${esc(a.screen_title)}</a></dd>` +
           `<dt>Kind</dt><dd>${esc(kindLabel(a.screen_kind))}</dd>` +
           `<dt>Release</dt><dd>${esc(a.screen_release_date ?? 'TBA')}</dd>` +
         `</dl>` +
@@ -89,9 +90,9 @@ export async function adaptationView({ params }) {
 // ---------------------------------------------------------------------------
 
 export async function bookView({ params }) {
-  const id = Number(params.id);
-  if (!Number.isInteger(id) || id < 1) { renderNotFound(); return { title: 'Not found', html: '' }; }
-  const r = await api(`/api/v1/books/${id}`, { loginRedirect: false });
+  const slug = String(params.slug ?? '').trim();
+  if (!slug) { renderNotFound(); return { title: 'Not found', html: '' }; }
+  const r = await api(`/api/v1/books/${encodeURIComponent(slug)}`, { loginRedirect: false });
   if (!r.ok) {
     if (r.status === 404 || r.status === 422) { renderNotFound(); return { title: 'Not found', html: '' }; }
     throw new Error(errMsg(r));
@@ -141,40 +142,36 @@ export async function bookView({ params }) {
 // /watch/:id — the screen work
 // ---------------------------------------------------------------------------
 
-function whereToWatch(data) {
+function whereToWatch(data, title) {
   if (!data) return '';
-  const hasAny = data.flatrate.length > 0 || data.rent.length > 0 || data.buy.length > 0;
-  if (!hasAny && !data.link) return '';
-  const group = (title, providers) => {
-    if (!providers || providers.length === 0) return '';
-    return (
-      `<div style="margin-bottom:1rem">` +
-        `<h3 class="meta" style="margin:0 0 0.5rem;text-transform:uppercase;letter-spacing:0.05em">${esc(title)}</h3>` +
-        `<ul style="list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:0.75rem">` +
-        providers.map((p) =>
-          `<li class="wtw-provider" style="display:flex;align-items:center;gap:0.5rem">` +
-            `<img src="${esc(p.logo)}" alt="" width="36" height="36" loading="lazy" style="border-radius:6px">` +
-            `<span>${esc(p.name)}</span>` +
-          `</li>`
-        ).join('') +
-        `</ul>` +
-      `</div>`
-    );
-  };
-  const link = safeUrl(data.link);
+  // Merge the three TMDB provider groups into one deduplicated chip list.
+  // Chips link to an exact-title JustWatch search — TMDB gives us provider
+  // names/logos but no title-specific deep links, and we never invent them.
+  const seen = new Set();
+  const providers = [...(data.flatrate ?? []), ...(data.rent ?? []), ...(data.buy ?? [])]
+    .filter((p) => p && p.name && !seen.has(String(p.name).toLowerCase()) && (seen.add(String(p.name).toLowerCase()), true));
+  if (providers.length === 0) return '';
+  const search = `https://www.justwatch.com/us/search?q=${encodeURIComponent(title ?? '')}`;
   return (
-    `<section class="panel"><h2>Where to watch</h2>` +
-      group('Stream', data.flatrate) + group('Rent', data.rent) + group('Buy', data.buy) +
-      (link ? `<p style="margin:0.5rem 0 0"><a href="${esc(link)}" target="_blank" rel="noopener noreferrer">More options ↗</a></p>` : '') +
-      `<p class="meta" style="margin:0.75rem 0 0;font-size:0.8rem">Watch provider data via JustWatch</p>` +
+    `<section class="panel wtw"><h2>Where to watch</h2>` +
+      `<ul class="wtw-chips">` +
+      providers.map((p) =>
+        `<li><a class="wtw-chip" href="${esc(search)}" target="_blank" rel="noopener noreferrer" ` +
+          `title="Find ${esc(title)} on ${esc(p.name)} — JustWatch">` +
+          (p.logo ? `<img src="${esc(p.logo)}" alt="" width="22" height="22" loading="lazy">` : '') +
+          `<span>${esc(p.name)}</span>` +
+        `</a></li>`
+      ).join('') +
+      `</ul>` +
+      `<p class="meta wtw-caption">Watch provider data via JustWatch</p>` +
     `</section>`
   );
 }
 
 export async function watchView({ params }) {
-  const id = Number(params.id);
-  if (!Number.isInteger(id) || id < 1) { renderNotFound(); return { title: 'Not found', html: '' }; }
-  const r = await api(`/api/v1/watch/${id}`, { loginRedirect: false });
+  const slug = String(params.slug ?? '').trim();
+  if (!slug) { renderNotFound(); return { title: 'Not found', html: '' }; }
+  const r = await api(`/api/v1/watch/${encodeURIComponent(slug)}`, { loginRedirect: false });
   if (!r.ok) {
     if (r.status === 404 || r.status === 422) { renderNotFound(); return { title: 'Not found', html: '' }; }
     throw new Error(errMsg(r));
@@ -183,7 +180,7 @@ export async function watchView({ params }) {
   const authed = isAuthedResolved();
   const year = releaseYear(w.release_date);
   const adaptLink = w.adaptations.length === 1
-    ? `<a href="/adaptations/${w.adaptations[0].id}">adaptation page →</a>`
+    ? `<a href="${adaptationUrl(w.adaptations[0])}">adaptation page →</a>`
     : `linked adaptation pages below.`;
 
   return {
@@ -198,7 +195,6 @@ export async function watchView({ params }) {
           `<p class="byline">${esc(kindLabel(w.kind))}${year ? ` · ${esc(year)}` : ''}</p>` +
           `<div class="hero-badges">${kindPill(w.kind)}` +
           (w.release_date ? `<span class="kind-pill">📅 ${esc(w.release_date)}</span>` : '') +
-          (w.tmdb_id ? `<a class="kind-pill" href="${esc(tmdbUrl(w.kind, w.tmdb_id))}" target="_blank" rel="noopener noreferrer">TMDB ↗</a>` : '') +
           `</div>` +
           `<p class="meta" style="margin-top:0.75rem">This page covers the film or series itself. For the full book-to-screen story and its status timeline, see the ${adaptLink}</p>` +
           `<div class="hero-actions">` +
@@ -215,13 +211,12 @@ export async function watchView({ params }) {
           ? `<p>${esc(w.synopsis.trim())}</p>`
           : `<p class="empty" style="margin:0">Synopsis coming soon — we're pulling it in from TMDB.</p>`) +
       `</section>` +
-      whereToWatch(r.data.watch_providers) +
+      whereToWatch(r.data.watch_providers, w.title) +
       `<div class="detail-grid two" style="margin-top:1.5rem">` +
         `<section class="panel"><h2>Details</h2><dl class="facts">` +
           `<dt>Title</dt><dd>${esc(w.title)}</dd>` +
           `<dt>Kind</dt><dd>${esc(kindLabel(w.kind))}</dd>` +
           `<dt>Release</dt><dd>${esc(w.release_date ?? 'TBA')}</dd>` +
-          `<dt>TMDB</dt><dd>${w.tmdb_id ? `<a href="${esc(tmdbUrl(w.kind, w.tmdb_id))}" target="_blank" rel="noopener noreferrer">View on TMDB ↗</a>` : '—'}</dd>` +
         `</dl></section>` +
         `<section class="panel"><h2>Cast &amp; crew</h2>` +
           `<p class="empty" style="margin:0">Cast and crew will appear once this page is filled in from TMDB.</p>` +
@@ -233,7 +228,7 @@ export async function watchView({ params }) {
           ? `<p class="empty">No linked books yet.</p>`
           : `<ul class="shelf-list panel">` +
             w.books.map((b) =>
-              `<li><span><a href="/books/${b.id}">${esc(b.title)}</a><span class="meta"> by ${esc(b.authors)}</span></span>` +
+              `<li><span><a href="${bookUrl(b)}">${esc(b.title)}</a><span class="meta"> by ${esc(b.authors)}</span></span>` +
               `<span class="shelf-kind kind-pill">📚 Book</span></li>`
             ).join('') + `</ul>`) +
       `</section>` +
@@ -243,7 +238,7 @@ export async function watchView({ params }) {
           ? `<p class="empty">No adaptations tracked for this screen work yet.</p>`
           : `<ul class="shelf-list panel">` +
             w.adaptations.map((a) =>
-              `<li><span><a href="/adaptations/${a.id}">${esc(a.title)}</a></span>${statusBadge(a.status)}</li>`
+              `<li><span><a href="${adaptationUrl(a)}">${esc(a.title)}</a></span>${statusBadge(a.status)}</li>`
             ).join('') + `</ul>`) +
       `</section>` +
       `<section style="margin-top:2rem">` +

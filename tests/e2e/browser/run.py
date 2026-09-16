@@ -40,6 +40,12 @@ DEFAULT_EXECUTABLE = (
     Path.home() / "workspace" / ".browsers" / "chrome-headless-shell-linux64" / "chrome-headless-shell"
 )
 BASE_DEFAULT = "https://noveladaptations.com"
+
+# Canonical slugs for the fixture titles (id 38), produced by the deterministic
+# slug backfill (scripts/backfill-slugs.py). Numeric page URLs 301 to these.
+BOOK_SLUG = "the-last-wish-andrzej-sapkowski"
+WATCH_SLUG = "the-witcher-2019"
+ADAPT_SLUG = "the-witcher-2019"
 PROXY_ADDR = ("127.0.0.1", 18080)
 
 sys.path.insert(0, str(REPO_ROOT))  # noqa: E402  (not strictly needed; keeps imports local)
@@ -181,47 +187,39 @@ def flow_auth_header(page, c):
     expect(menu).to_be_hidden(timeout=10000)
 
 
-def flow_home_load_more(page, c):
+def flow_home_landing(page, c):
     spa_goto(page, c.base + "/")
-    grid = page.locator("[data-home-grid]")
-    expect(grid.locator(".poster-card")).to_have_count(24, timeout=30000)
-    btn = page.locator("[data-load-more]")
-    expect(btn).to_be_visible()
-    total = page.evaluate(
-        "fetch('/api/v1/home').then(r => r.json()).then(j => j.adaptations.total)"
-    )
-    assert total >= 900, f"expected the full catalog, got total={total}"
-    assert f"{total - 24} of {total} remaining" in btn.inner_text()
+    # Search-centric hero: submitting the form navigates to /search?q=...
+    hero = page.locator("[data-hero-search]")
+    expect(hero).to_be_visible(timeout=30000)
+    hero.locator('input[name="q"]').fill("dune")
     mark_alive(page)
-    # Page through a few times: each click appends 24 more cards in place,
-    # the remaining count ticks down, and nothing reloads. (Paging through
-    # all ~1000 would take 40+ clicks; the API pagination is covered by the
-    # Node suite.)
-    for expected in (48, 72):
-        btn.click()
-        expect(grid.locator(".poster-card")).to_have_count(expected, timeout=30000)
-        left = total - expected
-        assert f"{left} of {total} remaining" in btn.inner_text(), (
-            "remaining count did not tick down after load more"
-        )
-        mark_alive(page)
-    # Scroll the whole grid so every lazy poster fires, then require all of
-    # them to load — a broken TMDB artwork URL anywhere fails the suite.
-    page.evaluate(
-        """async () => {
-            const cards = [...document.querySelectorAll('[data-home-grid] .poster-card')];
-            for (const c of cards) { c.scrollIntoView({ block: 'center' }); await new Promise(r => setTimeout(r, 120)); }
-        }"""
-    )
-    page.wait_for_function(
-        """() => {
-            const imgs = [...document.querySelectorAll('[data-home-grid] .poster-card .poster img')];
-            return imgs.length > 0 && imgs.every(i => i.complete && i.naturalWidth > 0);
-        }""",
-        timeout=60000,
-    )
-    assert_no_reload(page, "load more")
-    page.screenshot(path=str(c.shots / "home-load-more.png"))
+    hero.locator('button[type="submit"]').click()
+    page.wait_for_url(re.compile(r"/search\?q=dune"), timeout=30000)
+    assert_no_reload(page, "hero search → search page")
+    # Back home: browse chips link to filtered search / calendar / most-wanted.
+    spa_goto(page, c.base + "/")
+    mark_alive(page)
+    for href in ("/search?kind=film", "/search?kind=series", "/search?status=released",
+                 "/search?status=upcoming", "/calendar", "/most-wanted"):
+        expect(page.locator(f'.chip-row a[href="{href}"]')).to_be_visible(timeout=30000)
+    # Featured rail + recently-added grid are small, real sections — the home
+    # page no longer dumps the catalog as a load-more list.
+    rail = page.locator(".rail")
+    expect(rail.locator(".poster-card").first).to_be_visible(timeout=30000)
+    rail_count = rail.locator(".poster-card").count()
+    assert rail_count <= 12, f"featured rail should be a small rail, got {rail_count} cards"
+    recent = page.locator("section[aria-label='Recently added'] .poster-card")
+    assert 1 <= recent.count() <= 8, f"recent grid should hold 1-8 cards, got {recent.count()}"
+    mark_alive(page)
+    # "Browse all N adaptations" hands full-catalog browsing to /search.
+    browse_all = page.locator('.catalog-cta a[href="/search"]')
+    expect(browse_all).to_be_visible()
+    assert "Browse all" in browse_all.inner_text()
+    browse_all.click()
+    page.wait_for_url(re.compile(r"/search$"), timeout=30000)
+    assert_no_reload(page, "browse all → search")
+    page.screenshot(path=str(c.shots / "home-landing.png"))
 
 
 def flow_book_vote(page, c):
@@ -242,7 +240,7 @@ def flow_book_vote(page, c):
 
 
 def flow_watch_rate(page, c):
-    spa_goto(page, c.base + "/watch/38")
+    spa_goto(page, c.base + f"/watch/{WATCH_SLUG}")
     widget = page.locator("[data-rating-widget]")
     expect(widget).to_be_visible(timeout=30000)
     assert widget.get_attribute("data-user-rating") == "0", "fresh test user should have no rating yet"
@@ -261,7 +259,7 @@ def flow_watch_rate(page, c):
 
 
 def flow_adaptation_poll(page, c):
-    spa_goto(page, c.base + "/adaptations/38")
+    spa_goto(page, c.base + f"/adaptations/{ADAPT_SLUG}")
     widget = page.locator("[data-poll-widget]")
     expect(widget).to_be_visible(timeout=30000)
     count_el = widget.locator('[data-poll-row="book"] .poll-count')
@@ -277,7 +275,7 @@ def flow_adaptation_poll(page, c):
 
 def flow_spoiler_review(page, c):
     marker = "BROWSER-REVIEW-" + uuid.uuid4().hex[:8]
-    spa_goto(page, c.base + "/watch/38")
+    spa_goto(page, c.base + f"/watch/{WATCH_SLUG}")
     form = page.locator("form[data-review-form]")
     expect(form).to_be_visible(timeout=30000)
     form.locator('textarea[name="body"]').fill(
@@ -318,7 +316,7 @@ def flow_lists(page, c):
     add.locator('input[name="target_id"]').fill("38")
     add.locator('input[name="note"]').fill("browser-suite item")
     add.locator('button[type="submit"]').click()
-    expect(page.locator('[data-item-row] a[href="/watch/38"]')).to_be_visible(timeout=30000)
+    expect(page.locator('[data-item-row] a[href="/watch/' + WATCH_SLUG + '"]')).to_be_visible(timeout=30000)
     assert_no_reload(page, "list add item")
     # poster art rendered for the item
     assert page.locator('[data-item-row] .thumb img, [data-item-row] .thumb .poster-art').count() >= 1
@@ -342,7 +340,7 @@ def _shelf_change(page, value):
 
 
 def flow_shelf(page, c):
-    spa_goto(page, c.base + "/books/38")
+    spa_goto(page, c.base + f"/books/{BOOK_SLUG}")
     sel = page.locator("[data-shelf-select]")
     expect(sel).to_be_visible(timeout=30000)
     mark_alive(page)
@@ -358,7 +356,7 @@ def flow_shelf(page, c):
     expect(sel).to_have_value("read", timeout=30000)
     spa_goto(page, c.base + "/shelves")
     group = page.locator(".shelf-group", has_text="Read")
-    expect(group.locator('a[href="/books/38"]')).to_be_visible(timeout=30000)
+    expect(group.locator('a[href="/books/' + BOOK_SLUG + '"]')).to_be_visible(timeout=30000)
 
 
 def flow_logout(page, c):
@@ -415,7 +413,7 @@ def flow_mobile_layout(page, c):
     checks = [
         ("/", ".poster-card"),
         ("/calendar", ".shelf-group"),
-        ("/watch/38", ".hero h1"),
+        ("/watch/" + WATCH_SLUG, ".hero h1"),
     ]
     for path, probe in checks:
         spa_goto(page, c.base + path)
@@ -469,14 +467,62 @@ def flow_search_flow(page, c):
     link = results.locator('a[href^="/books/"]').first
     expect(link).to_be_visible()
     link.click()
-    page.wait_for_url(re.compile(r"/books/\d+"), timeout=30000)
+    page.wait_for_url(re.compile(r"/books/[\w-]+"), timeout=30000)
     assert_no_reload(page, "search → detail navigation")
+
+
+def flow_redirects(page, c):
+    # Numeric page URLs are legacy: they 301 to the slug permalinks.
+    for path, slug in (("/books/38", BOOK_SLUG), ("/watch/38", WATCH_SLUG), ("/adaptations/38", ADAPT_SLUG)):
+        resp = page.request.get(c.base + path, max_redirects=0)
+        assert resp.status == 301, f"{path} -> {resp.status}, expected 301"
+        expected = f"{c.base}{path.rsplit('/', 1)[0]}/{slug}"
+        assert resp.headers.get("location") == expected, \
+            f"{path} Location {resp.headers.get('location')!r} != {expected!r}"
+
+
+def flow_detail_meta(page, c):
+    # Watch page: JustWatch search chips, exact footer attribution, no per-page TMDB links.
+    spa_goto(page, c.base + f"/watch/{WATCH_SLUG}")
+    chips = page.locator('a[href^="https://www.justwatch.com/us/search?q="]')
+    expect(chips.first).to_be_visible(timeout=30000)
+    footer = page.locator(".site-footer")
+    expect(footer).to_contain_text(
+        "This product uses the TMDB API but is not endorsed or certified by TMDB.",
+        timeout=30000,
+    )
+    assert page.locator('a[href*="themoviedb.org/movie"], a[href*="themoviedb.org/tv"]').count() == 0, \
+        "per-page TMDB links must be gone"
+
+
+def flow_search_keyboard(page, c):
+    # Debounced, keyboard-accessible search: ArrowDown + Enter opens a result.
+    spa_goto(page, c.base + "/search")
+    form = page.locator("[data-search-form]")
+    expect(form).to_be_visible(timeout=30000)
+    box = form.locator('input[name="q"]')
+    box.click()
+    box.press_sequentially("dune", delay=30)
+    results = page.locator("[data-search-results]")
+    expect(results.locator('[role="option"]').first).to_be_visible(timeout=30000)
+    mark_alive(page)
+    box.press("ArrowDown")
+    expect(results.locator('[role="option"][aria-selected="true"]')).to_have_count(1, timeout=10000)
+    box.press("Enter")
+    page.wait_for_url(re.compile(r"/(books|watch|adaptations)/[\w-]+"), timeout=30000)
+    assert_no_reload(page, "keyboard search -> detail navigation")
+
+    # No-result state offers the adaptation suggestion CTA.
+    spa_goto(page, c.base + "/search?q=zzqxplork")
+    cta = page.locator('a[href^="/feedback?type=adaptation_tip"]')
+    expect(cta).to_be_visible(timeout=30000)
+    expect(cta).to_contain_text("Suggest an adaptation")
 
 
 FLOWS = [
     # (name, needs_auth, mobile, fn)
     ("auth_header", True, False, flow_auth_header),
-    ("home_load_more", True, False, flow_home_load_more),
+    ("home_landing", True, False, flow_home_landing),
     ("book_vote", True, False, flow_book_vote),
     ("watch_rate", True, False, flow_watch_rate),
     ("adaptation_poll", True, False, flow_adaptation_poll),
@@ -489,6 +535,9 @@ FLOWS = [
     ("mobile_layout", False, True, flow_mobile_layout),
     ("theme_toggle", False, False, flow_theme_toggle),
     ("search_flow", False, False, flow_search_flow),
+    ("redirects", False, False, flow_redirects),
+    ("detail_meta", False, False, flow_detail_meta),
+    ("search_keyboard", False, False, flow_search_keyboard),
 ]
 
 

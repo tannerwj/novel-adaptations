@@ -2,6 +2,7 @@
 // All shapes follow docs/API.md via src/api/v1.ts.
 
 import { esc, safeUrl } from '../utils.js';
+import { watchUrl } from '../links.js';
 import { api, errMsg } from '../api.js';
 import { pagination, wirePagination } from '../components.js';
 
@@ -237,7 +238,7 @@ function workCardHtml(w) {
   return (
     `<div class="list-card" data-work-id="${w.id}">` +
       `<div class="grow">` +
-        `<h2 class="work-title"><a href="/watch/${w.id}">${esc(w.title)}</a></h2>` +
+        `<h2 class="work-title"><a href="${watchUrl(w)}">${esc(w.title)}</a></h2>` +
         `<p class="meta">#${w.id} · ${esc(w.kind)}${w.tmdb_id ? ` · TMDB ${w.tmdb_id}` : ' · no TMDB id'}</p>` +
         `<form data-release-date style="display:flex;gap:.5rem;align-items:center;margin-top:.5rem;flex-wrap:wrap">` +
           `<label class="meta" for="rd-${w.id}">Release date</label>` +

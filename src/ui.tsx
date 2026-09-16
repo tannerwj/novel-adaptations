@@ -1406,7 +1406,7 @@ function ShelfPicker({
 function AdaptationCard({ a }: { a: AdaptationWithPoster }) {
   return (
     <article class="poster-card">
-      <a class="poster-link" href={`/watch/${a.screen_work_id}`} aria-label={`${a.screen_title} — the screen work`}>
+      <a class="poster-link" href={`/watch/${a.screen_slug ?? a.screen_work_id}`} aria-label={`${a.screen_title} — the screen work`}>
         <PosterArt
           src={a.screen_poster_url ?? a.book_cover_url}
           title={a.screen_title}
@@ -1415,10 +1415,10 @@ function AdaptationCard({ a }: { a: AdaptationWithPoster }) {
       </a>
       <div class="card-body">
         <h2 class="card-title">
-          <a href={`/adaptations/${a.id}`}>{a.screen_title}</a>
+          <a href={`/adaptations/${a.adaptation_slug ?? a.id}`}>{a.screen_title}</a>
         </h2>
         <p class="card-meta">
-          from <a href={`/books/${a.book_id}`}>{a.book_title}</a> by {a.book_authors}
+          from <a href={`/books/${a.book_slug ?? a.book_id}`}>{a.book_title}</a> by {a.book_authors}
         </p>
         <div class="card-badges">
           <span class="kind-pill">{kindLabel(a.screen_kind)}</span>
@@ -1513,7 +1513,7 @@ export function AdaptationPage({
           <p class="kicker">{kindLabel(adaptation.screen_kind)} adaptation</p>
           <h1>{adaptation.screen_title}</h1>
           <p class="byline">
-            Based on <a href={`/books/${adaptation.book_id}`}><em>{adaptation.book_title}</em></a>
+            Based on <a href={`/books/${adaptation.book_slug ?? adaptation.book_id}`}><em>{adaptation.book_title}</em></a>
             {' '}by {adaptation.book_authors}
           </p>
           <div class="hero-badges">
@@ -1562,7 +1562,7 @@ export function AdaptationPage({
           <dl class="facts">
             <dt>Title</dt>
             <dd>
-              <a href={`/books/${adaptation.book_id}`}>{adaptation.book_title}</a>
+              <a href={`/books/${adaptation.book_slug ?? adaptation.book_id}`}>{adaptation.book_title}</a>
             </dd>
             <dt>Authors</dt>
             <dd>{adaptation.book_authors}</dd>
@@ -1573,7 +1573,7 @@ export function AdaptationPage({
           <dl class="facts">
             <dt>Title</dt>
             <dd>
-              <a href={`/watch/${adaptation.screen_work_id}`}>{adaptation.screen_title}</a>
+              <a href={`/watch/${adaptation.screen_slug ?? adaptation.screen_work_id}`}>{adaptation.screen_title}</a>
             </dd>
             <dt>Kind</dt>
             <dd>{kindLabel(adaptation.screen_kind)}</dd>

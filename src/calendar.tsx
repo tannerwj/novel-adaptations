@@ -25,6 +25,7 @@ export interface CalendarWork {
   kind: string;
   release_date: string | null;
   poster_url: string | null;
+  slug: string | null;
 }
 
 /** Works whose release_date falls in the trailing 120 days show as "recent". */
@@ -49,7 +50,7 @@ const MONTH_NAMES = [
 export async function listCalendarWorks(db: D1Database): Promise<CalendarWork[]> {
   const { results } = await db
     .prepare(
-      `SELECT id, title, kind, release_date, poster_url
+      `SELECT id, title, kind, release_date, poster_url, slug
          FROM screen_works
         ORDER BY title ASC`,
     )
@@ -172,7 +173,7 @@ function CalendarItem({ work, today }: { work: CalendarWork; today: string }) {
   return (
     <li>
       <a
-        href={`/watch/${work.id}`}
+        href={`/watch/${work.slug ?? work.id}`}
         tabIndex={-1}
         aria-hidden="true"
         style="width:44px;flex-shrink:0;display:block"
@@ -181,7 +182,7 @@ function CalendarItem({ work, today }: { work: CalendarWork; today: string }) {
       </a>
       <div style="min-width:0">
         <a
-          href={`/watch/${work.id}`}
+          href={`/watch/${work.slug ?? work.id}`}
           style="color:var(--text);font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
         >
           {work.title}
@@ -370,7 +371,7 @@ export async function getEarlierWorksForYear(
   if (!/^\d{4}$/.test(year)) return [];
   const { results } = await db
     .prepare(
-      `SELECT id, title, kind, release_date, poster_url
+      `SELECT id, title, kind, release_date, poster_url, slug
          FROM screen_works
         WHERE substr(release_date, 1, 4) = ?1
           AND (release_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'

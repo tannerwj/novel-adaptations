@@ -22,6 +22,7 @@ import { spaShell, type ThemeName } from './spa/shell';
 import { serverHeaderHtml, serverFooterHtml, type ChromeUser } from './spa/chrome';
 import { getUser, type SessionUser } from './auth/session';
 import { isCrawler, servePrerendered } from './prerender';
+import { slugForId } from './db';
 
 export interface Env {
   DB: D1Database;
@@ -101,12 +102,29 @@ const servePage = async (c: Context) => {
   return serveShell(c);
 };
 
+// Numeric detail URLs are legacy: 301 them to the slug permalink before the
+// crawler check so bots and browsers both learn the canonical URL.
+const serveDetailPage = (table: 'books' | 'screen_works' | 'adaptations') => {
+  return async (c: Context) => {
+    const param = c.req.param('slug') ?? '';
+    if (/^\d+$/.test(param)) {
+      const slug = await slugForId(c.env.DB, table, Number(param));
+      if (slug) {
+        const url = new URL(c.req.url);
+        const route = url.pathname.split('/')[1]; // watch | books | adaptations
+        return c.redirect(`${url.origin}/${route}/${slug}${url.search}`, 301);
+      }
+    }
+    return servePage(c);
+  };
+};
+
 app.get('/', servePage);
 app.get('/calendar', servePage);
 app.get('/most-wanted', servePage);
-app.get('/watch/:id', servePage);
-app.get('/adaptations/:id', servePage);
-app.get('/books/:id', servePage);
+app.get('/watch/:slug', serveDetailPage('screen_works'));
+app.get('/adaptations/:slug', serveDetailPage('adaptations'));
+app.get('/books/:slug', serveDetailPage('books'));
 app.get('/search', servePage);
 app.get('/lists', servePage);
 app.get('/lists/:slug', servePage);

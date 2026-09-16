@@ -17,7 +17,7 @@ export interface SeoHeadOptions {
   title: string;
   description?: string;
   image?: string;
-  /** Path portion of the canonical URL, e.g. `/watch/12`. Defaults to `/`. */
+  /** Path portion of the canonical URL, e.g. `/watch/dune-part-two-2024`. Defaults to `/`. */
   path?: string;
 }
 
@@ -102,28 +102,28 @@ export async function collectSitemapEntries(
   const entries: SitemapEntry[] = STATIC_PATHS.map((p) => ({ loc: origin + p }));
 
   const { results: books } = await db
-    .prepare('SELECT id FROM books ORDER BY id ASC')
-    .all<{ id: number }>();
+    .prepare('SELECT id, slug FROM books ORDER BY id ASC')
+    .all<{ id: number; slug: string | null }>();
   for (const b of books ?? []) {
-    entries.push({ loc: `${origin}/books/${b.id}` });
+    entries.push({ loc: `${origin}/books/${b.slug ?? b.id}` });
   }
 
   const { results: works } = await db
-    .prepare('SELECT id, release_date FROM screen_works ORDER BY id ASC')
-    .all<{ id: number; release_date: string | null }>();
+    .prepare('SELECT id, slug, release_date FROM screen_works ORDER BY id ASC')
+    .all<{ id: number; slug: string | null; release_date: string | null }>();
   for (const w of works ?? []) {
     entries.push({
-      loc: `${origin}/watch/${w.id}`,
+      loc: `${origin}/watch/${w.slug ?? w.id}`,
       // Keep the date-only form Google prefers; release_date is YYYY-MM-DD.
       lastmod: w.release_date ? w.release_date.slice(0, 10) : undefined,
     });
   }
 
   const { results: adaptations } = await db
-    .prepare('SELECT id FROM adaptations ORDER BY id ASC')
-    .all<{ id: number }>();
+    .prepare('SELECT id, slug FROM adaptations ORDER BY id ASC')
+    .all<{ id: number; slug: string | null }>();
   for (const a of adaptations ?? []) {
-    entries.push({ loc: `${origin}/adaptations/${a.id}` });
+    entries.push({ loc: `${origin}/adaptations/${a.slug ?? a.id}` });
   }
 
   return entries;

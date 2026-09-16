@@ -346,7 +346,7 @@ export function ReviewForm({
 
 /**
  * Convenience wrapper for detail pages: heading + form + list.
- * targetType is 'book' for /books/:id, 'screen_work' for /watch/:id.
+ * targetType is 'book' for /books/:slug, 'screen_work' for /watch/:slug.
  */
 export function ReviewsSection({
   targetType,

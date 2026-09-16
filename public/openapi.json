@@ -354,6 +354,30 @@
               "string",
               "null"
             ]
+          },
+          "adaptation_slug": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "dune-part-two-2024",
+            "description": "SEO permalink slug for /adaptations/:slug."
+          },
+          "book_slug": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "dune-frank-herbert",
+            "description": "SEO permalink slug for /books/:slug."
+          },
+          "screen_slug": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "dune-part-two-2024",
+            "description": "SEO permalink slug for /watch/:slug."
           }
         }
       },
@@ -424,6 +448,14 @@
               "string",
               "null"
             ]
+          },
+          "slug": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "dune-frank-herbert",
+            "description": "SEO permalink slug for /books/:slug."
           }
         }
       },
@@ -495,6 +527,14 @@
               "null"
             ],
             "description": "Affiliate URL column; no UI reads it yet."
+          },
+          "slug": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "dune-part-two-2024",
+            "description": "SEO permalink slug for /watch/:slug."
           }
         }
       },
@@ -892,6 +932,17 @@
           },
           "authors": {
             "type": "string"
+          },
+          "slug": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "SEO permalink slug for /books/:slug."
+          },
+          "rank": {
+            "type": "integer",
+            "description": "Relevance tier, 0 = exact title match … 7 = substring; lower is better."
           }
         }
       },
@@ -922,6 +973,17 @@
               "string",
               "null"
             ]
+          },
+          "slug": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "SEO permalink slug for /watch/:slug."
+          },
+          "rank": {
+            "type": "integer",
+            "description": "Relevance tier, 0 = exact title match … 5 = substring; lower is better."
           }
         }
       },
@@ -957,6 +1019,31 @@
               "film",
               "series"
             ]
+          },
+          "slug": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "SEO permalink slug for /adaptations/:slug."
+          },
+          "book_slug": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "SEO permalink slug for /books/:slug."
+          },
+          "screen_slug": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "SEO permalink slug for /watch/:slug."
+          },
+          "rank": {
+            "type": "integer",
+            "description": "Relevance tier, 0 = exact title match … 7 = substring; lower is better."
           }
         }
       },
@@ -1991,6 +2078,17 @@
               "$ref": "#/components/schemas/AdaptationStatus"
             },
             "description": "Filter adaptations by status. 422 on any other value."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "newest"
+              ]
+            },
+            "description": "Opt-in sort: `newest` orders newest catalog records first (id DESC). Default is oldest first. 422 on any other value."
           }
         ],
         "responses": {
@@ -2010,7 +2108,79 @@
         }
       }
     },
-    "/api/v1/adaptations/{id}": {
+    "/api/v1/home/featured": {
+      "get": {
+        "tags": [
+          "Home"
+        ],
+        "summary": "Featured adaptation rail",
+        "description": "A small, fixed-size rail for the home landing page — derived from real data only (no curation): adaptations whose screen work has actual poster art (TMDB enrichment), ordered by the community vote count on the source book, then newest release date, then newest record. `limit` defaults to 12 and is clamped to 24.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 24,
+              "default": 12
+            },
+            "description": "Rail size. 12 by default, 24 max."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Featured adaptation summaries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "limit",
+                    "total"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/AdaptationSummary"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "book_votes"
+                            ],
+                            "properties": {
+                              "book_votes": {
+                                "type": "integer",
+                                "example": 42,
+                                "description": "Community vote count on the source book (drives the ranking)."
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "example": 12
+                    },
+                    "total": {
+                      "type": "integer",
+                      "example": 12
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/adaptations/{idOrSlug}": {
       "get": {
         "tags": [
           "Adaptations"
@@ -2018,12 +2188,12 @@
         "summary": "Adaptation detail",
         "parameters": [
           {
-            "name": "id",
+            "name": "idOrSlug",
             "in": "path",
             "required": true,
+            "description": "Numeric id (legacy) or SEO permalink slug.",
             "schema": {
-              "type": "integer",
-              "minimum": 1
+              "type": "string"
             }
           }
         ],
@@ -2085,7 +2255,7 @@
         }
       }
     },
-    "/api/v1/books/{id}": {
+    "/api/v1/books/{idOrSlug}": {
       "get": {
         "tags": [
           "Books"
@@ -2093,12 +2263,12 @@
         "summary": "Book detail",
         "parameters": [
           {
-            "name": "id",
+            "name": "idOrSlug",
             "in": "path",
             "required": true,
+            "description": "Numeric id (legacy) or SEO permalink slug.",
             "schema": {
-              "type": "integer",
-              "minimum": 1
+              "type": "string"
             }
           },
           {
@@ -2211,7 +2381,7 @@
         }
       }
     },
-    "/api/v1/watch/{id}": {
+    "/api/v1/watch/{idOrSlug}": {
       "get": {
         "tags": [
           "ScreenWorks"
@@ -2219,12 +2389,12 @@
         "summary": "Screen-work detail",
         "parameters": [
           {
-            "name": "id",
+            "name": "idOrSlug",
             "in": "path",
             "required": true,
+            "description": "Numeric id (legacy) or SEO permalink slug.",
             "schema": {
-              "type": "integer",
-              "minimum": 1
+              "type": "string"
             }
           },
           {
@@ -4026,7 +4196,7 @@
           "Calendar"
         ],
         "summary": "Release calendar feed",
-        "description": "Screen works bucketed by release date: `coming_soon` (today or later),\n`recently_released` (trailing 120 days), `earlier_releases` (dated but\nolder than the window, newest first), and `tba` (no usable date).\n",
+        "description": "Screen works bucketed by release date: `coming_soon` (today or later),\n`recently_released` (trailing 120 days), `earlier_years` (year\nsummaries for older dated releases, newest year first), `tba` (no\nusable date), and `earlier_releases` (only the newest year's items,\nshipped inline for first paint). Older years lazy-load via\n/api/v1/calendar/year/{year}.\n",
         "responses": {
           "200": {
             "description": "Calendar feed.",
@@ -4038,6 +4208,7 @@
                     "today",
                     "coming_soon",
                     "recently_released",
+                    "earlier_years",
                     "earlier_releases",
                     "tba"
                   ],
@@ -4059,8 +4230,29 @@
                         "$ref": "#/components/schemas/CalendarWork"
                       }
                     },
+                    "earlier_years": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "year",
+                          "count"
+                        ],
+                        "properties": {
+                          "year": {
+                            "type": "string",
+                            "example": "2025"
+                          },
+                          "count": {
+                            "type": "integer",
+                            "example": 42
+                          }
+                        }
+                      }
+                    },
                     "earlier_releases": {
                       "type": "array",
+                      "description": "Items for the newest earlier year only.",
                       "items": {
                         "$ref": "#/components/schemas/CalendarWork"
                       }
@@ -4075,6 +4267,58 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/calendar/year/{year}": {
+      "get": {
+        "tags": [
+          "Calendar"
+        ],
+        "summary": "One earlier-release year",
+        "description": "Works released in the given year that fall outside the recent window\n(the same set counted in /api/v1/calendar's `earlier_years`),\nnewest first. Powers lazy-loading of collapsed calendar year groups.\n",
+        "parameters": [
+          {
+            "name": "year",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}$",
+              "example": "1994"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The year's earlier releases.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "year",
+                    "works"
+                  ],
+                  "properties": {
+                    "year": {
+                      "type": "string",
+                      "example": "1994"
+                    },
+                    "works": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CalendarWork"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed year."
           }
         }
       }

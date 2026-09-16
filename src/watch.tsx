@@ -1,11 +1,11 @@
 /** @jsxImportSource hono/jsx */
 /**
- * src/watch.tsx — the screen-work page (`/watch/:id`).
+ * src/watch.tsx — the screen-work page (`/watch/:slug`).
  *
  * Conceptual split, kept crisp in copy throughout:
- *   /adaptations/:id = "the adaptation story" — the book→screen journey and
+ *   /adaptations/:slug = "the adaptation story" — the book→screen journey and
  *                      its status timeline.
- *   /watch/:id       = "the screen work" — the film or series itself:
+ *   /watch/:slug       = "the screen work" — the film or series itself:
  *                      poster, synopsis, linked books/adaptations, news.
  *
  * Stubbed on purpose: synopsis/cast/crew arrive via future TMDB enrichment
@@ -34,10 +34,6 @@ function releaseYear(releaseDate: string | null | undefined): string | null {
   if (!releaseDate || releaseDate.length < 4) return null;
   const y = releaseDate.slice(0, 4);
   return /^\d{4}$/.test(y) ? y : null;
-}
-
-function tmdbUrl(kind: string, tmdbId: number): string {
-  return `https://www.themoviedb.org/${kind === 'film' ? 'movie' : 'tv'}/${tmdbId}`;
 }
 
 export function ScreenWorkPage({
@@ -101,22 +97,12 @@ export function ScreenWorkPage({
             {work.release_date && (
               <span class="kind-pill">📅 {work.release_date}</span>
             )}
-            {work.tmdb_id && (
-              <a
-                class="kind-pill"
-                href={tmdbUrl(work.kind, work.tmdb_id)}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                TMDB ↗
-              </a>
-            )}
           </div>
           <p class="meta" style="margin-top:0.75rem">
             This page is about the screen work itself — the film or series. For
             the full book-to-screen story and its status timeline, see the{' '}
             {work.adaptations.length === 1 ? (
-              <a href={`/adaptations/${work.adaptations[0]!.id}`}>
+              <a href={`/adaptations/${work.adaptations[0]!.slug ?? work.adaptations[0]!.id}`}>
                 adaptation page →
               </a>
             ) : (
@@ -175,20 +161,6 @@ export function ScreenWorkPage({
             <dd>{kindLabel(work.kind)}</dd>
             <dt>Release</dt>
             <dd>{work.release_date ?? 'TBA'}</dd>
-            <dt>TMDB</dt>
-            <dd>
-              {work.tmdb_id ? (
-                <a
-                  href={tmdbUrl(work.kind, work.tmdb_id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  View on TMDB ↗
-                </a>
-              ) : (
-                '—'
-              )}
-            </dd>
           </dl>
         </section>
         <section class="panel">
@@ -210,7 +182,7 @@ export function ScreenWorkPage({
             {work.books.map((b) => (
               <li key={b.id}>
                 <span>
-                  <a href={`/books/${b.id}`}>{b.title}</a>
+                  <a href={`/books/${b.slug ?? b.id}`}>{b.title}</a>
                   <span class="meta"> by {b.authors}</span>
                 </span>
                 <span class="shelf-kind kind-pill">📚 Book</span>
@@ -231,7 +203,7 @@ export function ScreenWorkPage({
             {work.adaptations.map((a) => (
               <li key={a.id}>
                 <span>
-                  <a href={`/adaptations/${a.id}`}>{a.title}</a>
+                  <a href={`/adaptations/${a.slug ?? a.id}`}>{a.title}</a>
                 </span>
                 <StatusBadge status={a.status} />
               </li>

@@ -1,6 +1,7 @@
 // public/js/views/lists.js — My lists, public list detail, Shelves.
 
 import { esc, posterArt } from '../utils.js';
+import { bookUrl, adaptationUrl } from '../links.js';
 import { api, errMsg } from '../api.js';
 import { navigate, renderNotFound, rerender } from '../router.js';
 import { pagination, wirePagination } from '../components.js';
@@ -347,7 +348,7 @@ export async function shelvesView() {
               `<ul class="shelf-list">` +
               (grouped.get(shelf) || []).map((s) =>
                 `<li>` +
-                  `<span><a href="${s.target_type === 'book' ? `/books/${s.target_id}` : `/adaptations/${s.target_id}`}">${esc(s.title)}</a></span>` +
+                  `<span><a href="${s.target_type === 'book' ? bookUrl(s) : adaptationUrl(s)}">${esc(s.title)}</a></span>` +
                   `<span class="shelf-kind kind-pill">${s.target_type === 'book' ? '📚 Book' : '🎬 Adaptation'}</span>` +
                 `</li>`
               ).join('') +

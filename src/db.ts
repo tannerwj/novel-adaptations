@@ -9,6 +9,8 @@ export interface Book {
   isbn: string | null;
   openlibrary_id: string | null;
   googlebooks_id: string | null;
+  /** SEO permalink slug (migration 0020). Null until the backfill runs. */
+  slug: string | null;
 }
 
 export interface ScreenWork {
@@ -24,6 +26,8 @@ export interface ScreenWork {
   synopsis: string | null;
   /** Added in migration 0009; stored, NOT rendered yet (affiliate UI is future). */
   purchase_url_screen: string | null;
+  /** SEO permalink slug (migration 0020). Null until the backfill runs. */
+  slug: string | null;
 }
 
 export interface Adaptation {
@@ -53,18 +57,24 @@ export interface AdaptationSummary extends Adaptation {
   screen_poster_url: string | null;
   /** Populated from screen_works.backdrop_url (migration 0006). */
   screen_backdrop_url: string | null;
+  /** SEO permalink slugs (migration 0020). Null until the backfill runs. */
+  adaptation_slug: string | null;
+  book_slug: string | null;
+  screen_slug: string | null;
 }
 
 /** Shared JOIN behind listAdaptations / getAdaptationSummary. Exported so the
  * v1 API can batch it with sibling statements in one D1 round trip. */
 export const SELECT_ADAPTATION_SUMMARY = `
   SELECT a.id, a.book_id, a.screen_work_id, a.status, a.source_url,
+         a.slug AS adaptation_slug,
          b.title AS book_title, b.authors AS book_authors,
-         b.cover_url AS book_cover_url,
+         b.cover_url AS book_cover_url, b.slug AS book_slug,
          s.title AS screen_title, s.kind AS screen_kind,
          s.release_date AS screen_release_date,
          s.poster_url AS screen_poster_url,
-         s.backdrop_url AS screen_backdrop_url
+         s.backdrop_url AS screen_backdrop_url,
+         s.slug AS screen_slug
   FROM adaptations a
   JOIN books b ON b.id = a.book_id
   JOIN screen_works s ON s.id = a.screen_work_id
@@ -108,8 +118,8 @@ export async function getBookAdaptations(
 
 /** A screen work plus its linked adaptations and linked books (one page load). */
 export interface ScreenWorkDetail extends ScreenWork {
-  adaptations: { id: number; title: string; status: string }[];
-  books: { id: number; title: string; authors: string }[];
+  adaptations: { id: number; title: string; status: string; slug: string | null }[];
+  books: { id: number; title: string; authors: string; slug: string | null }[];
 }
 
 /** Null when no screen_works row has that id (route turns it into a 404). */
@@ -124,25 +134,75 @@ export async function getScreenWork(
   if (!row) return null;
   const { results: adaptations } = await db
     .prepare(
-      `SELECT a.id, b.title AS title, a.status
+      `SELECT a.id, a.slug, b.title AS title, a.status
        FROM adaptations a
        JOIN books b ON b.id = a.book_id
        WHERE a.screen_work_id = ?1
        ORDER BY a.id ASC`,
     )
     .bind(id)
-    .all<{ id: number; title: string; status: string }>();
+    .all<{ id: number; title: string; status: string; slug: string | null }>();
   const { results: books } = await db
     .prepare(
-      `SELECT DISTINCT b.id, b.title, b.authors
+      `SELECT DISTINCT b.id, b.slug, b.title, b.authors
        FROM adaptations a
        JOIN books b ON b.id = a.book_id
        WHERE a.screen_work_id = ?1
        ORDER BY b.id ASC`,
     )
     .bind(id)
-    .all<{ id: number; title: string; authors: string }>();
+    .all<{ id: number; title: string; authors: string; slug: string | null }>();
   return { ...row, adaptations: adaptations ?? [], books: books ?? [] };
+}
+
+/** Numeric id for a slug, or null. Table is a fixed union — no injection. */
+export async function idForSlug(
+  db: D1Database,
+  table: 'books' | 'screen_works' | 'adaptations',
+  slug: string,
+): Promise<number | null> {
+  const row = await db
+    .prepare(`SELECT id FROM ${table} WHERE slug = ?1`)
+    .bind(slug)
+    .first<{ id: number }>();
+  return row?.id ?? null;
+}
+
+/** Slug for a numeric id, or null when the row is missing / not backfilled. */
+export async function slugForId(
+  db: D1Database,
+  table: 'books' | 'screen_works' | 'adaptations',
+  id: number,
+): Promise<string | null> {
+  const row = await db
+    .prepare(`SELECT slug FROM ${table} WHERE id = ?1`)
+    .bind(id)
+    .first<{ slug: string | null }>();
+  return row?.slug ?? null;
+}
+
+export async function getBookBySlug(db: D1Database, slug: string): Promise<Book | null> {
+  const id = await idForSlug(db, 'books', slug);
+  return id === null ? null : getBook(db, id);
+}
+
+export async function getScreenWorkBySlug(
+  db: D1Database,
+  slug: string,
+): Promise<ScreenWorkDetail | null> {
+  const id = await idForSlug(db, 'screen_works', slug);
+  return id === null ? null : getScreenWork(db, id);
+}
+
+export async function getAdaptationSummaryBySlug(
+  db: D1Database,
+  slug: string,
+): Promise<AdaptationSummary | null> {
+  const row = await db
+    .prepare(`${SELECT_ADAPTATION_SUMMARY} WHERE a.slug = ?1`)
+    .bind(slug)
+    .first<AdaptationSummary>();
+  return row ?? null;
 }
 
 /**

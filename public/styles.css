@@ -423,7 +423,12 @@ body.sheet-open { overflow: hidden; }
   .display-title { font-size: 2rem; }
   .hero h1 { font-size: 2rem; }
 }
-/* ---- poster cards ---- */
+/* ---- poster cards ----
+ * ARTWORK POLICY: every book cover and screen poster renders at a 2:3
+ * aspect ratio with object-fit: cover cropping (.poster, .hero .poster,
+ * .rank-thumb, .duel-art) so cards, heroes, and search results all treat
+ * artwork identically. posterArt() in public/js/utils.js always emits
+ * the .poster wrapper; never bypass it for title artwork. */
 .poster-grid {
   display: grid; gap: 1.75rem 1.5rem;
   grid-template-columns: repeat(2, 1fr);
@@ -886,6 +891,29 @@ table.admin-table th {
 .search-result-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .75rem; }
 .search-result-list > li > a:first-child { font-weight: 600; }
 .search-result-list .sub { color: var(--muted); font-size: .88rem; }
+
+/* ---- search filters + empty state ---- */
+.search-filters { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: 0 0 1.75rem; }
+.search-filters .meta { margin-right: .25rem; }
+.filter-pill {
+  font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer;
+  padding: .4rem .95rem; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--muted);
+}
+.filter-pill:hover { border-color: var(--accent); color: var(--text); }
+.filter-pill.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.filter-status { display: inline-flex; align-items: center; gap: .4rem; font-size: .82rem; color: var(--muted); margin-left: .25rem; }
+.filter-status select {
+  font: inherit; font-size: .82rem; font-weight: 600; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px;
+  padding: .4rem .8rem; cursor: pointer;
+}
+.empty-state { padding: 2.5rem 0; max-width: 34rem; }
+.empty-state h2 { font-family: var(--serif); font-size: 1.6rem; margin: .25rem 0 .5rem; }
+.empty-state p { color: var(--muted); }
+.empty-state .btn { margin-top: .75rem; display: inline-block; text-decoration: none; }
+/* Keyboard highlight for the active search result. */
+[role="option"][aria-selected="true"] { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: .5rem; }
 .adapt-story { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; }
 @media (max-width: 719px) {
   /* 44px row hit areas for result titles. */
@@ -1109,25 +1137,35 @@ textarea.f-input { min-height: 4.5rem; resize: vertical; }
 }
 
 
-/* --- hype meter (src/hype/ui.tsx HYPE_CSS) --- */
+/* --- hype meter (public/js/widgets.js hypeWidget) --- */
 
 
-.hype-widget { border: 1px solid var(--border); background: var(--bg-soft); border-radius: var(--radius); padding: 1rem 1.25rem; }
-.hype-title { font-family: var(--serif); font-size: 1.1rem; font-weight: 700; color: var(--text); }
-.hype-gauge { display: flex; gap: 6px; margin: 0.75rem 0 0.5rem; }
-.hype-cell { flex: 1 1 0; height: 14px; border-radius: 7px; background: var(--surface-2); border: 1px solid var(--border); }
+.hype-widget { border: 1px solid var(--border); background: var(--bg-soft); border-radius: var(--radius); padding: 0.8rem 1rem; max-width: 34rem; }
+.hype-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
+.hype-title { font-family: var(--serif); font-size: 1rem; font-weight: 700; color: var(--text); white-space: nowrap; }
+.hype-stats { margin: 0; color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
+.hype-stats strong { color: var(--text); font-size: 1rem; }
+.hype-gauge { display: flex; gap: 4px; margin: 0.55rem 0 0.15rem; }
+.hype-cell { flex: 1 1 0; height: 10px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--border); }
 .hype-cell.on { background: linear-gradient(90deg, #ff9a3c, #ff5e3a, #e5383b); border-color: transparent; }
-.hype-stats { margin: 0; color: var(--muted); font-size: 0.9rem; }
-.hype-stats strong { color: var(--text); font-size: 1.05rem; }
-.hype-ask { margin: 0.9rem 0 0.4rem; color: var(--text); font-weight: 600; font-size: 0.95rem; }
-.hype-segs { display: flex; gap: 6px; }
-.hype-seg { flex: 1 1 0; appearance: none; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--muted); border-radius: 10px; padding: 0.55rem 0 0.45rem; font: inherit; font-size: 0.85rem; font-weight: 700; }
-.hype-seg:hover { border-color: #ff9a3c; color: var(--text); }
-.hype-seg.mine { background: linear-gradient(180deg, rgba(255,154,60,.28), rgba(229,56,59,.28)); border-color: #ff9a3c; color: var(--text); }
+.hype-vote { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
+.hype-ask { margin: 0; color: var(--text); font-weight: 600; font-size: 0.85rem; }
+.hype-segs { display: flex; gap: 4px; flex: 1 1 auto; min-width: 12rem; }
+.hype-seg { flex: 1 1 0; appearance: none; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--muted); border-radius: 8px; padding: 0.4rem 0; font: inherit; font-size: 0.8rem; font-weight: 700; }
+.hype-seg:hover { border-color: #ff9a3c; color: var(--text); transform: translateY(-1px); }
+.hype-seg.mine { background: linear-gradient(180deg, rgba(255,154,60,.3), rgba(229,56,59,.3)); border-color: #ff9a3c; color: var(--text); box-shadow: 0 0 0 1px #ff9a3c inset; }
 .hype-seg:disabled { opacity: 0.6; cursor: wait; }
-.hype-hint { margin: 0.5rem 0 0; color: var(--faint); font-size: 0.8rem; }
-.hype-signin { margin: 0.9rem 0 0; color: var(--muted); font-size: 0.9rem; }
+.hype-hint { margin: 0.45rem 0 0; color: var(--faint); font-size: 0.75rem; width: 100%; }
+.hype-signin { margin: 0.6rem 0 0; color: var(--muted); font-size: 0.85rem; }
 .hype-signin a { color: var(--link); }
+
+/* --- where to watch (compact provider chips, public/js/views/detail.js) --- */
+.wtw h2 { margin-bottom: 0.5rem; }
+.wtw-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.wtw-chip { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.6rem 0.3rem 0.35rem; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font-size: 0.8rem; font-weight: 600; text-decoration: none; }
+.wtw-chip img { border-radius: 50%; display: block; }
+.wtw-chip:hover { border-color: var(--accent); text-decoration: none; color: var(--text); }
+.wtw-caption { margin: 0.6rem 0 0; font-size: 0.75rem; }
 
 
 /* --- spoiler-safe reviews (src/reviews/ui.tsx REVIEW_CSS) --- */
@@ -1188,7 +1226,46 @@ textarea.f-input { min-height: 4.5rem; resize: vertical; }
 .skip-link:focus { left: 0; }
 
 
-/* ---- 16px minimum on form controls (last in file — wins specificity ties) ----
+/* ---- home landing (hero, rails, browse chips) ---- */
+.home-hero { padding: 1.5rem 0 0; }
+.home-search { max-width: 38rem; }
+.home-search input[type="search"] { padding: .85rem 1.1rem; }
+.chip-row { display: flex; flex-wrap: wrap; gap: .5rem; margin: 0 0 1rem; }
+.chip {
+  display: inline-block; padding: .45rem 1rem; border: 1px solid var(--border);
+  border-radius: 999px; background: var(--surface); color: var(--text);
+  font-weight: 600; font-size: .88rem; text-decoration: none;
+}
+.chip:hover { border-color: var(--border-strong); background: var(--surface-2); text-decoration: none; }
+.section-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 1rem; margin: 3rem 0 1.25rem;
+}
+.home-section-title {
+  font-family: var(--serif); font-size: 1.55rem; font-weight: 700;
+  margin: 0 0 .35rem; letter-spacing: -.01em;
+}
+.section-sub { color: var(--muted); font-size: .95rem; margin: 0; max-width: 40rem; }
+.view-all { font-weight: 600; white-space: nowrap; padding-top: .35rem; }
+.rail {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 172px);
+  gap: 1.25rem; overflow-x: auto; padding-bottom: .75rem;
+  scroll-snap-type: x mandatory;
+}
+.rail .poster-card { scroll-snap-align: start; }
+.two-col { display: grid; gap: 2rem; }
+@media (min-width: 820px) { .two-col { grid-template-columns: 1fr 1fr; } }
+.two-col .empty { padding: 1.5rem 1rem; text-align: left; }
+.catalog-cta {
+  margin: 3.5rem 0 1rem; padding: 2.25rem 2rem; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--surface); text-align: center;
+}
+.catalog-cta .home-section-title { margin-bottom: .5rem; }
+.catalog-cta .section-sub { margin: 0 auto 1.25rem; }
+.catalog-cta p:last-child { margin-bottom: 0; }
+
+
+/* ---- 16px minimum on form controls (wins specificity ties) ----
  * iOS Safari auto-zooms the page when a focused control is smaller than 16px.
  * Label text sizes are untouched — only the controls. */
 .auth-card input[type="email"], .auth-card input[type="text"],
