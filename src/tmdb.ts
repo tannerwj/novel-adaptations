@@ -86,6 +86,13 @@ function isoDateOrNull(raw: string | null | undefined): string | null {
  *
  * Picks the first result carrying a poster, preferring one whose normalized
  * title matches the query; returns null when nothing suitable is found.
+ *
+ * Year safety: TMDB's year filter is not bulletproof, so every hit is
+ * post-verified — a hit whose own release year differs from the known year
+ * by more than one is rejected (release years legitimately disagree by a
+ * year across sources: festival premiere vs wide release). When the
+ * year-filtered search finds nothing, one unfiltered retry is allowed, but
+ * only a normalized-title match within ±1 year is accepted — never a guess.
  */
 export async function searchTmdb(
   apiKey: string,
@@ -94,59 +101,66 @@ export async function searchTmdb(
 ): Promise<TmdbEnrichment | null> {
   const title = input.title.trim();
   if (!apiKey || !title) return null;
+  const year =
+    input.year && Number.isInteger(input.year) && input.year > 1800
+      ? input.year
+      : null;
 
   const endpoint = input.kind === 'series' ? 'search/tv' : 'search/movie';
-  const params = new URLSearchParams({
-    api_key: apiKey,
-    query: title,
-    language: 'en-US',
-    page: '1',
-    include_adult: 'false',
-  });
-  if (input.year && Number.isInteger(input.year) && input.year > 1800) {
-    params.set(input.kind === 'series' ? 'first_air_date_year' : 'year', String(input.year));
-  }
-
-  let res: Response;
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
-    try {
-      res = await fetcher(`${TMDB_API}/${endpoint}?${params}`, {
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
-  } catch {
-    return null; // Network failure → no enrichment; the caller counts it.
-  }
-  if (!res.ok) return null;
-
-  let payload: { results?: TmdbSearchResult[] };
-  try {
-    payload = (await res.json()) as { results?: TmdbSearchResult[] };
-  } catch {
-    return null;
-  }
-  const results = Array.isArray(payload.results) ? payload.results : [];
-  // Only results with a poster are useful to us (the backfill selects exactly
-  // the poster-less rows). Scan a few candidates so one poster-less top hit
-  // doesn't block a good match ranked just below it.
-  const candidates = results.filter(
-    (r) => r && Number.isInteger(r.id) && r.id > 0 && r.poster_path,
-  );
-  if (candidates.length === 0) return null;
-
+  const yearParam = input.kind === 'series' ? 'first_air_date_year' : 'year';
   const wanted = normalizeTitle(title);
-  const match =
-    candidates.find((r) =>
+
+  const doSearch = async (withYear: boolean): Promise<TmdbSearchResult | null> => {
+    const params = new URLSearchParams({
+      api_key: apiKey,
+      query: title,
+      language: 'en-US',
+      page: '1',
+      include_adult: 'false',
+    });
+    if (withYear && year) params.set(yearParam, String(year));
+
+    let res: Response;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+      try {
+        res = await fetcher(`${TMDB_API}/${endpoint}?${params}`, {
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+    } catch {
+      return null; // Network failure → no enrichment; the caller counts it.
+    }
+    if (!res.ok) return null;
+
+    let payload: { results?: TmdbSearchResult[] };
+    try {
+      payload = (await res.json()) as { results?: TmdbSearchResult[] };
+    } catch {
+      return null;
+    }
+    const results = Array.isArray(payload.results) ? payload.results : [];
+    // Only results with a poster are useful to us (the backfill selects exactly
+    // the poster-less rows). Scan a few candidates so one poster-less top hit
+    // doesn't block a good match ranked just below it.
+    const candidates = results.filter(
+      (r) => r && Number.isInteger(r.id) && r.id > 0 && r.poster_path,
+    );
+    if (candidates.length === 0) return null;
+
+    const exact = candidates.find((r) =>
       [r.title, r.name, r.original_title, r.original_name]
         .filter(Boolean)
         .some((t) => normalizeTitle(t as string) === wanted),
-    ) ?? candidates[0]!;
+    );
+    // Unfiltered fallback must not guess: require the title match.
+    return exact ?? (withYear ? candidates[0]! : null);
+  };
 
-  return {
+  const toEnrichment = (match: TmdbSearchResult): TmdbEnrichment => ({
     tmdbId: match.id,
     posterUrl: `https://image.tmdb.org/t/p/${POSTER_SIZE}${match.poster_path}`,
     backdropUrl: match.backdrop_path
@@ -160,7 +174,34 @@ export async function searchTmdb(
       input.kind === 'series'
         ? isoDateOrNull(match.first_air_date)
         : isoDateOrNull(match.release_date),
+  });
+
+  /** The hit's own release year, for post-verification against the known year. */
+  const hitYear = (e: TmdbEnrichment): number | null =>
+    e.releaseDate && /^\d{4}/.test(e.releaseDate)
+      ? Number(e.releaseDate.slice(0, 4))
+      : null;
+  const yearOk = (e: TmdbEnrichment): boolean => {
+    if (!year) return true; // nothing to verify against — accept title match
+    const hy = hitYear(e);
+    return hy !== null && Math.abs(hy - year) <= 1;
   };
+
+  // Primary: year-filtered search, post-verified.
+  const primary = await doSearch(true);
+  if (primary) {
+    const e = toEnrichment(primary);
+    if (yearOk(e)) return e;
+  }
+  // Fallback: unfiltered search, title match + ±1 year only.
+  if (year) {
+    const fallback = await doSearch(false);
+    if (fallback) {
+      const e = toEnrichment(fallback);
+      if (yearOk(e)) return e;
+    }
+  }
+  return null;
 }
 
 /**

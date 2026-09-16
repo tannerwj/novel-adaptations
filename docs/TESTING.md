@@ -89,8 +89,10 @@ How it works:
   interaction — the SPA must never trigger a full page load.
 
 What it covers (14 flows, all green against production): avatar menu +
-logout; home 24→40 cards in place with **every poster image actually
-loading** (scroll-triggered, catches broken TMDB artwork); Most Wanted vote
+logout; home 24→48→72 cards in place with **every rendered poster image
+actually loading** (scroll-triggered, catches broken TMDB artwork; the full
+~1000-title catalog is covered by API pagination in the Node suite rather
+than clicking through 40+ load-more pages); Most Wanted vote
 with live count +1; 4★ rating → persistence across reload → change to 2★;
 "Book" poll vote with tally movement; spoiler review post → blurred until
 revealed; list create → add item → item with poster on the detail page →

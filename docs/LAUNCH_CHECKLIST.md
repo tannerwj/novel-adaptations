@@ -56,6 +56,14 @@ deploy.
    backfill** (10 works per run) as new works are added or when unmatched
    titles get TMDB entries.
 
+   2026-09-16 catalog expansion: the catalog grew 40 → ~1,260 adaptations
+   via a Wikidata harvest (films + TV series with P144 "based on" links to
+   books/literary works, top-by-sitelinks per decade, stage works and video
+   games excluded) enriched with Open Library book data. New rows carry
+   year-only release dates that the TMDB backfill refines to exact dates;
+   each newly-dated adaptation got a sourced "Released" timeline event.
+   Re-run the backfill for any rows that still show year-only dates.
+
 ## Already verified (2026-09-15)
 
 - Footer: no design-doc link, TMDB attribution present, Privacy/Terms links added.

@@ -482,6 +482,12 @@ body.sheet-open { overflow: hidden; }
 .poster-card .card-title a:hover { color: var(--accent-deep); text-decoration: none; }
 .poster-card .card-meta { color: var(--muted); font-size: .85rem; margin: 0 0 .45rem; }
 .poster-card .card-meta a { color: var(--muted); }
+/* WCAG 2.2 target size: card title/author links are tappable targets, so they
+   get a 24px minimum hit area without changing the card's visual rhythm. */
+.poster-card .card-title a,
+.poster-card .card-meta a {
+  display: inline-block; min-height: 24px;
+}
 .poster-card .card-badges { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
 
 /* ---- badges ---- */
