@@ -21,6 +21,7 @@ import { THEME_COOKIE } from './ui';
 import { spaShell, type ThemeName } from './spa/shell';
 import { serverHeaderHtml, serverFooterHtml, type ChromeUser } from './spa/chrome';
 import { getUser, type SessionUser } from './auth/session';
+import { isCrawler, servePrerendered } from './prerender';
 
 export interface Env {
   DB: D1Database;
@@ -81,23 +82,40 @@ const serveShell = async (c: Context) => {
 // Bookmarkable SPA routes. GET /auth/verify?token=… serves the shell and the
 // SPA consumes the token via POST /api/v1/auth/verify (magic-link emails keep
 // working across the cutover).
-app.get('/', serveShell);
-app.get('/calendar', serveShell);
-app.get('/most-wanted', serveShell);
-app.get('/watch/:id', serveShell);
-app.get('/adaptations/:id', serveShell);
-app.get('/books/:id', serveShell);
-app.get('/search', serveShell);
-app.get('/lists', serveShell);
-app.get('/lists/:slug', serveShell);
-app.get('/shelves', serveShell);
-app.get('/feedback', serveShell);
-app.get('/auth/login', serveShell);
-app.get('/auth/verify', serveShell);
-app.get('/admin/news', serveShell);
-app.get('/admin/news/runs', serveShell);
-app.get('/admin/screen-works', serveShell);
-app.get('/admin/feedback', serveShell);
+//
+// Bot-aware: requests with a crawler User-Agent get a lightweight prerendered
+// HTML document (per-route title/meta/OG tags from D1, cached at the edge)
+// instead of the SPA shell; real browsers always get the shell. Auth/admin
+// routes and unknown IDs fall through to the shell (prerender returns null).
+const servePage = async (c: Context) => {
+  if (c.req.method === 'GET' && isCrawler(c.req.header('user-agent'))) {
+    const prerendered = await servePrerendered(
+      c.env.DB,
+      c.req.url,
+      (p) => c.executionCtx.waitUntil(p),
+    );
+    if (prerendered) return prerendered;
+  }
+  return serveShell(c);
+};
+
+app.get('/', servePage);
+app.get('/calendar', servePage);
+app.get('/most-wanted', servePage);
+app.get('/watch/:id', servePage);
+app.get('/adaptations/:id', servePage);
+app.get('/books/:id', servePage);
+app.get('/search', servePage);
+app.get('/lists', servePage);
+app.get('/lists/:slug', servePage);
+app.get('/shelves', servePage);
+app.get('/feedback', servePage);
+app.get('/auth/login', servePage);
+app.get('/auth/verify', servePage);
+app.get('/admin/news', servePage);
+app.get('/admin/news/runs', servePage);
+app.get('/admin/screen-works', servePage);
+app.get('/admin/feedback', servePage);
 
 // Embedded favicon (src/favicon.ts — no [assets] static dir).
 // Registered before the API so the icon paths are never shadowed.
