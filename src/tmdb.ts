@@ -84,15 +84,17 @@ function isoDateOrNull(raw: string | null | undefined): string | null {
  * The year is passed as a search filter (year / first_air_date_year) when
  * known, which is the standard way to disambiguate remakes.
  *
- * Picks the first result carrying a poster, preferring one whose normalized
- * title matches the query; returns null when nothing suitable is found.
+ * Picks the first result carrying a poster whose normalized title matches
+ * the query and whose own release year is within ±1 of the known year;
+ * returns null when nothing suitable is found.
  *
  * Year safety: TMDB's year filter is not bulletproof, so every hit is
  * post-verified — a hit whose own release year differs from the known year
  * by more than one is rejected (release years legitimately disagree by a
  * year across sources: festival premiere vs wide release). When the
- * year-filtered search finds nothing, one unfiltered retry is allowed, but
- * only a normalized-title match within ±1 year is accepted — never a guess.
+ * year-filtered search finds nothing, one unfiltered retry scans every
+ * exact-title hit for one within ±1 year (remake versions rank below the
+ * popular original, so the top hit alone isn't enough) — never a guess.
  */
 export async function searchTmdb(
   apiKey: string,
@@ -110,7 +112,9 @@ export async function searchTmdb(
   const yearParam = input.kind === 'series' ? 'first_air_date_year' : 'year';
   const wanted = normalizeTitle(title);
 
-  const doSearch = async (withYear: boolean): Promise<TmdbSearchResult | null> => {
+  const doSearch = async (
+    withYear: boolean,
+  ): Promise<TmdbSearchResult[]> => {
     const params = new URLSearchParams({
       api_key: apiKey,
       query: title,
@@ -132,33 +136,30 @@ export async function searchTmdb(
         clearTimeout(timeout);
       }
     } catch {
-      return null; // Network failure → no enrichment; the caller counts it.
+      return []; // Network failure → no enrichment; the caller counts it.
     }
-    if (!res.ok) return null;
+    if (!res.ok) return [];
 
     let payload: { results?: TmdbSearchResult[] };
     try {
       payload = (await res.json()) as { results?: TmdbSearchResult[] };
     } catch {
-      return null;
+      return [];
     }
     const results = Array.isArray(payload.results) ? payload.results : [];
     // Only results with a poster are useful to us (the backfill selects exactly
     // the poster-less rows). Scan a few candidates so one poster-less top hit
     // doesn't block a good match ranked just below it.
-    const candidates = results.filter(
+    return results.filter(
       (r) => r && Number.isInteger(r.id) && r.id > 0 && r.poster_path,
     );
-    if (candidates.length === 0) return null;
-
-    const exact = candidates.find((r) =>
-      [r.title, r.name, r.original_title, r.original_name]
-        .filter(Boolean)
-        .some((t) => normalizeTitle(t as string) === wanted),
-    );
-    // Unfiltered fallback must not guess: require the title match.
-    return exact ?? (withYear ? candidates[0]! : null);
   };
+
+  /** Normalized title equality against every title variant TMDB returns. */
+  const isTitleMatch = (r: TmdbSearchResult): boolean =>
+    [r.title, r.name, r.original_title, r.original_name]
+      .filter(Boolean)
+      .some((t) => normalizeTitle(t as string) === wanted);
 
   const toEnrichment = (match: TmdbSearchResult): TmdbEnrichment => ({
     tmdbId: match.id,
@@ -187,17 +188,20 @@ export async function searchTmdb(
     return hy !== null && Math.abs(hy - year) <= 1;
   };
 
-  // Primary: year-filtered search, post-verified.
-  const primary = await doSearch(true);
-  if (primary) {
-    const e = toEnrichment(primary);
+  // Primary: year-filtered search — exact title + post-verified year only.
+  // Never a guess: a non-exact title is skipped even when its year fits.
+  for (const r of await doSearch(true)) {
+    if (!isTitleMatch(r)) continue;
+    const e = toEnrichment(r);
     if (yearOk(e)) return e;
   }
-  // Fallback: unfiltered search, title match + ±1 year only.
+  // Fallback: unfiltered search, scanning every exact-title hit for one
+  // within ±1 year (remake versions rank below the popular original, so the
+  // top hit alone isn't enough). Still never a guess.
   if (year) {
-    const fallback = await doSearch(false);
-    if (fallback) {
-      const e = toEnrichment(fallback);
+    for (const r of await doSearch(false)) {
+      if (!isTitleMatch(r)) continue;
+      const e = toEnrichment(r);
       if (yearOk(e)) return e;
     }
   }
