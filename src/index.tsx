@@ -1,44 +1,23 @@
-import { Hono } from 'hono';
-import { setCookie } from 'hono/cookie';
-import { AdaptationPage, BookPage, HomePage, Layout, THEME_COOKIE, themeOf } from './ui';
-import { ScreenWorkPage } from './watch';
-import {
-  getAdaptationSummary,
-  getBook,
-  getBookAdaptations,
-  getScreenWork,
-  getScreenWorkNews,
-  listAdaptations,
-} from './db';
-import { registerCurationRoutes } from './news/curation';
-import { scheduledNewsRun } from './news/ingest';
-import { getUser, type SessionUser } from './auth/session';
-import { mountAuth } from './auth/routes';
-import { mountVotes } from './votes/routes';
-import { mountFeedback } from './feedback/routes';
-import { getAdaptationTimeline, getBookVoteState } from './votes/detail';
-import { getShelf } from './votes/db';
+// Phase 2+3 (SSR→SPA cutover): this worker now serves a single-page app.
+//
+// - Every bookmarkable page route serves the SPA shell (src/spa/shell.ts).
+//   The client router (public/app.js) renders the page; ALL data and
+//   mutations flow through the versioned JSON API at /api/v1 (docs/API.md).
+// - All legacy server-rendered pages and unversioned /api/* endpoints are
+//   retired. Their modules stay on disk only where src/api/v1.ts reuses
+//   their helpers (db access, crypto, email); no legacy route is mounted.
+// - Kept: /api/v1/*, sitemap.xml, robots.txt, favicons, the daily news
+//   pipeline cron, and the scheduled() handler.
+
+import { Hono, type Context } from 'hono';
+import { getCookie } from 'hono/cookie';
 import { serveFavicon } from './favicon';
-// Round 3: release calendar, site search, SEO, in-worker TMDB enrichment.
-import { registerCalendarRoutes } from './calendar';
-import { getWatchProviders } from './watch_providers';
-import { registerSearchRoutes } from './search';
+import { scheduledNewsRun } from './news/ingest';
 import { registerSeoRoutes } from './seo';
-import { registerEnrichmentRoutes } from './enrichment';
-// Phase 1 (SSR→SPA): versioned JSON API at /api/v1 — the SPA contract.
-// Existing /api/* routes and SSR pages are untouched; this only ADDS routes.
+// Versioned JSON API at /api/v1 — the SPA contract (docs/API.md).
 import { mountV1 } from './api/v1';
-// Round 4: community — ratings, spoiler-safe reviews, polls, hype, lists.
-import { mountRatings } from './ratings/routes';
-import { mountReviews } from './reviews/routes';
-import { mountPolls } from './polls/routes';
-import { mountHype } from './hype/routes';
-import { mountLists } from './lists/routes';
-import { getRatingSummary, getUserRating } from './ratings/db';
-import { listReviews } from './reviews/db';
-import { getPollResults, getUserChoice } from './polls/db';
-import { getHypeSummary, getUserHype, isUnreleased } from './hype/db';
-import { listUserLists } from './lists/db';
+import { THEME_COOKIE } from './ui';
+import { spaShell, type ThemeName } from './spa/shell';
 
 export interface Env {
   DB: D1Database;
@@ -62,242 +41,55 @@ export interface Env {
 
 const app = new Hono<{ Bindings: Env }>();
 
-/** Project a SessionUser into the shape pages/header consume. */
-const toAuthUser = (user: SessionUser | null) =>
-  user ? { email: user.email, isAdmin: user.isAdmin } : null;
+const themeOf = (c: Context): ThemeName =>
+  getCookie(c, THEME_COOKIE) === 'dark' ? 'dark' : 'light';
 
-app.get('/', async (c) => {
-  const adaptations = await listAdaptations(c.env.DB);
-  const user = await getUser(c);
-  return c.html(
-    <HomePage
-      adaptations={adaptations}
-      user={toAuthUser(user)}
-      origin={new URL(c.req.url).origin}
-      theme={themeOf(c)}
-    />,
-  );
-});
+/** Serve the SPA shell. The client router renders the page from /api/v1. */
+const serveShell = (c: Context) => c.html(spaShell(themeOf(c)));
 
-// Track A: theme toggle. Accepts form fields `theme` and `next`; sets the
-// 1-year `theme` cookie. API clients (Accept: application/json) get
-// `{ok, theme}` as JSON; plain form posts 303 back to `next` (Referer-aware,
-// validated as a local path to avoid open redirects).
-app.post('/api/theme', async (c) => {
-  let rawTheme: string | null = null;
-  let rawNext: string | null = null;
-  try {
-    const body = await c.req.parseBody();
-    const t = body['theme'];
-    const n = body['next'];
-    rawTheme = typeof t === 'string' ? t : null;
-    rawNext = typeof n === 'string' ? n : null;
-  } catch {
-    // fall through with defaults
-  }
-  const theme = rawTheme === 'dark' || rawTheme === 'light' ? rawTheme : 'light';
-  // Where to send the no-JS fallback after the toggle: prefer the Referer
-  // (same-origin only) so the toggle returns to the page it was used on,
-  // then the explicit `next` form field, then '/'.
-  const isLocalPath = (p: string) => /^\/[^/\\]/.test(p) && !p.includes('://');
-  let next = '/';
-  const selfUrl = new URL(c.req.url);
-  const ref = c.req.header('referer');
-  if (ref) {
-    try {
-      const u = new URL(ref, selfUrl);
-      if (u.origin === selfUrl.origin && isLocalPath(u.pathname)) {
-        next = u.pathname + u.search;
-      }
-    } catch {
-      // malformed Referer — fall through to `next` field / '/'
-    }
-  }
-  if (next === '/' && rawNext && isLocalPath(rawNext)) next = rawNext;
-  // Share the theme cookie between apex and www so the toggle sticks on
-  // both hosts. Never set Domain on other hosts (e.g. workers.dev previews).
-  const host = new URL(c.req.url).hostname;
-  const sharedDomain =
-    host === 'noveladaptations.com' || host === 'www.noveladaptations.com'
-      ? 'noveladaptations.com'
-      : undefined;
-  setCookie(c, THEME_COOKIE, theme, {
-    path: '/',
-    maxAge: 31536000,
-    sameSite: 'Lax',
-    ...(sharedDomain ? { domain: sharedDomain } : {}),
-  });
-  if ((c.req.header('accept') ?? '').includes('application/json')) {
-    return c.json({ ok: true, theme });
-  }
-  return c.redirect(next, 303);
-});
-
-app.get('/adaptations/:id', async (c) => {
-  const id = Number(c.req.param('id'));
-  if (!Number.isInteger(id)) {
-    return c.html(<Layout title="Not found" theme={themeOf(c)}>404 — adaptation not found.</Layout>, 404);
-  }
-  const adaptation = await getAdaptationSummary(c.env.DB, id);
-  if (!adaptation) {
-    return c.html(<Layout title="Not found" theme={themeOf(c)}>404 — adaptation not found.</Layout>, 404);
-  }
-  const user = await getUser(c);
-  const timeline = await getAdaptationTimeline(c.env.DB, id);
-  const userVoted = user ? await getBookVoteState(c.env.DB, user.id, adaptation.book_id) : false;
-  const userShelf = user ? await getShelf(c.env.DB, user.id, 'adaptation', id) : null;
-  const pollResults = await getPollResults(c.env.DB, id);
-  const pollChoice = user ? await getUserChoice(c.env.DB, user.id, id) : null;
-  return c.html(
-    <AdaptationPage
-      adaptation={adaptation}
-      timeline={timeline}
-      userVoted={userVoted}
-      userShelf={userShelf}
-      pollResults={pollResults}
-      pollChoice={pollChoice}
-      user={toAuthUser(user)}
-      origin={new URL(c.req.url).origin}
-      canonicalPath={c.req.path}
-      theme={themeOf(c)}
-    />,
-  );
-});
-
-app.get('/books/:id', async (c) => {
-  const id = Number(c.req.param('id'));
-  if (!Number.isInteger(id)) {
-    return c.html(<Layout title="Not found" theme={themeOf(c)}>404 — book not found.</Layout>, 404);
-  }
-  const book = await getBook(c.env.DB, id);
-  if (!book) {
-    return c.html(<Layout title="Not found" theme={themeOf(c)}>404 — book not found.</Layout>, 404);
-  }
-  const adaptations = await getBookAdaptations(c.env.DB, id);
-  const user = await getUser(c);
-  const userVoted = user ? await getBookVoteState(c.env.DB, user.id, id) : false;
-  const userShelf = user ? await getShelf(c.env.DB, user.id, 'book', id) : null;
-  const ratingSummary = await getRatingSummary(c.env.DB, 'book', id);
-  const userRating = user ? await getUserRating(c.env.DB, user.id, 'book', id) : null;
-  const reviews = await listReviews(c.env.DB, 'book', id);
-  const userLists = user
-    ? (await listUserLists(c.env.DB, user.id)).map((l) => ({ id: l.id, title: l.title }))
-    : [];
-  return c.html(
-    <BookPage
-      book={book}
-      adaptations={adaptations}
-      userVoted={userVoted}
-      userShelf={userShelf}
-      ratingSummary={ratingSummary}
-      userRating={userRating}
-      reviews={reviews}
-      userId={user?.id ?? null}
-      userLists={userLists}
-      user={toAuthUser(user)}
-      origin={new URL(c.req.url).origin}
-      canonicalPath={c.req.path}
-      theme={themeOf(c)}
-    />,
-  );
-});
-
-app.get('/api/adaptations', async (c) => {
-  const adaptations = await listAdaptations(c.env.DB);
-  return c.json(adaptations);
-});
+// Bookmarkable SPA routes. GET /auth/verify?token=… serves the shell and the
+// SPA consumes the token via POST /api/v1/auth/verify (magic-link emails keep
+// working across the cutover).
+app.get('/', serveShell);
+app.get('/calendar', serveShell);
+app.get('/most-wanted', serveShell);
+app.get('/watch/:id', serveShell);
+app.get('/adaptations/:id', serveShell);
+app.get('/books/:id', serveShell);
+app.get('/search', serveShell);
+app.get('/lists', serveShell);
+app.get('/lists/:slug', serveShell);
+app.get('/shelves', serveShell);
+app.get('/feedback', serveShell);
+app.get('/auth/login', serveShell);
+app.get('/auth/verify', serveShell);
+app.get('/admin/news', serveShell);
+app.get('/admin/news/runs', serveShell);
+app.get('/admin/screen-works', serveShell);
+app.get('/admin/feedback', serveShell);
 
 // Embedded favicon (src/favicon.ts — no [assets] static dir).
-// Registered before auth/vote mounts so the icon paths are never shadowed.
+// Registered before the API so the icon paths are never shadowed.
 app.get('/favicon.png', () => serveFavicon());
 app.get('/favicon.ico', () => serveFavicon());
 app.get('/apple-touch-icon.png', () => serveFavicon());
 
-// /watch/:id = the screen work itself (film/series), NOT the adaptation story.
-// /adaptations/:id remains "the adaptation story" (book→screen journey + timeline).
-app.get('/watch/:id', async (c) => {
-  const id = Number(c.req.param('id'));
-  if (!Number.isInteger(id)) {
-    return c.html(<Layout title="Not found" theme={themeOf(c)}>404 — screen work not found.</Layout>, 404);
-  }
-  const work = await getScreenWork(c.env.DB, id);
-  if (!work) {
-    return c.html(<Layout title="Not found" theme={themeOf(c)}>404 — screen work not found.</Layout>, 404);
-  }
-  const news = await getScreenWorkNews(
-    c.env.DB,
-    work.books.map((b) => b.title),
-  );
-  // Round 3: where-to-watch providers (7-day D1 cache; never throws, never
-  // blocks render beyond a cold-miss fetch) + SEO origin for canonical/OG tags.
-  const providers = await getWatchProviders(c.env.DB, c.executionCtx, c.env, {
-    id: work.id,
-    tmdb_id: work.tmdb_id,
-    kind: work.kind,
-  });
-  const user = await getUser(c);
-  const origin = new URL(c.req.url).origin;
-  // Round 4: community widgets — ratings, reviews, hype (unreleased only), lists.
-  const ratingSummary = await getRatingSummary(c.env.DB, 'screen_work', id);
-  const userRating = user ? await getUserRating(c.env.DB, user.id, 'screen_work', id) : null;
-  const reviews = await listReviews(c.env.DB, 'screen_work', id);
-  const showHype = isUnreleased(work.release_date);
-  const hypeSummary = showHype ? await getHypeSummary(c.env.DB, id) : null;
-  const userHype = showHype && user ? await getUserHype(c.env.DB, user.id, id) : null;
-  const userLists = user
-    ? (await listUserLists(c.env.DB, user.id)).map((l) => ({ id: l.id, title: l.title }))
-    : [];
-  return c.html(
-    <ScreenWorkPage
-      work={work}
-      news={news}
-      providers={providers}
-      origin={origin}
-      canonicalPath={c.req.path}
-      user={toAuthUser(user)}
-      theme={themeOf(c)}
-      ratingSummary={ratingSummary}
-      userRating={userRating}
-      reviews={reviews}
-      userId={user?.id ?? null}
-      hype={hypeSummary ? { ...hypeSummary, userLevel: userHype } : null}
-      userLists={userLists}
-    />,
-  );
-});
-
-// Phase 2: magic-link auth + voting/shelves.
-mountAuth(app);
-mountVotes(app);
-
-// Round 4: community — ratings, spoiler-safe reviews, book-vs-screen polls,
-// hype meter, shareable lists.
-mountRatings(app);
-mountReviews(app);
-mountPolls(app);
-mountHype(app);
-mountLists(app);
-
-// Public feedback + admin triage queue.
-mountFeedback(app);
-
-// Owner-only news curation queue + API (gated by admin sessions; see
-// src/auth/session.ts requireAdminPage / requireAdminApi).
-registerCurationRoutes(app);
-
-// Round 3: release calendar, site search, SEO (sitemap/robots), and
-// in-worker TMDB enrichment (self-gated admin endpoint).
-registerCalendarRoutes(app);
-registerSearchRoutes(app);
-registerSeoRoutes(app);
-registerEnrichmentRoutes(app);
-
-// Phase 1 (SSR→SPA): versioned JSON API. Registered after all legacy
-// routes; a trailing wildcard inside src/api/v1.ts answers unknown
-// /api/v1/* paths with the JSON error envelope.
+// Versioned JSON API. Registered after the page routes; a trailing wildcard
+// inside src/api/v1.ts answers unknown /api/v1/* paths with the JSON error
+// envelope.
 mountV1(app);
 
-app.notFound((c) => c.html(<Layout title="Not found" theme={themeOf(c)}>404 — page not found.</Layout>, 404));
+// SEO: /sitemap.xml + /robots.txt.
+registerSeoRoutes(app);
+
+app.notFound((c) => {
+  if (c.req.path.startsWith('/api/')) {
+    return c.json({ error: { code: 'not_found', message: 'Not found.' } }, 404);
+  }
+  // Unknown page path → shell with a 404 status; the SPA router renders its
+  // own not-found view without a reload.
+  return c.html(spaShell(themeOf(c)), 404);
+});
 
 export default {
   // Hono's fetch is an arrow-function property, so it can be re-homed safely.

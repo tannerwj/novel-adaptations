@@ -40,6 +40,11 @@ crons = ["0 6 * * *"]
 [ai]
 binding = "AI"
 
+# SPA static assets (public/styles.css, public/app.js, public/js/*). Served by
+# Cloudflare; the worker only handles page shells, /api/v1, SEO, and favicons.
+[assets]
+directory = "public"
+
 # News pipeline kill switch (Track A guardrails; see docs/NEWS_PIPELINE.md
 # "Autonomy policy"). scheduledNewsRun() in src/news/ingest.ts does nothing
 # unless this is exactly "1" — fail closed when unset. Set to "0" (or remove
