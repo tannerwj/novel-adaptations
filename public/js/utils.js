@@ -93,6 +93,7 @@ export function posterArt(src, title, subtitle, opts) {
   return (
     `<div class="poster">` +
       `<div class="art-fallback" style="background:${gradient}">` +
+        `<div class="art-mono" aria-hidden="true">${esc(String(title ?? '').charAt(0))}</div>` +
         `<div class="art-title">${esc(title)}</div>` +
         (subtitle ? `<div class="art-sub">${esc(subtitle)}</div>` : '') +
       `</div>` +

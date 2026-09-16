@@ -46,7 +46,7 @@ export function renderError(title, heading, message, cta) {
       `<p class="kicker">Hmm</p>` +
       `<h1 class="display-title">${heading}</h1>` +
       `<p class="lede">${message}</p>` +
-      (cta || `<p><a href="/">← Back to all adaptations</a></p>`) +
+      (cta || `<p class="center" style="margin-top:1.75rem"><a class="btn btn-primary" href="/">← Back to all adaptations</a></p>`) +
     `</div>`;
 }
 

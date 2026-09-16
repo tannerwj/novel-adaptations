@@ -44,7 +44,7 @@ export async function adaptationView({ params }) {
             shelfPicker('adaptation', a.id, user_shelf) +
             (!authed ? `<span class="meta">Log in to vote and shelve.</span>` : '') +
           `</div>` +
-          `<p class="meta" style="margin-top:1rem"><a href="${correctionHref}">Suggest a correction</a></p>` +
+          `<p class="meta" style="margin-top:1rem"><a class="correction-link" href="${correctionHref}">Suggest a correction</a></p>` +
         `</div>` +
       `</div>` +
       `<section>` +
@@ -110,7 +110,7 @@ export async function bookView({ params }) {
             addToListControl('book', b.id, r.data.user_lists ?? [], authed) +
             (!authed ? `<span class="meta">Log in to vote and shelve.</span>` : '') +
           `</div>` +
-          `<p class="meta" style="margin-top:1rem"><a href="${correctionHref}">Suggest a correction</a></p>` +
+          `<p class="meta" style="margin-top:1rem"><a class="correction-link" href="${correctionHref}">Suggest a correction</a></p>` +
         `</div>` +
       `</div>` +
       `<div class="detail-grid">` +
@@ -145,7 +145,7 @@ function whereToWatch(data) {
         `<h3 class="meta" style="margin:0 0 0.5rem;text-transform:uppercase;letter-spacing:0.05em">${esc(title)}</h3>` +
         `<ul style="list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:0.75rem">` +
         providers.map((p) =>
-          `<li style="display:flex;align-items:center;gap:0.5rem">` +
+          `<li class="wtw-provider" style="display:flex;align-items:center;gap:0.5rem">` +
             `<img src="${esc(p.logo)}" alt="${esc(p.name)}" width="36" height="36" loading="lazy" style="border-radius:6px">` +
             `<span>${esc(p.name)}</span>` +
           `</li>`

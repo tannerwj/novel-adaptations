@@ -309,7 +309,7 @@ export async function listDetailView({ params }) {
 
 const SHELF_ORDER = ['want_to_read', 'read', 'want_to_watch', 'watched'];
 const SHELF_SECTION_TITLES = {
-  want_to_read: 'Reading',
+  want_to_read: 'Want to Read',
   read: 'Read',
   want_to_watch: 'Watchlist',
   watched: 'Watched',

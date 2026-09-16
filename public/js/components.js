@@ -10,6 +10,11 @@ import { api } from './api.js';
 
 const SUN_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`;
 const MOON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>`;
+const SEARCH_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>`;
+const HOME_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>`;
+const CAL_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`;
+const STAR_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.8 6.3.7-4.7 4.3 1.3 6.2L12 16.9 6.4 20l1.3-6.2L3 9.5l6.3-.7z"/></svg>`;
+const DOTS_SVG = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>`;
 
 // --- badges -----------------------------------------------------------------
 
@@ -216,6 +221,90 @@ export function wirePagination(root, go) {
   });
 }
 
+// --- mobile chrome: slim header toggle, bottom tab bar, More sheet ----------
+// Mirrors src/spa/chrome.ts mobileChromeHtml() — the two must stay
+// byte-identical for the same inputs (pathname, theme, user).
+
+/** Which bottom-tab is active for a pathname; detail pages → no tab. */
+function mobileTabFor(pathname) {
+  if (pathname === '/') return 'home';
+  if (pathname === '/calendar' || pathname.startsWith('/calendar/')) return 'calendar';
+  if (pathname === '/most-wanted' || pathname.startsWith('/most-wanted/')) return 'most-wanted';
+  if (pathname === '/search' || pathname.startsWith('/search/')) return 'search';
+  return null;
+}
+
+/** Which More-sheet item is active; null when the sheet has no match. */
+function moreItemFor(path) {
+  const q = path.indexOf('?');
+  const pathname = q === -1 ? path : path.slice(0, q);
+  const search = q === -1 ? '' : path.slice(q);
+  if (pathname === '/admin/news' || pathname.startsWith('/admin/news/')) return 'admin-news';
+  if (pathname === '/admin/screen-works' || pathname.startsWith('/admin/screen-works/')) return 'admin-screen-works';
+  if (pathname === '/admin/feedback' || pathname.startsWith('/admin/feedback/')) return 'admin-feedback';
+  if (pathname === '/lists' || pathname.startsWith('/lists/')) return 'lists';
+  if (pathname === '/shelves' || pathname.startsWith('/shelves/')) return 'shelves';
+  if (pathname === '/feedback' || pathname.startsWith('/feedback/')) {
+    if (search.includes('type=correction')) return 'feedback-correction';
+    if (search.includes('type=adaptation_tip')) return 'feedback-adaptation_tip';
+    return 'feedback-feature';
+  }
+  return null;
+}
+
+function mobileChromeHtml(pathname) {
+  const user = store.user;
+  const theme = store.theme;
+  const tab = mobileTabFor(pathname);
+  const moreItem = moreItemFor(pathname + window.location.search);
+  const tabLink = (id, href, label, icon) => {
+    const active = tab === id;
+    return `<a class="tab-link${active ? ' active' : ''}" href="${href}"${active ? ' aria-current="page"' : ''}>` +
+      `<span class="tab-pill" aria-hidden="true">${icon}</span><span class="tab-label">${label}</span></a>`;
+  };
+  const sheetItem = (id, href, icon, label) =>
+    `<a class="sheet-item${moreItem === id ? ' active' : ''}" href="${href}">` +
+      `<span class="sheet-ico" aria-hidden="true">${icon}</span>${label}</a>`;
+  const themeLabel = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  return (
+    `<nav class="tab-bar" aria-label="Primary">` +
+      tabLink('home', '/', 'Home', HOME_SVG) +
+      tabLink('calendar', '/calendar', 'Calendar', CAL_SVG) +
+      tabLink('most-wanted', '/most-wanted', 'Most Wanted', STAR_SVG) +
+      tabLink('search', '/search', 'Search', SEARCH_SVG) +
+      `<button class="tab-link${moreItem ? ' active' : ''}" type="button" data-more-btn aria-expanded="false" aria-controls="more-sheet">` +
+        `<span class="tab-pill" aria-hidden="true">${DOTS_SVG}</span><span class="tab-label">More</span></button>` +
+    `</nav>` +
+    `<div class="sheet-scrim" data-more-scrim hidden></div>` +
+    `<section class="more-sheet" id="more-sheet" data-more-sheet hidden role="dialog" aria-modal="true" aria-label="More">` +
+      `<div class="sheet-handle" aria-hidden="true"></div>` +
+      `<nav aria-label="More destinations">` +
+        sheetItem('lists', '/lists', '🗂️', 'Lists') +
+        sheetItem('shelves', '/shelves', '📚', 'Shelves') +
+        sheetItem('feedback-feature', '/feedback?type=feature', '💡', 'Suggest a feature') +
+        sheetItem('feedback-adaptation_tip', '/feedback?type=adaptation_tip', '🎬', 'Report an adaptation') +
+        sheetItem('feedback-correction', '/feedback?type=correction', '✏️', 'Suggest a correction') +
+        `<button class="sheet-item theme-toggle" type="button" data-theme-toggle aria-label="${themeLabel}" title="${themeLabel}">` +
+          `<span class="sheet-ico" aria-hidden="true">` +
+            `<span data-theme-icon="sun"${theme !== 'dark' ? ' hidden' : ''}>☀️</span>` +
+            `<span data-theme-icon="moon"${theme === 'dark' ? ' hidden' : ''}>🌙</span>` +
+          `</span>Theme</button>` +
+        (user && user.is_admin
+          ? `<hr class="sheet-divider">` +
+            `<p class="sheet-cap">Admin</p>` +
+            sheetItem('admin-news', '/admin/news', '📰', 'News curation') +
+            sheetItem('admin-feedback', '/admin/feedback', '💬', 'Feedback triage') +
+            sheetItem('admin-screen-works', '/admin/screen-works', '🎬', 'Screen works')
+          : '') +
+        `<hr class="sheet-divider">` +
+        (user
+          ? `<button class="sheet-item" type="button" data-logout><span class="sheet-ico" aria-hidden="true">⎋</span>Log out</button>`
+          : `<a class="sheet-item" href="/auth/login"><span class="sheet-ico" aria-hidden="true">🔑</span>Log in</a>`) +
+      `</nav>` +
+    `</section>`
+  );
+}
+
 // --- header / footer --------------------------------------------------------------
 
 const NAV_LINKS = [
@@ -255,6 +344,7 @@ export function headerHtml(pathname) {
       `<div class="site-header-inner">` +
         `<a class="brand" href="/" aria-label="Novel Adaptations — home"><span class="brand-wordmark">Novel Adaptations</span><span class="brand-arrow">.</span></a>` +
         `<nav class="main-nav" aria-label="Primary">${nav}</nav>` +
+        `<button class="mobile-search-toggle" type="button" data-mobile-search aria-label="Search" aria-expanded="false">${SEARCH_SVG}</button>` +
         `<form class="header-search" data-header-search role="search">` +
           `<input type="search" name="q" placeholder="Search books, movies, shows…" aria-label="Search books, movies, and shows" maxlength="100">` +
           `<button class="btn btn-sm" type="submit">Search</button>` +
@@ -267,7 +357,8 @@ export function headerHtml(pathname) {
           `<div class="header-user">${userArea}</div>` +
         `</div>` +
       `</div>` +
-    `</header>`
+    `</header>` +
+    mobileChromeHtml(pathname)
   );
 }
 
@@ -335,14 +426,70 @@ export function mountChrome() {
 }
 
 export function refreshChrome() {
+  // A navigation re-renders the chrome wholesale: drop any open More sheet
+  // state first, otherwise a sheet link could leave the body scroll-locked.
+  document.body.classList.remove('sheet-open');
   const pathname = window.location.pathname;
   document.getElementById('chrome-header').innerHTML = headerHtml(pathname);
   document.getElementById('chrome-footer').innerHTML = footerHtml();
 }
 
-/** One-time wiring for chrome interactions: dropdown, theme toggle, search, logout. */
+/** One-time wiring for chrome interactions: dropdown, theme toggle, search, logout,
+ *  mobile search toggle, and the More bottom sheet. */
 function wireChrome() {
+  const moreEls = () => ({
+    sheet: document.querySelector('[data-more-sheet]'),
+    scrim: document.querySelector('[data-more-scrim]'),
+    btn: document.querySelector('[data-more-btn]'),
+  });
+  const openMoreSheet = () => {
+    const { sheet, scrim, btn } = moreEls();
+    if (!sheet || !scrim || !btn || !sheet.hidden) return;
+    sheet.hidden = false;
+    scrim.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+    document.body.classList.add('sheet-open');
+    const first = sheet.querySelector('.sheet-item');
+    if (first) first.focus();
+  };
+  const closeMoreSheet = (focusBtn = true) => {
+    const { sheet, scrim, btn } = moreEls();
+    if (!sheet || sheet.hidden) return;
+    sheet.hidden = true;
+    if (scrim) scrim.hidden = true;
+    if (btn) {
+      btn.setAttribute('aria-expanded', 'false');
+      if (focusBtn) btn.focus();
+    }
+    document.body.classList.remove('sheet-open');
+  };
+
   document.addEventListener('click', (e) => {
+    const mSearch = e.target.closest('[data-mobile-search]');
+    if (mSearch) {
+      const header = mSearch.closest('.site-header');
+      if (header) {
+        const willOpen = !header.classList.contains('search-open');
+        header.classList.toggle('search-open', willOpen);
+        mSearch.setAttribute('aria-expanded', String(willOpen));
+        if (willOpen) {
+          const input = header.querySelector('.header-search input[type="search"]');
+          if (input) input.focus();
+        }
+      }
+      return;
+    }
+    const moreBtn = e.target.closest('[data-more-btn]');
+    if (moreBtn) {
+      const { sheet } = moreEls();
+      if (sheet && sheet.hidden) openMoreSheet();
+      else closeMoreSheet(false);
+      return;
+    }
+    if (e.target.closest('[data-more-scrim]')) {
+      closeMoreSheet();
+      return;
+    }
     const btn = e.target.closest('[data-user-menu-btn]');
     const menu = document.querySelector('[data-user-menu]');
     if (btn && menu) {
@@ -381,6 +528,13 @@ function wireChrome() {
         const b = document.querySelector('[data-user-menu-btn]');
         if (b) { b.setAttribute('aria-expanded', 'false'); b.focus(); }
       }
+      const openSearch = document.querySelector('.site-header.search-open');
+      if (openSearch) {
+        openSearch.classList.remove('search-open');
+        const sb = openSearch.querySelector('[data-mobile-search]');
+        if (sb) sb.setAttribute('aria-expanded', 'false');
+      }
+      closeMoreSheet();
     }
   });
 

@@ -71,7 +71,7 @@ const serveShell = async (c: Context) => {
   return c.html(
     spaShell(
       theme,
-      serverHeaderHtml(pathname, theme, user),
+      serverHeaderHtml(pathname, theme, user, new URL(c.req.url).search),
       serverFooterHtml(),
       bootUserJson(sessionUser),
     ),
@@ -152,7 +152,7 @@ app.notFound(async (c) => {
   return c.html(
     spaShell(
       theme,
-      serverHeaderHtml(pathname, theme, user),
+      serverHeaderHtml(pathname, theme, user, new URL(c.req.url).search),
       serverFooterHtml(),
       bootUserJson(sessionUser),
     ),

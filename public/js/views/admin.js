@@ -134,17 +134,60 @@ export async function adminNewsView({ query }) {
 // /admin/news/runs — pipeline runs + backfill
 // ---------------------------------------------------------------------------
 
+/** Real fields from the pipeline_runs row (src/news/ingest.ts): id, status,
+ *  feeds_ok, feeds_failed, items_fetched, items_new, items_skipped_cap,
+ *  llm_calls, started_at, errors (string|null). */
 function runRowHtml(r) {
   return (
     `<tr>` +
       `<td>#${r.id}</td>` +
-      `<td>${esc(r.trigger)}${r.trigger_detail ? ` · ${esc(r.trigger_detail)}` : ''}</td>` +
       `<td>${esc(r.status)}</td>` +
-      `<td>${r.processed}/${r.matched}/${r.queued}</td>` +
-      `<td>${r.duration_ms != null ? (r.duration_ms / 1000).toFixed(1) + 's' : '—'}</td>` +
-      `<td>${esc(r.started_at)}</td>` +
-      `<td>${esc(r.error ?? '')}</td>` +
+      `<td>${r.feeds_ok ?? '—'}${r.feeds_failed != null && r.feeds_failed !== 0 ? ` / ${r.feeds_failed} failed` : ''}</td>` +
+      `<td>${r.items_fetched ?? '—'}</td>` +
+      `<td>${r.items_new ?? '—'}</td>` +
+      `<td>${r.items_skipped_cap ?? '—'}</td>` +
+      `<td>${r.llm_calls ?? '—'}</td>` +
+      `<td>${r.started_at ? esc(r.started_at) : '—'}</td>` +
+      `<td>${r.errors ? esc(r.errors) : '—'}</td>` +
     `</tr>`
+  );
+}
+
+/** Mobile labeled-card version of the same data — no horizontal scrolling. */
+function runCardHtml(r) {
+  const field = (label, value) =>
+    `<div><dt>${label}</dt><dd>${value}</dd></div>`;
+  return (
+    `<article class="run-card">` +
+      `<div class="run-card-head">` +
+        `<span class="run-id">Run #${r.id}</span>` +
+        `<span class="status-pill ${esc(r.status)}">${esc(r.status)}</span>` +
+      `</div>` +
+      `<dl>` +
+        field('Feeds ok/failed', `${r.feeds_ok ?? '—'}${r.feeds_failed != null ? ` / ${r.feeds_failed}` : ''}`) +
+        field('Fetched', `${r.items_fetched ?? '—'}`) +
+        field('New', `${r.items_new ?? '—'}`) +
+        field('Skipped', `${r.items_skipped_cap ?? '—'}`) +
+        field('LLM calls', `${r.llm_calls ?? '—'}`) +
+        field('Started', `${r.started_at ? esc(r.started_at) : '—'}`) +
+        (r.errors
+          ? `<div class="run-card-error"><dt>Error</dt><dd>${esc(r.errors)}</dd></div>`
+          : '') +
+      `</dl>` +
+    `</article>`
+  );
+}
+
+const RUNS_HEAD = `<thead><tr><th>Run</th><th>Status</th><th>Feeds ok/failed</th><th>Fetched</th><th>New</th><th>Skipped</th><th>LLM calls</th><th>Started</th><th>Error</th></tr></thead>`;
+
+function runsTableHtml(data) {
+  return (
+    `<div data-runs-table>` +
+      `<div class="table-wrap"><table class="admin-table">${RUNS_HEAD}` +
+        `<tbody>${data.map(runRowHtml).join('')}</tbody>` +
+      `</table></div>` +
+      `<div class="run-cards">${data.map(runCardHtml).join('')}</div>` +
+    `</div>`
   );
 }
 
@@ -158,13 +201,10 @@ export async function adminRunsView() {
       adminBar('/admin/news/runs') +
       `<p class="kicker">Admin</p>` +
       `<h1 class="display-title">Pipeline runs</h1>` +
-      `<p class="lede">Daily news ingestion history — processed / matched / queued, newest first.</p>` +
+      `<p class="lede">Daily news ingestion history — fetched / new / skipped per run, newest first.</p>` +
       (data.length === 0
         ? `<p class="empty">No pipeline runs yet.</p>`
-        : `<div class="table-wrap"><table class="admin-table">` +
-          `<thead><tr><th>Run</th><th>Trigger</th><th>Status</th><th>Proc/Match/Queue</th><th>Duration</th><th>Started</th><th>Error</th></tr></thead>` +
-          `<tbody>${data.map(runRowHtml).join('')}</tbody>` +
-          `</table></div>`) +
+        : runsTableHtml(data)) +
       pagination(pg, per_page, total) +
       `<div data-backfill-slot></div>`,
     after(root) {
@@ -174,12 +214,8 @@ export async function adminRunsView() {
       const refreshRuns = async (page) => {
         const rr = await api(`/api/v1/admin/news/runs?page=${page}&per_page=25`);
         if (!rr.ok) { alert(errMsg(rr)); return; }
-        const wrap = root.querySelector('.table-wrap');
-        if (wrap) {
-          wrap.innerHTML = `<table class="admin-table">` +
-            `<thead><tr><th>Run</th><th>Trigger</th><th>Status</th><th>Proc/Match/Queue</th><th>Duration</th><th>Started</th><th>Error</th></tr></thead>` +
-            `<tbody>${rr.data.runs.data.map(runRowHtml).join('')}</tbody></table>`;
-        }
+        const box = root.querySelector('[data-runs-table]');
+        if (box) box.outerHTML = runsTableHtml(rr.data.runs.data);
         const old = root.querySelector('[data-pagination]');
         if (old) {
           const tmp = document.createElement('div');

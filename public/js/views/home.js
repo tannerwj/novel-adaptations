@@ -57,7 +57,7 @@ function calendarItem(w, today) {
   const d = cleanDate(w);
   return (
     `<li>` +
-      `<a href="/watch/${w.id}" tabindex="-1" aria-hidden="true" style="width:44px;flex-shrink:0;display:block">` +
+      `<a class="thumb-sm" href="/watch/${w.id}" tabindex="-1" aria-hidden="true" style="width:44px;flex-shrink:0;display:block">` +
         posterArt(w.poster_url, w.title) +
       `</a>` +
       `<div style="min-width:0">` +
