@@ -88,6 +88,24 @@ before(async () => {
       VALUES (${userId}, 'My List', 'desc', 1, 'my-list');`,
   );
   const listId = sqlite.prepare('SELECT id FROM lists WHERE slug = ?').get('my-list').id;
+  // Feedback rows for intake gating tests.
+  sqlite.exec(`
+    INSERT INTO feedback (id, type, subject, body, proof_url, status)
+      VALUES (1, 'adaptation_tip', 'The love hypothesis', 'The movie is coming out next week',
+              'https://www.imdb.com/title/tt22526100/', 'reviewed');
+    INSERT INTO feedback (id, type, subject, body, proof_url, status)
+      VALUES (2, 'adaptation_tip', 'Old tip', 'body', 'https://www.imdb.com/title/tt0000001/', 'done');
+    INSERT INTO feedback (id, type, subject, body, status)
+      VALUES (3, 'feature', 'Dark mode', 'please', 'new');
+  `);
+  // Non-admin user + session for 403 tests.
+  sqlite.exec(`INSERT INTO users (email, is_admin) VALUES ('user@example.com', 0);`);
+  const plainId = sqlite.prepare('SELECT id FROM users WHERE email = ?').get('user@example.com').id;
+  const plainHash = createHash('sha256').update('plain-session-token').digest('hex');
+  sqlite.exec(
+    `INSERT INTO sessions (user_id, token_hash, expires_at)
+      VALUES (${plainId}, '${plainHash}', datetime('now', '+30 days'));`,
+  );
   globalThis.__testIds = { userId, bookId, listId };
 
   globalThis.caches = {
@@ -190,4 +208,47 @@ test('DELETE /api/v1/lists/:id purges the bot preview', async () => {
     purged.some((u) => u.includes('/lists/my-list?na-prerender=1')),
     `preview purge expected after delete, got: ${JSON.stringify(purged)}`,
   );
+});
+
+// --- feedback intake gating (v1) ----------------------------------------------
+
+async function intakeReq(id, cookie = 'na_session=test-session-token') {
+  return req(`/api/v1/admin/feedback/${id}/intake`, {
+    method: 'POST',
+    headers: { cookie, 'Content-Type': 'application/json' },
+  });
+}
+
+test('POST /api/v1/admin/feedback/:id/intake requires login', async () => {
+  const res = await app.request(
+    '/api/v1/admin/feedback/1/intake',
+    { method: 'POST' },
+    env,
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  assert.equal(res.status, 401);
+});
+
+test('POST /api/v1/admin/feedback/:id/intake requires admin', async () => {
+  const res = await intakeReq(1, 'na_session=plain-session-token');
+  assert.equal(res.status, 403);
+});
+
+test('POST /api/v1/admin/feedback/:id/intake 404s on unknown feedback', async () => {
+  const res = await intakeReq(999);
+  assert.equal(res.status, 404);
+});
+
+test('POST /api/v1/admin/feedback/:id/intake rejects non-tip feedback', async () => {
+  const res = await intakeReq(3); // type = feature
+  assert.equal(res.status, 422);
+  const body = await res.json();
+  assert.match(body.error.message, /adaptation tips/);
+});
+
+test('POST /api/v1/admin/feedback/:id/intake rejects already-done tips', async () => {
+  const res = await intakeReq(2); // status = done
+  assert.equal(res.status, 422);
+  const body = await res.json();
+  assert.match(body.error.message, /already marked done/);
 });

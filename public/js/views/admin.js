@@ -469,6 +469,9 @@ function feedbackRowHtml(fb) {
         (link ? `<p class="meta">Proof: <a href="${esc(link)}" target="_blank" rel="noopener noreferrer">${esc(fb.proof_url)}</a></p>` : '') +
       `</div>` +
       `<div class="row-actions">` +
+        (fb.type === 'adaptation_tip' && fb.status !== 'done'
+          ? `<button class="btn btn-sm btn-primary" type="button" data-fb-intake>Fetch metadata</button>`
+          : '') +
         (fb.status !== 'reviewed' ? `<button class="btn btn-sm" type="button" data-fb-status="reviewed">Mark reviewed</button>` : '') +
         (fb.status !== 'done' ? `<button class="btn btn-sm" type="button" data-fb-status="done">Mark done</button>` : '') +
       `</div>` +
@@ -508,6 +511,42 @@ export async function adminFeedbackView({ query }) {
         root.querySelectorAll('[data-feedback-id]').forEach((row) => {
           if (row.dataset.wired) return;
           row.dataset.wired = '1';
+          const showRowMessage = (msg, isError) => {
+            let el = row.querySelector('[data-row-msg]');
+            if (!el) {
+              el = document.createElement('p');
+              el.setAttribute('data-row-msg', '1');
+              row.appendChild(el);
+            }
+            el.className = isError ? 'form-error visible' : 'meta';
+            el.textContent = msg;
+          };
+          // Fetch metadata: resolve the tip into catalog records (book,
+          // screen work, adaptation) and mark the tip done — inline result,
+          // no reload.
+          row.querySelectorAll('[data-fb-intake]').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+              btn.disabled = true;
+              const original = btn.textContent;
+              btn.textContent = 'Fetching…';
+              const r2 = await api(`/api/v1/admin/feedback/${row.dataset.feedbackId}/intake`, {
+                method: 'POST',
+              });
+              if (!r2.ok) {
+                btn.disabled = false;
+                btn.textContent = original;
+                showRowMessage(errMsg(r2), true);
+                return;
+              }
+              const d = r2.data ?? {};
+              const book = d.book ? `"${d.book.title}"` : 'book';
+              const screen = d.screenWork ? `"${d.screenWork.title}"` : 'screen work';
+              showRowMessage(`✓ Cataloged ${book} → ${screen}. Tip marked done.`, false);
+              row.style.opacity = '0.4';
+              btn.remove();
+              row.querySelectorAll('[data-fb-status]').forEach((b) => b.remove());
+            });
+          });
           row.querySelectorAll('[data-fb-status]').forEach((btn) => {
             btn.addEventListener('click', async () => {
               btn.disabled = true;
@@ -517,15 +556,7 @@ export async function adminFeedbackView({ query }) {
               });
               if (!r2.ok) {
                 btn.disabled = false;
-                let el = row.querySelector('[data-row-error]');
-                if (!el) {
-                  el = document.createElement('p');
-                  el.className = 'form-error';
-                  el.setAttribute('data-row-error', '1');
-                  row.appendChild(el);
-                }
-                el.textContent = errMsg(r2);
-                el.classList.add('visible');
+                showRowMessage(errMsg(r2), true);
                 return;
               }
               row.style.opacity = '0.4';

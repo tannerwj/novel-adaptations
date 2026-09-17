@@ -167,6 +167,8 @@ import {
   recentWindowStart,
 } from '../calendar_db';
 import { getWatchProviders } from '../watch_providers_cache';
+import { fetchAndCacheProviders } from '../watch_providers_cache';
+import { IntakeError, intakeFromTip } from '../intake';
 
 const v1 = new Hono<{ Bindings: Env }>();
 
@@ -1989,6 +1991,58 @@ v1.post('/admin/feedback/:id/status', async (c) => {
   if (!item) return apiError(c, 404, 'not_found', `Feedback ${id} not found.`);
   await setFeedbackStatus(c.env.DB, id, body['status']);
   return c.json({ ok: true, id, status: body['status'] });
+});
+
+// Fetch book/screen metadata for an adaptation tip and create the catalog
+// records (book, screen work, adaptation) atomically, then mark the tip
+// done. Admin-only via the /admin/* gate above.
+v1.post('/admin/feedback/:id/intake', async (c) => {
+  const id = toInt(c.req.param('id'));
+  if (id === null || id < 1) {
+    return validationError(c, 'Feedback id must be a positive integer.');
+  }
+  const item = await getFeedback(c.env.DB, id);
+  if (!item) return apiError(c, 404, 'not_found', `Feedback ${id} not found.`);
+  if (item.type !== 'adaptation_tip') {
+    return validationError(c, 'Metadata intake is only for adaptation tips.');
+  }
+  if (item.status === 'done') {
+    return validationError(c, 'This tip is already marked done.');
+  }
+  try {
+    const result = await intakeFromTip(c.env.DB, {
+      subject: item.subject,
+      proofUrl: item.proof_url,
+      sourceUrl: item.proof_url,
+      tmdbApiKey: c.env.TMDB_API_KEY,
+    });
+    // Warm the where-to-watch cache in the background; the page works
+    // without it.
+    const tmdbIdRow = await c.env.DB.prepare(
+      'SELECT tmdb_id FROM screen_works WHERE id = ?1',
+    )
+      .bind(result.screenWork.id)
+      .first<{ tmdb_id: number | null }>();
+    if (c.env.TMDB_API_KEY && tmdbIdRow?.tmdb_id) {
+      c.executionCtx.waitUntil(
+        fetchAndCacheProviders(
+          c.env.DB,
+          c.env.TMDB_API_KEY,
+          result.screenWork.id,
+          tmdbIdRow.tmdb_id,
+          result.screenWork.kind as 'film' | 'series',
+        ).catch((e) => console.error('intake provider warm failed:', (e as Error).message)),
+      );
+    }
+    await setFeedbackStatus(c.env.DB, id, 'done');
+    return c.json({ ok: true, id, ...result });
+  } catch (e) {
+    if (e instanceof IntakeError) {
+      return apiError(c, 422, 'intake_failed', e.message);
+    }
+    console.error(`/api/v1/admin/feedback/${id}/intake failed:`, (e as Error).message);
+    return apiError(c, 500, 'intake_failed', 'Metadata intake failed.');
+  }
 });
 
 // --- unknown routes ----------------------------------------------------------
