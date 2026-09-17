@@ -44,7 +44,13 @@ function fakeDb(seed = {}, opts = {}) {
     }
     if (q.startsWith('INSERT INTO books')) {
       const id = nextId++;
-      state.books.push({ id, openlibrary_id: args[4], title: args[0] });
+      state.books.push({
+        id,
+        openlibrary_id: args[4],
+        title: args[0],
+        description: args[6],
+        subjects: args[7],
+      });
       state.slugs.add(args[5]);
       return { meta: { last_row_id: id } };
     }
@@ -136,7 +142,7 @@ const MOVIE_HIT = {
   release_date: '2099-09-25',
 };
 
-function stubFetcher({ find, search, ol, findThrows = false } = {}) {
+function stubFetcher({ find, search, ol, olWork, olWorkThrows = false, findThrows = false } = {}) {
   return async (url) => {
     const u = String(url);
     if (u.includes('/find/tt')) {
@@ -152,6 +158,18 @@ function stubFetcher({ find, search, ol, findThrows = false } = {}) {
         ok: true,
         status: 200,
         json: async () => search ?? { results: [] },
+      };
+    }
+    if (u.includes('openlibrary.org/works/')) {
+      if (olWorkThrows) throw new Error('network down');
+      return {
+        ok: true,
+        status: 200,
+        json: async () =>
+          olWork ?? {
+            description: { value: 'Olive is a PhD student who fake-dates a professor.' },
+            subjects: ['Romance', 'Fiction', 'Love stories'],
+          },
       };
     }
     if (u.includes('openlibrary.org')) {
@@ -216,6 +234,42 @@ test('happy path: imdb id → creates book, film, adaptation', async () => {
   // Poster + cover + slug made it into the inserts.
   const workInsert = db.state.writes.find((w) => w.startsWith('INSERT INTO screen_works'));
   assert.ok(workInsert);
+});
+
+test('book intake stores OL work description and subjects', async () => {
+  const db = fakeDb();
+  const fetcher = stubFetcher({
+    find: { movie_results: [MOVIE_HIT], tv_results: [] },
+  });
+  await intakeFromTip(db, BASE_INPUT, fetcher);
+  const book = db.state.books[0];
+  assert.equal(book.description, 'Olive is a PhD student who fake-dates a professor.');
+  assert.deepEqual(JSON.parse(book.subjects), ['Romance', 'Fiction', 'Love stories']);
+});
+
+test('book intake degrades when OL work detail fails', async () => {
+  const db = fakeDb();
+  const fetcher = stubFetcher({
+    find: { movie_results: [MOVIE_HIT], tv_results: [] },
+    olWorkThrows: true,
+  });
+  const r = await intakeFromTip(db, BASE_INPUT, fetcher);
+  assert.equal(r.book.created, true);
+  const book = db.state.books[0];
+  assert.equal(book.description, null);
+  assert.deepEqual(JSON.parse(book.subjects), []);
+});
+
+test('book intake stores string-form OL description', async () => {
+  const db = fakeDb();
+  const fetcher = stubFetcher({
+    find: { movie_results: [MOVIE_HIT], tv_results: [] },
+    olWork: { description: 'A plain string blurb.', subjects: 'not-an-array' },
+  });
+  await intakeFromTip(db, BASE_INPUT, fetcher);
+  const book = db.state.books[0];
+  assert.equal(book.description, 'A plain string blurb.');
+  assert.deepEqual(JSON.parse(book.subjects), []);
 });
 
 test('rerun is idempotent: existing rows reused, nothing written', async () => {

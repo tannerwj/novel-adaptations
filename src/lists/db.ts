@@ -93,8 +93,8 @@ export async function getListBySlug(db: D1Database, slug: string): Promise<ListR
   return row ?? null;
 }
 
-/** All of a user's lists, newest first, each with its item count. */
-export async function listUserLists(db: D1Database, userId: number): Promise<UserListSummary[]> {
+/** All of a user's lists, newest first, each with its item count.
+ */export async function listUserLists(db: D1Database, userId: number): Promise<UserListSummary[]> {
   const { results } = await db
     .prepare('SELECT * FROM lists WHERE user_id = ?1 ORDER BY created_at DESC, id DESC')
     .bind(userId)
@@ -111,6 +111,47 @@ export async function listUserLists(db: D1Database, userId: number): Promise<Use
     .all<{ list_id: number; n: number }>();
   const countById = new Map((counts ?? []).map((c) => [c.list_id, c.n]));
   return lists.map((l) => ({ ...l, itemCount: countById.get(l.id) ?? 0 }));
+}
+
+/**
+ * Public lists gallery: every public list, most recently updated first,
+ * each with its item count. No owner info is exposed — the users table has
+ * no public handle, and emails must never leak (finding 1).
+ */
+export async function listPublicLists(
+  db: D1Database,
+  limit: number,
+  offset: number,
+): Promise<{ lists: UserListSummary[]; total: number }> {
+  const totalRow = await db
+    .prepare('SELECT COUNT(*) AS n FROM lists WHERE is_public = 1')
+    .first<{ n: number }>();
+  const total = totalRow?.n ?? 0;
+  if (total === 0) return { lists: [], total: 0 };
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM lists
+         WHERE is_public = 1
+         ORDER BY updated_at DESC, id DESC
+         LIMIT ?1 OFFSET ?2`,
+    )
+    .bind(limit, offset)
+    .all<ListRow>();
+  const lists = results ?? [];
+  if (lists.length === 0) return { lists: [], total };
+  const { results: counts } = await db
+    .prepare(
+      `SELECT list_id, COUNT(*) AS n FROM list_items
+        WHERE list_id IN (${lists.map((_, i) => `?${i + 1}`).join(', ')})
+        GROUP BY list_id`,
+    )
+    .bind(...lists.map((l) => l.id))
+    .all<{ list_id: number; n: number }>();
+  const countById = new Map((counts ?? []).map((c) => [c.list_id, c.n]));
+  return {
+    lists: lists.map((l) => ({ ...l, itemCount: countById.get(l.id) ?? 0 })),
+    total,
+  };
 }
 
 /** Items of a list in position order, with each target resolved for display.

@@ -4,7 +4,7 @@ import { esc, debounce, posterArt } from '../utils.js';
 import { bookUrl, watchUrl, adaptationUrl } from '../links.js';
 import { api, errMsg } from '../api.js';
 import { navigate, replaceQuery } from '../router.js';
-import { adaptationCard, statusBadge, kindPill, voteButton, wireUserControls } from '../components.js';
+import { adaptationCard, statusBadge, kindPill, voteButton, wireUserControls, newsList } from '../components.js';
 
 // ---------------------------------------------------------------------------
 // Home
@@ -15,6 +15,7 @@ import { adaptationCard, statusBadge, kindPill, voteButton, wireUserControls } f
 const FEATURED_RAIL_SIZE = 12;
 const RECENT_GRID_SIZE = 8;
 const RADAR_LIMIT = 6;
+const NEWS_STRIP_SIZE = 6;
 
 function chip(href, label) {
   return `<a class="chip" href="${href}">${esc(label)}</a>`;
@@ -48,18 +49,21 @@ function wireHeroSearch(root) {
 }
 
 export async function homeView() {
-  // Three small, SQL-paginated requests in parallel: featured rail (fixed
-  // LIMIT 12), newest 8, and the calendar buckets (already bucketed in SQL).
-  // The unfiltered catalog total rides on the adaptations page response —
-  // no extra call, and no endpoint ships more than one page of rows.
-  const [featuredRes, recentRes, calendarRes] = await Promise.all([
+  // Four small, SQL-paginated requests in parallel: featured rail (fixed
+  // LIMIT 12), newest 8, the calendar buckets (already bucketed in SQL),
+  // and the latest approved news. The unfiltered catalog total rides on the
+  // adaptations page response — no extra call, and no endpoint ships more
+  // than one page of rows.
+  const [featuredRes, recentRes, calendarRes, newsRes] = await Promise.all([
     api(`/api/v1/home/featured?limit=${FEATURED_RAIL_SIZE}`, { loginRedirect: false }),
     api(`/api/v1/adaptations?sort=newest&per_page=${RECENT_GRID_SIZE}`, { loginRedirect: false }),
     api('/api/v1/calendar', { loginRedirect: false }),
+    api(`/api/v1/news/recent?limit=${NEWS_STRIP_SIZE}`, { loginRedirect: false }),
   ]);
-  const failed = [featuredRes, recentRes, calendarRes].some((r) => !r.ok);
+  const failed = [featuredRes, recentRes, calendarRes, newsRes].some((r) => !r.ok);
   const featured = featuredRes.ok ? (featuredRes.data.data ?? []) : [];
   const recent = recentRes.ok ? (recentRes.data.data ?? []) : [];
+  const news = newsRes.ok ? (newsRes.data.items ?? []) : [];
   const total = recentRes.ok ? Number(recentRes.data.total ?? 0) : 0;
   const cal = calendarRes.ok ? calendarRes.data : null;
   const today = cal ? cal.today : null;
@@ -124,6 +128,12 @@ export async function homeView() {
           `</div>` +
         `</div>` +
       `</section>` +
+      (news.length > 0
+        ? `<section aria-label="Latest adaptation news">` +
+            sectionHead('Latest news', 'Fresh from the adaptation newswire — curated by our editors.') +
+            newsList(news) +
+          `</section>`
+        : '') +
       (total > 0
         ? `<section class="catalog-cta" aria-label="Browse the full catalog">` +
             `<h2 class="home-section-title">The whole shelf, one search away</h2>` +

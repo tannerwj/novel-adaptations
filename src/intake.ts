@@ -64,6 +64,49 @@ export interface OpenLibraryBook {
   authors: string;
   coverUrl: string | null;
   pubDate: string | null;
+  description: string | null;
+  /** JSON-encoded array of subject strings (may be '[]'). */
+  subjects: string;
+}
+
+/** Work-detail payload from Open Library (description/subjects live here). */
+interface OpenLibraryWork {
+  description?: string | { value?: string };
+  subjects?: unknown;
+}
+
+/**
+ * Fetch a work's description + subjects from Open Library. Never throws —
+ * returns nulls on any failure so intake still succeeds without them.
+ */
+export async function fetchOpenLibraryWorkDetails(
+  workKey: string,
+  fetcher: TmdbFetcher = fetch,
+): Promise<{ description: string | null; subjects: string }> {
+  const empty = { description: null, subjects: '[]' };
+  if (!workKey.startsWith('/works/')) return empty;
+  try {
+    const { status, json } = await fetchJsonTimeout(
+      `https://openlibrary.org${workKey}.json`,
+      fetcher,
+      OPEN_LIBRARY_TIMEOUT_MS,
+    );
+    if (status !== 200 || !json) return empty;
+    const work = json as OpenLibraryWork;
+    const rawDesc = work.description;
+    const description =
+      typeof rawDesc === 'string'
+        ? rawDesc.trim() || null
+        : typeof rawDesc?.value === 'string' && rawDesc.value.trim()
+          ? rawDesc.value.trim()
+          : null;
+    const subjects = Array.isArray(work.subjects)
+      ? work.subjects.filter((s): s is string => typeof s === 'string').slice(0, 12)
+      : [];
+    return { description, subjects: JSON.stringify(subjects) };
+  } catch {
+    return empty;
+  }
 }
 
 /**
@@ -99,6 +142,7 @@ export async function findBookOnOpenLibrary(
       d.key.startsWith('/works/'),
   );
   if (!doc) return null;
+  const details = await fetchOpenLibraryWorkDetails(doc.key!, fetcher);
   return {
     openlibraryId: doc.key!,
     title: doc.title!,
@@ -111,6 +155,8 @@ export async function findBookOnOpenLibrary(
       typeof doc.first_publish_year === 'number'
         ? String(doc.first_publish_year)
         : null,
+    description: details.description,
+    subjects: details.subjects,
   };
 }
 
@@ -342,10 +388,10 @@ export async function intakeFromTip(
       db
         .prepare(
           `INSERT INTO books
-             (title, authors, cover_url, pub_date, openlibrary_id, slug)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+             (title, authors, cover_url, pub_date, openlibrary_id, slug, description, subjects)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`,
         )
-        .bind(book.title, book.authors, book.coverUrl, book.pubDate, book.openlibraryId, bookSlug),
+        .bind(book.title, book.authors, book.coverUrl, book.pubDate, book.openlibraryId, bookSlug, book.description, book.subjects),
     );
   }
   if (!existingAdaptation) {

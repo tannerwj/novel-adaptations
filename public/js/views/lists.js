@@ -5,6 +5,7 @@ import { bookUrl, adaptationUrl } from '../links.js';
 import { api, errMsg } from '../api.js';
 import { navigate, notFoundHtml, rerender } from '../router.js';
 import { pagination, wirePagination } from '../components.js';
+import { isAuthedResolved } from '../store.js';
 
 // ---------------------------------------------------------------------------
 // /lists — My lists (auth)
@@ -28,16 +29,31 @@ function listCardHtml(l) {
 }
 
 export async function myListsView() {
+  const section = await myListsSection();
+  return {
+    title: 'My lists',
+    html:
+      `<p class="kicker">Your collection</p>` +
+      `<h1 class="display-title">My Lists</h1>` +
+      `<p class="lede">Put books and movies into shareable lists — reading queues, ranked favorites, watch-party lineups. Public lists get a shareable link.</p>` +
+      section.html,
+    after: section.after,
+  };
+}
+
+/**
+ * "My lists" management section — the create form plus the user's own lists.
+ * Composable (no page-level H1) so /lists can stack it above the public
+ * gallery for logged-in visitors.
+ */
+async function myListsSection() {
   const renderPage = async (page = 1) => {
     const r = await api(`/api/v1/lists?page=${page}&per_page=50`);
     if (!r.ok) throw new Error(errMsg(r));
     const { data, page: pg, per_page, total } = r.data;
     return {
-      title: 'My lists',
       html:
-        `<p class="kicker">Your collection</p>` +
-        `<h1 class="display-title">My Lists</h1>` +
-        `<p class="lede">Put books and movies into shareable lists — reading queues, ranked favorites, watch-party lineups. Public lists get a shareable link.</p>` +
+        `<div data-my-lists>` +
         `<section class="panel" style="margin-bottom:2.5rem">` +
           `<h2>Create a new list</h2>` +
           `<form data-create-list style="display:grid;gap:.9rem">` +
@@ -54,7 +70,8 @@ export async function myListsView() {
         (data.length === 0
           ? `<p class="empty">No lists yet — create your first one above.</p>`
           : `<div data-lists>${data.map(listCardHtml).join('')}</div>`) +
-        pagination(pg, per_page, total),
+        pagination(pg, per_page, total) +
+        `</div>`,
       after(root) {
         const form = root.querySelector('[data-create-list]');
         const errEl = form.querySelector('.form-error');
@@ -80,18 +97,110 @@ export async function myListsView() {
           navigate('/lists/' + r2.data.slug);
         });
         wireListRowActions(root);
-        wirePagination(root, (p) => refresh(p));
+        const slot = root.querySelector('[data-my-lists]');
+        wirePagination(slot ?? root, (p) => refresh(p));
       },
     };
   };
   const out = await renderPage(1);
   const refresh = async (page) => {
     const next = await renderPage(page);
-    document.title = `${next.title} — Novel Adaptations`;
-    document.getElementById('app').innerHTML = next.html;
-    next.after(document.getElementById('app'));
+    const slot = document.querySelector('[data-my-lists]');
+    if (slot) {
+      slot.outerHTML = next.html;
+      next.after(document.getElementById('app'));
+    } else {
+      document.getElementById('app').innerHTML = next.html;
+      next.after(document.getElementById('app'));
+    }
   };
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Public lists gallery — the /lists landing page for logged-out visitors,
+// and the "Discover" section for logged-in ones.
+// ---------------------------------------------------------------------------
+
+/** Read-only card for a public list in the gallery (no owner controls). */
+function galleryCardHtml(l) {
+  return (
+    `<div class="list-card" data-list-row>` +
+      `<div class="grow">` +
+        `<h3><a href="/lists/${esc(l.slug)}">${esc(l.title)}</a></h3>` +
+        (l.description ? `<p class="desc">${esc(l.description)}</p>` : '') +
+        `<p class="meta">${l.item_count} ${l.item_count === 1 ? 'item' : 'items'}` +
+        (l.updated_at ? ` · updated ${esc(l.updated_at.slice(0, 10))}` : '') + `</p>` +
+      `</div>` +
+    `</div>`
+  );
+}
+
+/** Public gallery section — composable (no page-level H1). */
+async function discoverListsSection() {
+  const renderPage = async (page = 1) => {
+    const r = await api(`/api/v1/lists/public?page=${page}&per_page=20`, { loginRedirect: false });
+    if (!r.ok) throw new Error(errMsg(r));
+    const { data, page: pg, per_page, total } = r.data;
+    return {
+      html:
+        `<div data-discover-lists>` +
+        `<h2 class="section-title">Discover public lists <span class="count">${total}</span></h2>` +
+        (data.length === 0
+          ? `<p class="empty">No public lists yet — be the first to share one.</p>`
+          : `<div>${data.map(galleryCardHtml).join('')}</div>`) +
+        pagination(pg, per_page, total) +
+        `</div>`,
+      after(root) {
+        const slot = root.querySelector('[data-discover-lists]');
+        wirePagination(slot ?? root, (p) => refresh(p));
+      },
+    };
+  };
+  const out = await renderPage(1);
+  const refresh = async (page) => {
+    const next = await renderPage(page);
+    const slot = document.querySelector('[data-discover-lists]');
+    if (slot) {
+      slot.outerHTML = next.html;
+      next.after(document.getElementById('app'));
+    }
+  };
+  return out;
+}
+
+/**
+ * /lists — public landing page. Logged-out visitors get the public gallery
+ * (previously this route bounced them to login); logged-in visitors get
+ * their management section stacked above the gallery.
+ */
+export async function listsView() {
+  if (!isAuthedResolved()) {
+    const gallery = await discoverListsSection();
+    return {
+      title: 'Lists',
+      html:
+        `<p class="kicker">Community collections</p>` +
+        `<h1 class="display-title">Lists</h1>` +
+        `<p class="lede">Reading queues, ranked favorites, and watch-party lineups from the community. <a href="/auth/login?next=/lists">Log in</a> to create and share your own.</p>` +
+        gallery.html,
+      after: gallery.after,
+    };
+  }
+  const [mine, gallery] = await Promise.all([myListsSection(), discoverListsSection()]);
+  return {
+    title: 'Lists',
+    html:
+      `<p class="kicker">Your collection</p>` +
+      `<h1 class="display-title">Lists</h1>` +
+      `<p class="lede">Put books and movies into shareable lists — reading queues, ranked favorites, watch-party lineups. Public lists get a shareable link.</p>` +
+      mine.html +
+      `<div style="margin-top:3rem">` + gallery.html + `</div>`,
+    after(root) {
+      mine.after(root);
+      gallery.after(root);
+    },
+  };
 }
 
 /** Edit / delete buttons on list cards (shared by /lists and /lists/:slug). */

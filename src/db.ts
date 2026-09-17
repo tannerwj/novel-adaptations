@@ -11,6 +11,10 @@ export interface Book {
   googlebooks_id: string | null;
   /** SEO permalink slug (migration 0020). Null until the backfill runs. */
   slug: string | null;
+  /** Open Library synopsis (migration 0025). Null until the backfill runs. */
+  description: string | null;
+  /** JSON array of Open Library subject strings (migration 0025). */
+  subjects: string | null;
 }
 
 export interface ScreenWork {
@@ -28,6 +32,11 @@ export interface ScreenWork {
   purchase_url_screen: string | null;
   /** SEO permalink slug (migration 0020). Null until the backfill runs. */
   slug: string | null;
+  /**
+   * Cached TMDB trailer lookup (migration 0025): NULL = unchecked,
+   * '' = TMDB has no trailer, otherwise the YouTube video key.
+   */
+  trailer_youtube_key: string | null;
 }
 
 export interface Adaptation {

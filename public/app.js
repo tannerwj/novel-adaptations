@@ -30,7 +30,7 @@ registerRoutes([
   { pattern: /^\/watch\/(?<slug>[^/]+)\/?$/, view: watchView },
   { pattern: /^\/adaptations\/(?<slug>[^/]+)\/?$/, view: adaptationView },
   { pattern: /^\/books\/(?<slug>[^/]+)\/?$/, view: bookView },
-  { pattern: /^\/lists\/?$/, view: lazyView('./js/views/lists.js', 'myListsView'), auth: true },
+  { pattern: /^\/lists\/?$/, view: lazyView('./js/views/lists.js', 'listsView') },
   { pattern: /^\/lists\/(?<slug>[^/]+)\/?$/, view: lazyView('./js/views/lists.js', 'listDetailView') },
   { pattern: /^\/shelves\/?$/, view: lazyView('./js/views/lists.js', 'shelvesView'), auth: true },
   { pattern: /^\/feedback\/?$/, view: lazyView('./js/views/feedback.js', 'feedbackView') },

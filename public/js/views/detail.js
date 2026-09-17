@@ -89,6 +89,17 @@ export async function adaptationView({ params }) {
 // /books/:id — the book
 // ---------------------------------------------------------------------------
 
+/** Parse the JSON-encoded Open Library subjects array; never throws. */
+function bookSubjects(raw) {
+  if (!raw || typeof raw !== 'string') return [];
+  try {
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter((s) => typeof s === 'string').slice(0, 8) : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function bookView({ params }) {
   const slug = String(params.slug ?? '').trim();
   if (!slug) return { title: 'Not found', html: notFoundHtml() };
@@ -125,8 +136,16 @@ export async function bookView({ params }) {
         `<section class="panel"><h2>Details</h2><dl class="facts">` +
           `<dt>Published</dt><dd>${esc(b.pub_date ?? '—')}</dd>` +
           `<dt>ISBN</dt><dd>${esc(b.isbn ?? '—')}</dd>` +
+          (bookSubjects(b.subjects).length > 0
+            ? `<dt>Genres</dt><dd>${bookSubjects(b.subjects).map((s) => `<span class="kind-pill">${esc(s)}</span>`).join(' ')}</dd>`
+            : '') +
         `</dl></section>` +
       `</div>` +
+      (b.description && b.description.trim()
+        ? `<section class="panel" style="margin-top:1.5rem"><h2>Synopsis</h2>` +
+          `<p>${esc(b.description.trim())}</p>` +
+          `<p class="meta">Synopsis via Open Library</p></section>`
+        : '') +
       `<section>` +
         `<h2 class="section-title">Adaptations <span class="count">${r.data.adaptations.length}</span></h2>` +
         (r.data.adaptations.length === 0
@@ -200,9 +219,11 @@ export async function watchView({ params }) {
           `<div class="hero-actions">` +
             ratingWidget('screen_work', w.id, r.data.rating?.average ?? 0, r.data.rating?.count ?? 0, r.data.user_rating ?? null, authed) +
             addToListControl('screen_work', w.id, r.data.user_lists ?? [], authed) +
+            `<button class="btn" type="button" data-trailer-btn>▶ Trailer</button>` +
           `</div>` +
         `</div>` +
       `</div>` +
+      `<div data-trailer-slot></div>` +
       (r.data.hype
         ? hypeWidget(w.id, r.data.hype.average, r.data.hype.count, r.data.hype.user_level ?? null, authed)
         : '') +
@@ -248,6 +269,50 @@ export async function watchView({ params }) {
           : newsList(r.data.news)) +
       `</section>` +
       reviewsSection('screen_work', w.id),
-    after(root) { wireUserControls(root); wireWidgets(root); },
+    after(root) { wireUserControls(root); wireWidgets(root); wireTrailer(root, slug); },
   };
+}
+
+/**
+ * Trailer button: lazy-loads the YouTube key from the worker (which caches
+ * the TMDB lookup in D1) and swaps in a privacy-enhanced embed. The button
+ * stays visible even when no trailer exists — the lookup is cheap and cached.
+ */
+function wireTrailer(root, slug) {
+  const btn = root.querySelector('[data-trailer-btn]');
+  const slot = root.querySelector('[data-trailer-slot]');
+  if (!btn || !slot || btn.dataset.wired) return;
+  btn.dataset.wired = '1';
+  btn.addEventListener('click', async () => {
+    if (slot.dataset.loaded) {
+      slot.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Loading…';
+    try {
+      const r = await api(`/api/v1/watch/${encodeURIComponent(slug)}/trailer`, { loginRedirect: false });
+      if (!r.ok) throw new Error(errMsg(r));
+      const key = r.data && r.data.youtube_key;
+      if (key) {
+        slot.dataset.loaded = '1';
+        slot.innerHTML =
+          `<div style="position:relative;padding-top:56.25%;margin-top:1.5rem;border-radius:12px;overflow:hidden;background:#000">` +
+          `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(key)}?rel=0" ` +
+          `title="Trailer" style="position:absolute;inset:0;width:100%;height:100%;border:0" ` +
+          `allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" ` +
+          `allowfullscreen loading="lazy"></iframe></div>`;
+        slot.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        btn.textContent = '▶ Trailer';
+      } else {
+        slot.innerHTML = `<p class="empty" style="margin-top:1.5rem">No trailer found for this title yet.</p>`;
+        btn.textContent = '▶ Trailer';
+      }
+    } catch (e) {
+      slot.innerHTML = `<p class="empty" style="margin-top:1.5rem">Couldn't load the trailer — ${esc(e instanceof Error ? e.message : 'try again later')}.</p>`;
+      btn.textContent = '▶ Trailer';
+    } finally {
+      btn.disabled = false;
+    }
+  });
 }

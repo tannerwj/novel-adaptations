@@ -122,6 +122,7 @@ import {
   getListById,
   getListBySlug,
   listListItems,
+  listPublicLists,
   listUserLists,
   LIST_TARGET_TYPES,
   MAX_LISTS_PER_HOUR,
@@ -169,6 +170,7 @@ import {
 import { getWatchProviders } from '../watch_providers_cache';
 import { fetchAndCacheProviders } from '../watch_providers_cache';
 import { IntakeError, intakeFromTip } from '../intake';
+import { fetchTrailerKey } from '../trailers';
 
 const v1 = new Hono<{ Bindings: Env }>();
 
@@ -864,6 +866,41 @@ v1.get('/watch/:idOrSlug', async (c) => {
   });
 });
 
+// Trailer key for a screen work. The TMDB /videos lookup runs at most once
+// per title: hits and confirmed misses ('') are cached on
+// screen_works.trailer_youtube_key; network/API failures are not cached and
+// stay retryable. The TMDB key never leaves the worker — only the YouTube
+// video key is returned.
+v1.get('/watch/:idOrSlug/trailer', async (c) => {
+  const id = await resolveDetailId(c.env.DB, 'screen_works', c.req.param('idOrSlug'));
+  if (id === null) return apiError(c, 404, 'not_found', 'Screen work not found.');
+  const row = await c.env.DB
+    .prepare(
+      'SELECT id, tmdb_id, kind, trailer_youtube_key FROM screen_works WHERE id = ?1',
+    )
+    .bind(id)
+    .first<{ id: number; tmdb_id: number | null; kind: string; trailer_youtube_key: string | null }>();
+  if (!row) return apiError(c, 404, 'not_found', 'Screen work not found.');
+  if (row.trailer_youtube_key !== null) {
+    return c.json({ youtube_key: row.trailer_youtube_key || null, cached: true });
+  }
+  const outcome = await fetchTrailerKey(
+    row.tmdb_id ?? 0,
+    row.kind === 'series' ? 'series' : 'film',
+    c.env.TMDB_API_KEY ?? '',
+  );
+  if (outcome.status === 'failed' || outcome.status === 'not-attempted') {
+    // Don't cache failures — a later click retries.
+    return c.json({ youtube_key: null, cached: false });
+  }
+  const key = outcome.status === 'hit' ? outcome.key : '';
+  await c.env.DB
+    .prepare('UPDATE screen_works SET trailer_youtube_key = ?1 WHERE id = ?2')
+    .bind(key, id)
+    .run();
+  return c.json({ youtube_key: key || null, cached: false });
+});
+
 // --- most wanted & votes -----------------------------------------------------
 
 v1.get('/most-wanted', async (c) => {
@@ -1299,6 +1336,15 @@ v1.get('/lists', async (c) => {
   return c.json(paginate(lists.map(listToJson), page, per_page));
 });
 
+// Public lists gallery — every public list, most recently updated first.
+// No owner info is exposed (finding 1: emails never leave the API).
+// Registered before /lists/:slug so "public" isn't treated as a slug.
+v1.get('/lists/public', async (c) => {
+  const { page, per_page, offset } = pagination(c, 20);
+  const { lists, total } = await listPublicLists(c.env.DB, per_page, offset);
+  return c.json({ data: lists.map(listToJson), page, per_page, total });
+});
+
 v1.post('/lists', async (c) => {
   const user = await v1User(c);
   if (!user) return unauthorized(c, 'Sign in to manage lists.');
@@ -1668,6 +1714,26 @@ v1.get('/calendar/year/:year', async (c) => {
       recentWindowStart(today),
     );
     return c.json({ year, works });
+  });
+});
+
+// Site-wide recent news for the home page strip: approved items only,
+// newest first. Edge-cached like the calendar — identical for every visitor.
+v1.get('/news/recent', async (c) => {
+  return edgeCached(c, async () => {
+    const rawLimit = Number(c.req.query('limit'));
+    const limit =
+      Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 20) : 8;
+    const { results } = await c.env.DB
+      .prepare(
+        `SELECT * FROM news_items
+           WHERE status = 'approved'
+           ORDER BY published_at DESC NULLS LAST, id DESC
+           LIMIT ?1`,
+      )
+      .bind(limit)
+      .all<NewsItem>();
+    return c.json({ items: (results ?? []).map(newsToJson) });
   });
 });
 

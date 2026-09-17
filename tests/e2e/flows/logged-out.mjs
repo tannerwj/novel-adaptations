@@ -340,4 +340,48 @@ export const tests = [
     eq(docs.status, 200, 'GET /api/docs status');
     assert(/redoc/i.test(docs.text), 'API docs page loads the Redoc renderer');
   }),
+
+  test('public lists gallery: logged-out envelope, public-only, no owner identity', async () => {
+    const r = await apiGet('/api/v1/lists/public', { query: { page: '1', per_page: '20' } });
+    eq(r.status, 200, 'GET /api/v1/lists/public status');
+    const { data, page, per_page, total } = r.data;
+    assert(Array.isArray(data), 'data is an array');
+    eq(page, 1, 'page echoes');
+    eq(per_page, 20, 'per_page echoes');
+    assert(typeof total === 'number', 'total is a number');
+    assert(data.length <= 20, 'never more than one page of rows');
+    for (const l of data) {
+      eq(l.is_public, true, 'only public lists are exposed');
+      assert(!('owner_id' in l) && !('owner_email' in l), 'no owner identity leaks');
+      assert(typeof l.slug === 'string' && l.slug.length > 0, 'list has a slug');
+      assert(typeof l.item_count === 'number', 'list carries an item count');
+    }
+    const capped = await apiGet('/api/v1/lists/public', { query: { per_page: '999' } });
+    eq(capped.status, 200, 'oversized per_page clamps');
+    eq(capped.data.per_page, 100, 'per_page clamps to 100');
+  }),
+
+  test('recent news: approved-only, newest-first, capped limit', async () => {
+    const r = await apiGet('/api/v1/news/recent', { query: { limit: '6' } });
+    eq(r.status, 200, 'GET /api/v1/news/recent status');
+    assert(Array.isArray(r.data.items), 'items is an array');
+    assert(r.data.items.length <= 6, 'limit is honored');
+    for (const n of r.data.items) {
+      eq(n.status, 'approved', 'only approved news is exposed');
+    }
+    const capped = await apiGet('/api/v1/news/recent', { query: { limit: '500' } });
+    eq(capped.status, 200, 'over-limit clamps');
+    assert(capped.data.items.length <= 20, 'limit clamps to 20');
+    const bad = await apiGet('/api/v1/news/recent', { query: { limit: 'abc' } });
+    eq(bad.status, 200, 'non-numeric limit falls back to the default');
+    assert(bad.data.items.length <= 8, 'default limit is 8');
+  }),
+
+  test('book detail: description and subjects ship when present', async () => {
+    const b = await apiGet('/api/v1/books/the-last-wish-andrzej-sapkowski');
+    eq(b.status, 200, 'GET /api/v1/books/:slug status');
+    assert(b.data && b.data.book, 'book envelope present');
+    assert('description' in b.data.book, 'book payload carries description');
+    assert('subjects' in b.data.book, 'book payload carries subjects');
+  }),
 ];

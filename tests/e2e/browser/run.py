@@ -213,6 +213,14 @@ def flow_home_landing(page, c):
     assert rail_count <= 12, f"featured rail should be a small rail, got {rail_count} cards"
     recent = page.locator("section[aria-label='Recently added'] .poster-card")
     assert 1 <= recent.count() <= 8, f"recent grid should hold 1-8 cards, got {recent.count()}"
+    # News strip: the API must answer with a valid envelope; when approved
+    # news exists the section renders on the page.
+    news = page.evaluate(
+        "fetch('/api/v1/news/recent?limit=6').then(r => r.json()).catch(() => null)"
+    )
+    assert news and isinstance(news.get("items"), list), f"news API broken: {news}"
+    if news["items"]:
+        expect(page.locator("section[aria-label='Latest adaptation news']")).to_be_visible(timeout=30000)
     mark_alive(page)
     # "Browse all N adaptations" hands full-catalog browsing to /search.
     browse_all = page.locator('.catalog-cta a[href="/search"]')
@@ -367,9 +375,14 @@ def flow_logout(page, c):
     page.locator("[data-user-menu-btn]").click()
     page.locator("[data-user-menu] [data-logout]").click()
     expect(page.locator('.site-header a[href="/auth/login"]')).to_be_visible(timeout=30000)
+    # /lists is now public: logged-out visitors get the gallery, not a login redirect.
     spa_goto(page, c.base + "/lists")
+    expect(page.locator("h1", has_text="Lists")).to_be_visible(timeout=30000)
+    expect(page.locator("[data-discover-lists]")).to_be_visible(timeout=30000)
+    assert not re.search(r"/auth/login", page.url), f"unexpected login redirect: {page.url}"
+    # Shelves stays auth-gated.
+    spa_goto(page, c.base + "/shelves")
     page.wait_for_url(re.compile(r"/auth/login"), timeout=30000)
-    assert "next=" in page.url and "lists" in page.url, f"missing next param: {page.url}"
 
 
 # --------------------------------------------------------------------------
@@ -436,6 +449,24 @@ def flow_mobile_layout(page, c):
 # Flows — desktop, logged out
 # --------------------------------------------------------------------------
 
+def flow_watch_trailer(page, c):
+    spa_goto(page, c.base + f"/watch/{WATCH_SLUG}")
+    btn = page.locator("[data-trailer-btn]")
+    expect(btn).to_be_visible(timeout=30000)
+    mark_alive(page)
+    btn.click()
+    # The worker resolves the TMDB /videos lookup once and caches it in D1;
+    # the page then shows either the embed or a no-trailer notice.
+    page.wait_for_function(
+        """() => {
+          const slot = document.querySelector('[data-trailer-slot]');
+          return !!slot && (slot.querySelector('iframe[src*="youtube"]') || /trailer/i.test(slot.innerText));
+        }""",
+        timeout=30000,
+    )
+    assert_no_reload(page, "trailer load")
+
+
 def flow_theme_toggle(page, c):
     spa_goto(page, c.base + "/")
     meta = page.locator('meta[name="theme-color"]')
@@ -498,6 +529,12 @@ def flow_detail_meta(page, c):
     )
     assert page.locator('a[href*="themoviedb.org/movie"], a[href*="themoviedb.org/tv"]').count() == 0, \
         "per-page TMDB links must be gone"
+    # Book page: when the API ships a description, a Synopsis section renders.
+    book = page.evaluate(f"fetch('/api/v1/books/{BOOK_SLUG}').then(r => r.json()).catch(() => null)")
+    assert book, "book API broken"
+    spa_goto(page, c.base + f"/books/{BOOK_SLUG}")
+    if (book.get("data") or {}).get("description"):
+        expect(page.locator("section.panel h2", has_text="Synopsis")).to_be_visible(timeout=30000)
 
 
 def flow_search_keyboard(page, c):
@@ -539,6 +576,7 @@ FLOWS = [
     ("mobile_more_sheet", False, True, flow_mobile_more_sheet),
     ("mobile_layout", False, True, flow_mobile_layout),
     ("theme_toggle", False, False, flow_theme_toggle),
+    ("watch_trailer", False, False, flow_watch_trailer),
     ("search_flow", False, False, flow_search_flow),
     ("redirects", False, False, flow_redirects),
     ("detail_meta", False, False, flow_detail_meta),
