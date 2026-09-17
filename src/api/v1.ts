@@ -23,8 +23,8 @@ import {
   consumeMagicToken,
   issueMagicLink,
   promoteAdmin,
-} from '../auth/routes';
-import { THEME_COOKIE } from '../ui';
+} from '../auth/api';
+import { THEME_COOKIE } from '../theme';
 import {
   ADAPTATION_STATUSES,
   countNewsByStatus,
@@ -38,6 +38,7 @@ import {
   listNewsItems,
   nextStatusAfter,
   promoteNewsItem,
+  releasedAdaptationsViolatedByDate,
   SELECT_ADAPTATION_SUMMARY,
   setNewsItemStatus,
   type AdaptationSummary,
@@ -83,14 +84,15 @@ import {
   deleteReview,
   getReview,
   getUserReview,
-  listReviews,
+  listReviewsPage,
   MAX_REVIEWS_PER_HOUR,
+  publicDisplayName,
   REVIEW_TARGET_TYPES,
   updateReview,
   type Review,
   type ReviewTargetType,
 } from '../reviews/db';
-import { BODY_MAX, TITLE_MAX } from '../reviews/routes';
+import { BODY_MAX, TITLE_MAX } from '../reviews/db';
 import {
   checkPollsRate,
   getPollResults,
@@ -130,6 +132,7 @@ import {
   type ListTargetType,
   type UserListSummary,
 } from '../lists/db';
+import { purgeListPreview } from '../prerender';
 import {
   checkFeedbackRate,
   clientIp,
@@ -148,7 +151,7 @@ import {
   flagEnrichmentForAdaptation,
   listScreenWorksForAdmin,
   validateReleaseDate,
-} from '../news/curation';
+} from '../news/curation_db';
 import { countRemaining, countRemainingFull, parseBatchSize, runEnrichmentBatch, runFullBatch } from '../enrichment';
 import {
   getPopularBooks,
@@ -157,13 +160,13 @@ import {
   type AdaptationHit,
   type BookHit,
   type ScreenWorkHit,
-} from '../search';
+} from '../search_db';
 import {
   getCalendarFeed,
   getEarlierWorksForYear,
   recentWindowStart,
-} from '../calendar';
-import { getWatchProviders } from '../watch_providers';
+} from '../calendar_db';
+import { getWatchProviders } from '../watch_providers_cache';
 
 const v1 = new Hono<{ Bindings: Env }>();
 
@@ -360,7 +363,7 @@ function reviewToJson(r: Review) {
     created_at: r.createdAt,
     updated_at: r.updatedAt,
     author_id: r.authorId,
-    author_email: r.authorEmail,
+    author_name: publicDisplayName(r.authorEmail),
   };
 }
 
@@ -439,7 +442,7 @@ v1.post('/auth/magic-link', async (c) => {
   if (!EMAIL_RE.test(email)) {
     return validationError(c, 'Enter a valid email address.');
   }
-  if (!(await checkMagicLinkRate(c.env.DB, email))) {
+  if (!(await checkMagicLinkRate(c.env.DB, email, clientIp(c.req.raw.headers)))) {
     return apiError(
       c,
       429,
@@ -507,22 +510,79 @@ v1.post('/auth/logout', async (c) => {
 // --- home / adaptations ------------------------------------------------------
 
 /** Shared query parsing for the adaptation list endpoints. */
+/** Pre-release pipeline statuses behind the virtual `status=upcoming` filter. */
+const UPCOMING_STATUSES = ['rumored', 'optioned', 'in_development', 'filming', 'post_production'];
+
+const SCREEN_KINDS = ['film', 'series'] as const;
+
+/**
+ * Shared kind/status filter parsing for the adaptation list and search
+ * endpoints. `status=upcoming` expands to the pre-release pipeline set.
+ */
+function parseKindStatusFilter(c: V1Context):
+  | { ok: true; statuses: string[]; kind?: string }
+  | { ok: false; response: Response } {
+  const rawStatus = c.req.query('status');
+  let statuses: string[] = [];
+  if (rawStatus === 'upcoming') {
+    statuses = [...UPCOMING_STATUSES];
+  } else if (rawStatus) {
+    if (!(ADAPTATION_STATUSES as readonly string[]).includes(rawStatus)) {
+      return {
+        ok: false,
+        response: validationError(
+          c,
+          `status must be one of: ${ADAPTATION_STATUSES.join(', ')}, upcoming.`,
+        ),
+      };
+    }
+    statuses = [rawStatus];
+  }
+  const rawKind = c.req.query('kind');
+  let kind: string | undefined;
+  if (rawKind) {
+    if (!(SCREEN_KINDS as readonly string[]).includes(rawKind)) {
+      return {
+        ok: false,
+        response: validationError(c, `kind must be one of: ${SCREEN_KINDS.join(', ')}.`),
+      };
+    }
+    kind = rawKind;
+  }
+  return { ok: true, statuses, kind };
+}
+
+/**
+ * WHERE fragment for adaptation-list queries. SELECT_ADAPTATION_SUMMARY
+ * exposes the adaptations table as `a` and screen_works as `s`, so kind and
+ * status filters apply in SQL before LIMIT — the client never pages past
+ * rows it will discard.
+ */
+function adaptationFilterWhere(
+  statuses: string[],
+  kind?: string,
+): { where: string; params: unknown[] } {
+  const conds: string[] = [];
+  const params: unknown[] = [];
+  if (statuses.length > 0) {
+    conds.push(`a.status IN (${statuses.map(() => '?').join(', ')})`);
+    params.push(...statuses);
+  }
+  if (kind) {
+    conds.push('s.kind = ?');
+    params.push(kind);
+  }
+  return { where: conds.length > 0 ? `WHERE ${conds.join(' AND ')}` : '', params };
+}
+
 function parseAdaptationListQuery(
   c: V1Context,
 ):
-  | { ok: true; page: number; per_page: number; status?: string; newest: boolean }
+  | { ok: true; page: number; per_page: number; statuses: string[]; kind?: string; newest: boolean }
   | { ok: false; response: Response } {
   const { page, per_page } = pagination(c, 24);
-  const rawStatus = c.req.query('status');
-  if (rawStatus && !(ADAPTATION_STATUSES as readonly string[]).includes(rawStatus)) {
-    return {
-      ok: false,
-      response: validationError(
-        c,
-        `status must be one of: ${ADAPTATION_STATUSES.join(', ')}.`,
-      ),
-    };
-  }
+  const f = parseKindStatusFilter(c);
+  if (!f.ok) return f;
   // Additive, opt-in sort: `sort=newest` orders newest records first.
   // Anything else is a 422 — the query is part of the public API contract.
   const rawSort = c.req.query('sort');
@@ -536,7 +596,8 @@ function parseAdaptationListQuery(
     ok: true,
     page,
     per_page,
-    status: rawStatus || undefined,
+    statuses: f.statuses,
+    kind: f.kind,
     newest: rawSort === 'newest',
   };
 }
@@ -545,18 +606,17 @@ async function adaptationListData(c: V1Context) {
   const q = parseAdaptationListQuery(c);
   if (!q.ok) return q;
   // Paginate in SQL so D1 ships one page of rows, not the whole catalog.
+  // Kind/status filters also apply in SQL, so the count matches the rows
+  // and no page is wasted on rows the client would discard.
   const offset = (q.page - 1) * q.per_page;
   const orderBy = q.newest ? 'ORDER BY a.id DESC' : 'ORDER BY a.id ASC';
-  const listStmt = q.status
-    ? c.env.DB.prepare(
-        `${SELECT_ADAPTATION_SUMMARY} WHERE a.status = ?1 ${orderBy} LIMIT ?2 OFFSET ?3`,
-      ).bind(q.status, q.per_page, offset)
-    : c.env.DB.prepare(
-        `${SELECT_ADAPTATION_SUMMARY} ${orderBy} LIMIT ?1 OFFSET ?2`,
-      ).bind(q.per_page, offset);
-  const countStmt = q.status
-    ? c.env.DB.prepare('SELECT COUNT(*) AS n FROM adaptations WHERE status = ?1').bind(q.status)
-    : c.env.DB.prepare('SELECT COUNT(*) AS n FROM adaptations');
+  const { where, params } = adaptationFilterWhere(q.statuses, q.kind);
+  const listStmt = c.env.DB.prepare(
+    `${SELECT_ADAPTATION_SUMMARY} ${where} ${orderBy} LIMIT ? OFFSET ?`,
+  ).bind(...params, q.per_page, offset);
+  const countStmt = c.env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM adaptations a JOIN screen_works s ON s.id = a.screen_work_id ${where}`,
+  ).bind(...params);
   const batchRes = await c.env.DB.batch([listStmt, countStmt]);
   const listRes = batched(batchRes, 0);
   const countRes = batched(batchRes, 1);
@@ -574,16 +634,13 @@ v1.get('/home', async (c) => {
     // query is paginated in SQL — D1 ships 24 rows, not all 1,249.
     const offset = (q.page - 1) * q.per_page;
     const orderBy = q.newest ? 'ORDER BY a.id DESC' : 'ORDER BY a.id ASC';
-    const listStmt = q.status
-      ? c.env.DB.prepare(
-          `${SELECT_ADAPTATION_SUMMARY} WHERE a.status = ?1 ${orderBy} LIMIT ?2 OFFSET ?3`,
-        ).bind(q.status, q.per_page, offset)
-      : c.env.DB.prepare(
-          `${SELECT_ADAPTATION_SUMMARY} ${orderBy} LIMIT ?1 OFFSET ?2`,
-        ).bind(q.per_page, offset);
-    const listCountStmt = q.status
-      ? c.env.DB.prepare('SELECT COUNT(*) AS n FROM adaptations WHERE status = ?1').bind(q.status)
-      : c.env.DB.prepare('SELECT COUNT(*) AS n FROM adaptations');
+    const { where, params } = adaptationFilterWhere(q.statuses, q.kind);
+    const listStmt = c.env.DB.prepare(
+      `${SELECT_ADAPTATION_SUMMARY} ${where} ${orderBy} LIMIT ? OFFSET ?`,
+    ).bind(...params, q.per_page, offset);
+    const listCountStmt = c.env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM adaptations a JOIN screen_works s ON s.id = a.screen_work_id ${where}`,
+    ).bind(...params);
     const homeBatch = await c.env.DB.batch([
       listStmt,
       listCountStmt,
@@ -733,11 +790,9 @@ v1.get('/books/:idOrSlug', async (c) => {
   const book = await getBook(c.env.DB, id);
   if (!book) return apiError(c, 404, 'not_found', 'Book not found.');
   const user = await v1User(c);
-  const { page, per_page } = pagination(c, 20);
-  const [adaptations, ratingSummary, reviews] = await Promise.all([
+  const [adaptations, ratingSummary] = await Promise.all([
     getBookAdaptations(c.env.DB, id),
     getRatingSummary(c.env.DB, 'book', id),
-    listReviews(c.env.DB, 'book', id),
   ]);
   const [userRating, userVoted, userShelf, userLists] = user
     ? await Promise.all([
@@ -756,7 +811,6 @@ v1.get('/books/:idOrSlug', async (c) => {
     user_rating: userRating,
     user_voted: userVoted,
     user_shelf: userShelf,
-    reviews: paginate(reviews.map(reviewToJson), page, per_page),
     user_lists: userLists,
   });
 });
@@ -771,8 +825,7 @@ v1.get('/watch/:idOrSlug', async (c) => {
   const work = await getScreenWork(c.env.DB, id);
   if (!work) return apiError(c, 404, 'not_found', 'Screen work not found.');
   const user = await v1User(c);
-  const { page, per_page } = pagination(c, 20);
-  const [news, providers, ratingSummary, reviews] = await Promise.all([
+  const [news, providers, ratingSummary] = await Promise.all([
     getScreenWorkNews(
       c.env.DB,
       work.books.map((b) => b.title),
@@ -784,7 +837,6 @@ v1.get('/watch/:idOrSlug', async (c) => {
       kind: work.kind,
     }),
     getRatingSummary(c.env.DB, 'screen_work', id),
-    listReviews(c.env.DB, 'screen_work', id),
   ]);
   const showHype = isUnreleased(work.release_date);
   const [userRating, hypeSummary, userHype, userLists] = await Promise.all([
@@ -803,7 +855,6 @@ v1.get('/watch/:idOrSlug', async (c) => {
     watch_providers: providers,
     rating: { average: ratingSummary.average, count: ratingSummary.count },
     user_rating: userRating,
-    reviews: paginate(reviews.map(reviewToJson), page, per_page),
     hype: hypeSummary
       ? { average: hypeSummary.average, count: hypeSummary.count, user_level: userHype }
       : null,
@@ -1006,11 +1057,18 @@ v1.get('/reviews', async (c) => {
     );
   }
   const { page, per_page } = pagination(c, 20);
-  const reviews = await listReviews(c.env.DB, parsed.targetType, parsed.targetId);
+  const reviewPage = await listReviewsPage(c.env.DB, parsed.targetType, parsed.targetId, page, per_page);
+  // reviewPage.reviews is already the SQL-paginated page — return it directly.
+  // (finding 11: slicing it again here emptied page 2+.)
   return c.json({
     target_type: parsed.targetType,
     target_id: parsed.targetId,
-    reviews: paginate(reviews.map(reviewToJson), page, per_page),
+    reviews: {
+      data: reviewPage.reviews.map(reviewToJson),
+      page,
+      per_page,
+      total: reviewPage.total,
+    },
   });
 });
 
@@ -1336,6 +1394,14 @@ v1.put('/lists/:id', async (c) => {
   if (result === 'forbidden') {
     return apiError(c, 403, 'forbidden', 'You do not own this list.');
   }
+  // Title/description/visibility changed — drop the cached bot preview so a
+  // privatized list stops serving its old public preview from the edge.
+  const updated = await getListById(c.env.DB, id);
+  if (updated) {
+    c.executionCtx.waitUntil(
+      purgeListPreview(new URL(c.req.url).origin, updated.slug),
+    );
+  }
   return c.json({ ok: true });
 });
 
@@ -1344,10 +1410,18 @@ v1.delete('/lists/:id', async (c) => {
   if (!user) return unauthorized(c, 'Sign in to manage lists.');
   const id = toInt(c.req.param('id'));
   if (id === null || id < 1) return validationError(c, 'List id must be a positive integer.');
+  const doomed = await getListById(c.env.DB, id);
   const result = await deleteList(c.env.DB, user.id, id);
   if (result === 'not_found') return apiError(c, 404, 'not_found', 'List not found.');
   if (result === 'forbidden') {
     return apiError(c, 403, 'forbidden', 'You do not own this list.');
+  }
+  // Deleted — drop the cached bot preview so the old public page stops
+  // serving from the edge.
+  if (doomed) {
+    c.executionCtx.waitUntil(
+      purgeListPreview(new URL(c.req.url).origin, doomed.slug),
+    );
   }
   return c.json({ ok: true });
 });
@@ -1510,6 +1584,10 @@ v1.get('/search', async (c) => {
   // narrow that, never widen it — no SQL is duplicated here.
   let limit = Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : RESULT_LIMIT;
   limit = Math.min(limit, RESULT_LIMIT);
+  // Kind/status filters apply in SQL so the capped groups aren't wasted on
+  // rows the client would discard. `status=upcoming` = pre-release pipeline.
+  const f = parseKindStatusFilter(c);
+  if (!f.ok) return f.response;
   if (!q) {
     // Pure public fallback (no user fields) — safe to edge-cache.
     return edgeCached(c, async () =>
@@ -1524,7 +1602,9 @@ v1.get('/search', async (c) => {
   }
   return edgeCached(c, async () => {
     // One D1 round trip for the three search groups (was: three).
-    const searchBatch = await c.env.DB.batch(searchStatements(c.env.DB, q));
+    const searchBatch = await c.env.DB.batch(
+      searchStatements(c.env.DB, q, { kind: f.kind, statuses: f.statuses }),
+    );
     const booksRes = batched(searchBatch, 0);
     const worksRes = batched(searchBatch, 1);
     const storiesRes = batched(searchBatch, 2);
@@ -1539,7 +1619,7 @@ v1.get('/search', async (c) => {
       books.length + works.length + stories.length === 0
         ? await getPopularBooks(c.env.DB)
         : [];
-    // Pure function of q (no user fields) — safe to edge-cache per URL.
+    // Pure function of (q, kind, status) — no user fields — safe to edge-cache per URL.
     return c.json({
       q,
       books: group(books),
@@ -1854,6 +1934,15 @@ v1.post('/admin/screen-works/:id/release-date', async (c) => {
     .first<{ id: number }>();
   if (!existing) {
     return apiError(c, 404, 'not_found', `Screen work ${id} not found.`);
+  }
+  // Clearing the date or moving it to the future would invalidate linked
+  // 'released' adaptations — reject so the admin updates those first.
+  const violated = await releasedAdaptationsViolatedByDate(c.env.DB, id, parsed.value);
+  if (violated.length > 0) {
+    return validationError(
+      c,
+      `Cannot set release_date: adaptation${violated.length === 1 ? '' : 's'} ${violated.join(', ')} ${violated.length === 1 ? 'is' : 'are'} 'released' — change ${violated.length === 1 ? 'its' : 'their'} status first.`,
+    );
   }
   await c.env.DB
     .prepare('UPDATE screen_works SET release_date = ?1 WHERE id = ?2')

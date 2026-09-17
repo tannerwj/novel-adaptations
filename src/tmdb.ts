@@ -78,6 +78,66 @@ function isoDateOrNull(raw: string | null | undefined): string | null {
 }
 
 /**
+ * Bound for every TMDB HTTP call, headers *and* body. The timer used to stop
+ * at headers, leaving a stalled body unbounded.
+ */
+export const TMDB_TIMEOUT_MS = 10_000;
+
+/**
+ * Discriminated enrichment outcome, so callers can tell a genuine no-match
+ * from a retryable failure and from "nothing was even tried":
+ * - hit: persist the enrichment
+ * - no-match: the lookup ran and found nothing — safe to count an attempt
+ * - not-attempted: no API key or blank input — nothing was tried
+ * - failed: network/API failure — retryable, must NOT burn an attempt
+ */
+export type EnrichOutcome =
+  | { status: 'hit'; hit: TmdbEnrichment }
+  | { status: 'no-match' }
+  | { status: 'not-attempted' }
+  | { status: 'failed'; message?: string };
+
+/**
+ * GET JSON from TMDB with the deadline held through body consumption.
+ * Returns the HTTP status with the parsed body (null when unparseable).
+ * Throws on network failure or timeout — including a stalled body.
+ */
+export async function tmdbGetJson(
+  url: string,
+  fetcher: TmdbFetcher,
+): Promise<{ status: number; json: unknown }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TMDB_TIMEOUT_MS);
+  try {
+    const res = await fetcher(url, { signal: controller.signal });
+    if (!res.ok) return { status: res.status, json: null };
+    const json = await res.json().catch(() => null);
+    return { status: res.status, json };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** TMDB movie/TV result → the enrichment shape we persist. */
+function toEnrichment(match: TmdbSearchResult, kind: 'film' | 'series'): TmdbEnrichment {
+  return {
+    tmdbId: match.id,
+    posterUrl: `https://image.tmdb.org/t/p/${POSTER_SIZE}${match.poster_path}`,
+    backdropUrl: match.backdrop_path
+      ? `https://image.tmdb.org/t/p/${BACKDROP_SIZE}${match.backdrop_path}`
+      : null,
+    overview:
+      typeof match.overview === 'string' && match.overview.trim()
+        ? match.overview.trim()
+        : null,
+    releaseDate:
+      kind === 'series'
+        ? isoDateOrNull(match.first_air_date)
+        : isoDateOrNull(match.release_date),
+  };
+}
+
+/**
  * Search TMDB for a title. Uses the kind-specific endpoint — /search/movie
  * for films, /search/tv for series — rather than /search/multi, so a film
  * can never match a TV series of the same name (or a person/collection).
@@ -85,8 +145,9 @@ function isoDateOrNull(raw: string | null | undefined): string | null {
  * known, which is the standard way to disambiguate remakes.
  *
  * Picks the first result carrying a poster whose normalized title matches
- * the query and whose own release year is within ±1 of the known year;
- * returns null when nothing suitable is found.
+ * the query and whose own release year is within ±1 of the known year.
+ * Returns a discriminated EnrichOutcome: 'hit', 'no-match', 'not-attempted'
+ * (no key / blank title), or 'failed' (retryable network/API failure).
  *
  * Year safety: TMDB's year filter is not bulletproof, so every hit is
  * post-verified — a hit whose own release year differs from the known year
@@ -97,12 +158,12 @@ function isoDateOrNull(raw: string | null | undefined): string | null {
  * popular original, so the top hit alone isn't enough) — never a guess.
  */
 export async function searchTmdb(
-  apiKey: string,
+  apiKey: string | undefined,
   input: TmdbSearchInput,
   fetcher: TmdbFetcher = fetch,
-): Promise<TmdbEnrichment | null> {
+): Promise<EnrichOutcome> {
   const title = input.title.trim();
-  if (!apiKey || !title) return null;
+  if (!apiKey || !title) return { status: 'not-attempted' };
   const year =
     input.year && Number.isInteger(input.year) && input.year > 1800
       ? input.year
@@ -124,29 +185,15 @@ export async function searchTmdb(
     });
     if (withYear && year) params.set(yearParam, String(year));
 
-    let res: Response;
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10_000);
-      try {
-        res = await fetcher(`${TMDB_API}/${endpoint}?${params}`, {
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(timeout);
-      }
-    } catch {
-      return []; // Network failure → no enrichment; the caller counts it.
-    }
-    if (!res.ok) return [];
-
-    let payload: { results?: TmdbSearchResult[] };
-    try {
-      payload = (await res.json()) as { results?: TmdbSearchResult[] };
-    } catch {
-      return [];
-    }
-    const results = Array.isArray(payload.results) ? payload.results : [];
+    // Transport failures (network, timeout, stalled body) throw — the
+    // caller maps them to a retryable 'failed' outcome, not a no-match.
+    const { status, json } = await tmdbGetJson(
+      `${TMDB_API}/${endpoint}?${params}`,
+      fetcher,
+    );
+    if (status !== 200) throw new Error(`TMDB search HTTP ${status}`);
+    const payload = json as { results?: TmdbSearchResult[] } | null;
+    const results = Array.isArray(payload?.results) ? payload.results : [];
     // Only results with a poster are useful to us (the backfill selects exactly
     // the poster-less rows). Scan a few candidates so one poster-less top hit
     // doesn't block a good match ranked just below it.
@@ -161,22 +208,6 @@ export async function searchTmdb(
       .filter(Boolean)
       .some((t) => normalizeTitle(t as string) === wanted);
 
-  const toEnrichment = (match: TmdbSearchResult): TmdbEnrichment => ({
-    tmdbId: match.id,
-    posterUrl: `https://image.tmdb.org/t/p/${POSTER_SIZE}${match.poster_path}`,
-    backdropUrl: match.backdrop_path
-      ? `https://image.tmdb.org/t/p/${BACKDROP_SIZE}${match.backdrop_path}`
-      : null,
-    overview:
-      typeof match.overview === 'string' && match.overview.trim()
-        ? match.overview.trim()
-        : null,
-    releaseDate:
-      input.kind === 'series'
-        ? isoDateOrNull(match.first_air_date)
-        : isoDateOrNull(match.release_date),
-  });
-
   /** The hit's own release year, for post-verification against the known year. */
   const hitYear = (e: TmdbEnrichment): number | null =>
     e.releaseDate && /^\d{4}/.test(e.releaseDate)
@@ -190,37 +221,38 @@ export async function searchTmdb(
 
   // Primary: year-filtered search — exact title + post-verified year only.
   // Never a guess: a non-exact title is skipped even when its year fits.
-  for (const r of await doSearch(true)) {
-    if (!isTitleMatch(r)) continue;
-    const e = toEnrichment(r);
-    if (yearOk(e)) return e;
-  }
-  // Fallback: unfiltered search, scanning every exact-title hit for one
-  // within ±1 year (remake versions rank below the popular original, so the
-  // top hit alone isn't enough). Still never a guess.
-  if (year) {
-    for (const r of await doSearch(false)) {
+  try {
+    for (const r of await doSearch(true)) {
       if (!isTitleMatch(r)) continue;
-      const e = toEnrichment(r);
-      if (yearOk(e)) return e;
+      const e = toEnrichment(r, input.kind);
+      if (yearOk(e)) return { status: 'hit', hit: e };
     }
+    // Fallback: unfiltered search, scanning every exact-title hit for one
+    // within ±1 year (remake versions rank below the popular original, so the
+    // top hit alone isn't enough). Still never a guess.
+    if (year) {
+      for (const r of await doSearch(false)) {
+        if (!isTitleMatch(r)) continue;
+        const e = toEnrichment(r, input.kind);
+        if (yearOk(e)) return { status: 'hit', hit: e };
+      }
+    }
+    return { status: 'no-match' };
+  } catch (e) {
+    return { status: 'failed', message: (e as Error).message };
   }
-  return null;
 }
 
 /**
- * Enrich a screen work via TMDB title search. Returns null when enrichment
- * is unavailable (no key, blank title, no match, network/API failure).
+ * Enrich a screen work via TMDB title search. Returns a discriminated
+ * outcome (see EnrichOutcome) so callers can tell a genuine no-match from
+ * a retryable failure and from "nothing was even tried".
  */
 export async function enrichScreenWork(
   apiKey: string | undefined,
   input: TmdbSearchInput,
   fetcher: TmdbFetcher = fetch,
-): Promise<TmdbEnrichment | null> {
-  if (!apiKey) {
-    // No key → no network, no cost, no failure. Graceful by design.
-    return null;
-  }
+): Promise<EnrichOutcome> {
   return searchTmdb(apiKey, input, fetcher);
 }
 
@@ -229,6 +261,105 @@ export async function enrichScreenWorkFromEnv(
   env: TmdbEnv,
   input: TmdbSearchInput,
   fetcher: TmdbFetcher = fetch,
-): Promise<TmdbEnrichment | null> {
+): Promise<EnrichOutcome> {
   return enrichScreenWork(env.TMDB_API_KEY, input, fetcher);
+}
+
+/**
+ * Resolve an IMDb id (tt...) to its TMDB record via the /find endpoint with
+ * external_source=imdb_id — an exact identity lookup, never a title guess.
+ * The hit carries its kind ('film' from movie_results, 'series' from
+ * tv_results). A 404 / empty result set is a no-match; anything else non-OK
+ * or a transport failure is retryable.
+ */
+export type FindOutcome =
+  | { status: 'hit'; hit: TmdbEnrichment; kind: 'film' | 'series'; title: string }
+  | { status: 'no-match' }
+  | { status: 'not-attempted' }
+  | { status: 'failed'; message?: string };
+
+export async function findByImdbId(
+  apiKey: string | undefined,
+  imdbId: string,
+  fetcher: TmdbFetcher = fetch,
+): Promise<FindOutcome> {
+  if (!apiKey || !/^tt\d+$/.test(imdbId)) return { status: 'not-attempted' };
+  const params = new URLSearchParams({
+    external_source: 'imdb_id',
+    language: 'en-US',
+  });
+  params.set('api_key', apiKey);
+  try {
+    const { status, json } = await tmdbGetJson(
+      `${TMDB_API}/find/${imdbId}?${params}`,
+      fetcher,
+    );
+    if (status === 404) return { status: 'no-match' };
+    if (status !== 200) return { status: 'failed', message: `TMDB HTTP ${status}` };
+    const payload = json as {
+      movie_results?: TmdbSearchResult[];
+      tv_results?: TmdbSearchResult[];
+    } | null;
+    const movie = payload?.movie_results?.find(
+      (r) => r && Number.isInteger(r.id) && r.poster_path,
+    );
+    if (movie) {
+      return {
+        status: 'hit',
+        hit: toEnrichment(movie, 'film'),
+        kind: 'film',
+        title: movie.title || movie.original_title || '',
+      };
+    }
+    const tv = payload?.tv_results?.find(
+      (r) => r && Number.isInteger(r.id) && r.poster_path,
+    );
+    if (tv) {
+      return {
+        status: 'hit',
+        hit: toEnrichment(tv, 'series'),
+        kind: 'series',
+        title: tv.name || tv.original_name || '',
+      };
+    }
+    return { status: 'no-match' };
+  } catch (e) {
+    return { status: 'failed', message: (e as Error).message };
+  }
+}
+
+/**
+ * Enrich by known TMDB id (`/movie/{id}` or `/tv/{id}`) instead of title
+ * search. Used when the row already carries a tmdb_id: metadata is then
+ * guaranteed to describe the stored identity, never a different title's
+ * search hit. A 404 (stale id) is a no-match; anything else non-OK or a
+ * transport failure is retryable.
+ */
+export async function fetchEnrichmentById(
+  apiKey: string | undefined,
+  kind: 'film' | 'series',
+  tmdbId: number,
+  fetcher: TmdbFetcher = fetch,
+): Promise<EnrichOutcome> {
+  if (!apiKey || !Number.isInteger(tmdbId) || tmdbId < 1) {
+    return { status: 'not-attempted' };
+  }
+  const params = new URLSearchParams({ language: 'en-US' });
+  params.set('api_key', apiKey);
+  const endpoint = kind === 'series' ? 'tv' : 'movie';
+  try {
+    const { status, json } = await tmdbGetJson(
+      `${TMDB_API}/${endpoint}/${tmdbId}?${params}`,
+      fetcher,
+    );
+    if (status === 404) return { status: 'no-match' };
+    if (status !== 200) return { status: 'failed', message: `TMDB HTTP ${status}` };
+    const item = json as TmdbSearchResult | null;
+    if (!item || !Number.isInteger(item.id) || !item.poster_path) {
+      return { status: 'no-match' };
+    }
+    return { status: 'hit', hit: toEnrichment(item, kind) };
+  } catch (e) {
+    return { status: 'failed', message: (e as Error).message };
+  }
 }

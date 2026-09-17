@@ -103,6 +103,88 @@ const PENDING_SLA_DAYS = 30;
 const DEDUPE_WINDOW_DAYS = 7;
 /** A feed whose failures reach this count is auto-paused (is_active = 0). */
 const FEED_PAUSE_THRESHOLD = 5;
+/** A paused feed is rechecked after this many days without an attempt. */
+const PAUSE_RECHECK_DAYS = 7;
+
+/**
+ * Seed the D1 source registry from the SOURCES constant. INSERT … DO
+ * NOTHING preserves any DB-side feed_url / trust_tier edits — the constant
+ * only fills gaps on first run. Exported for unit tests.
+ */
+export async function seedSources(db: D1Database): Promise<void> {
+  for (const s of SOURCES) {
+    await db
+      .prepare(
+        `INSERT INTO sources (name, feed_url, trust_tier) VALUES (?1, ?2, ?3)
+         ON CONFLICT(name) DO NOTHING`,
+      )
+      .bind(s.name, s.feed_url, s.trust_tier)
+      .run();
+  }
+}
+
+/**
+ * Sources to fetch this run: every active source, plus paused ones due for
+ * their recheck (no attempt in PAUSE_RECHECK_DAYS, or never attempted).
+ * Exported for unit tests.
+ */
+export async function selectSourcesToFetch(db: D1Database): Promise<Source[]> {
+  const registry = await db
+    .prepare(
+      `SELECT name, feed_url, trust_tier FROM sources
+        WHERE is_active = 1
+           OR last_attempt_at IS NULL
+           OR last_attempt_at < datetime('now', ?1)`,
+    )
+    .bind(`-${PAUSE_RECHECK_DAYS} days`)
+    .all<{ name: string; feed_url: string; trust_tier: 'trusted' | 'reputable' | 'rumor' }>();
+  return (registry.results ?? []).map((r) => ({
+    name: r.name,
+    feed_url: r.feed_url,
+    trust_tier: r.trust_tier,
+  }));
+}
+
+/**
+ * Record a successful fetch: refreshes both timestamps, clears the failure
+ * streak, and resumes a paused source (is_active = 1). Exported for tests.
+ */
+export async function recordSourceSuccess(
+  db: D1Database,
+  src: Source,
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO sources (name, feed_url, trust_tier, last_fetched_at, last_attempt_at, last_status, consecutive_failures)
+       VALUES (?, ?, ?, datetime('now'), datetime('now'), 'ok', 0)
+       ON CONFLICT(name) DO UPDATE SET last_fetched_at=datetime('now'), last_attempt_at=datetime('now'),
+         last_status='ok', consecutive_failures=0, is_active=1`,
+    )
+    .bind(src.name, src.feed_url, src.trust_tier)
+    .run();
+}
+
+/**
+ * Record a failed fetch: bumps the failure streak and auto-pauses the
+ * source once the streak reaches FEED_PAUSE_THRESHOLD. last_attempt_at is
+ * updated on every attempt so the recheck cooldown has something to measure.
+ * Exported for tests.
+ */
+export async function recordSourceFailure(
+  db: D1Database,
+  src: Source,
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO sources (name, feed_url, trust_tier, last_attempt_at, last_status, consecutive_failures)
+       VALUES (?, ?, ?, datetime('now'), 'error', 1)
+       ON CONFLICT(name) DO UPDATE SET last_status='error', last_attempt_at=datetime('now'),
+         consecutive_failures = consecutive_failures + 1,
+         is_active = CASE WHEN consecutive_failures + 1 >= ? THEN 0 ELSE is_active END`,
+    )
+    .bind(src.name, src.feed_url, src.trust_tier, FEED_PAUSE_THRESHOLD)
+    .run();
+}
 /** Per-feed fetch timeout — a hung feed must not stall the run. */
 const FEED_FETCH_TIMEOUT_MS = 15000;
 
@@ -453,8 +535,15 @@ async function runIngestion(
     .all<{ title: string }>();
   const recentTitles = new Set((recentRows.results ?? []).map((r) => normalizeTitle(r.title)));
 
+  // The source registry lives in D1; SOURCES only seeds it on first run
+  // (DO NOTHING preserves any DB-side feed/trust edits). Fetch every active
+  // source, plus paused ones due for their recheck — a paused source that
+  // succeeds is automatically resumed (is_active = 1).
+  await seedSources(env.DB);
+  const fetchList = await selectSourcesToFetch(env.DB);
+
   const results = await Promise.allSettled(
-    SOURCES.map(async (src) => {
+    fetchList.map(async (src) => {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), FEED_FETCH_TIMEOUT_MS);
       try {
@@ -465,24 +554,10 @@ async function runIngestion(
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const xml = await resp.text();
         const items = parseFeed(xml);
-        await env.DB.prepare(
-          `INSERT INTO sources (name, feed_url, trust_tier, last_fetched_at, last_status, consecutive_failures)
-           VALUES (?, ?, ?, datetime('now'), 'ok', 0)
-           ON CONFLICT(name) DO UPDATE SET last_fetched_at=datetime('now'), last_status='ok', consecutive_failures=0`,
-        )
-          .bind(src.name, src.feed_url, src.trust_tier)
-          .run();
+        await recordSourceSuccess(env.DB, src);
         return { src, items, ok: true };
       } catch (e) {
-        await env.DB.prepare(
-          `INSERT INTO sources (name, feed_url, trust_tier, last_status, consecutive_failures)
-           VALUES (?, ?, ?, 'error', 1)
-           ON CONFLICT(name) DO UPDATE SET last_status='error',
-             consecutive_failures = consecutive_failures + 1,
-             is_active = CASE WHEN consecutive_failures + 1 >= ? THEN 0 ELSE is_active END`,
-        )
-          .bind(src.name, src.feed_url, src.trust_tier, FEED_PAUSE_THRESHOLD)
-          .run();
+        await recordSourceFailure(env.DB, src);
         console.error(`Feed failed: ${src.name}:`, (e as Error).message);
         return { src, items: [] as FeedItem[], ok: false };
       } finally {

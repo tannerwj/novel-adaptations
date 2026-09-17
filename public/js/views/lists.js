@@ -3,7 +3,7 @@
 import { esc, posterArt } from '../utils.js';
 import { bookUrl, adaptationUrl } from '../links.js';
 import { api, errMsg } from '../api.js';
-import { navigate, renderNotFound, rerender } from '../router.js';
+import { navigate, notFoundHtml, rerender } from '../router.js';
 import { pagination, wirePagination } from '../components.js';
 
 // ---------------------------------------------------------------------------
@@ -135,11 +135,32 @@ export function wireListRowActions(root) {
 // /lists/:slug — public list detail (+ owner controls)
 // ---------------------------------------------------------------------------
 
+/**
+ * Rebuild the DOM order of [data-item-row] elements from a submitted ID
+ * array, then renumber the .pos badges. (finding 21: the old in-place swap
+ * left stale UI when moving an item upward, so further moves derived from
+ * the wrong order.) Exported for unit tests.
+ */
+export function applyItemOrder(root, order) {
+  const rows = [...root.querySelectorAll('[data-item-row]')];
+  if (!rows.length) return;
+  const parent = rows[0].parentNode;
+  const byId = new Map(rows.map((r) => [Number(r.dataset.itemRow), r]));
+  for (const id of order) {
+    const row = byId.get(id);
+    if (row) parent.appendChild(row);
+  }
+  // Renumber the position badges.
+  [...parent.querySelectorAll('[data-item-row] .pos')].forEach((pos, idx) => {
+    pos.textContent = idx + 1;
+  });
+}
+
 export async function listDetailView({ params }) {
   const slug = params.slug;
   const r = await api(`/api/v1/lists/${encodeURIComponent(slug)}`, { loginRedirect: false });
   if (!r.ok) {
-    if (r.status === 404) { renderNotFound(); return { title: 'Not found', html: '' }; }
+    if (r.status === 404) return { title: 'Not found', html: notFoundHtml() };
     throw new Error(errMsg(r));
   }
   const { list, items, is_owner } = r.data;
@@ -268,15 +289,10 @@ export async function listDetailView({ params }) {
             body: { order },
           });
           if (!r2.ok) { alert(errMsg(r2)); return; }
-          // Swap the DOM rows in place (no reload).
-          const rows = [...root.querySelectorAll('[data-item-row]')];
-          const a = rows[i], b = rows[j];
-          const parent = a.parentNode;
-          const aNext = a.nextSibling === b ? a : a.nextSibling;
-          parent.insertBefore(b, a);
-          parent.insertBefore(a, b.nextSibling === a ? aNext : b.nextSibling);
-          // Renumber the position badges.
-          [...parent.querySelectorAll('[data-item-row] .pos')].forEach((pos, idx) => { pos.textContent = idx + 1; });
+          // Rebuild the DOM order from the successfully submitted ID array
+          // (finding 21): the old in-place swap left stale UI when moving
+          // an item upward, so further moves derived from the wrong order.
+          applyItemOrder(root, order);
         });
       });
 

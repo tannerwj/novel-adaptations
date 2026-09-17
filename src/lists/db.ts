@@ -113,7 +113,10 @@ export async function listUserLists(db: D1Database, userId: number): Promise<Use
   return lists.map((l) => ({ ...l, itemCount: countById.get(l.id) ?? 0 }));
 }
 
-/** Items of a list in position order, with each target resolved for display. */
+/** Items of a list in position order, with each target resolved for display.
+ * Targets resolve in two bounded bulk queries (one per kind) instead of
+ * per-item sequential lookups (finding 11): a 50-item list costs 3 queries,
+ * not 150+. */
 export async function listListItems(db: D1Database, listId: number): Promise<ListItemView[]> {
   const { results } = await db
     .prepare(
@@ -132,39 +135,60 @@ export async function listListItems(db: D1Database, listId: number): Promise<Lis
       position: number;
       note: string | null;
     }>();
+  const rows = results ?? [];
+  if (rows.length === 0) return [];
+
+  const placeholders = (n: number) =>
+    Array.from({ length: n }, (_, i) => `?${i + 1}`).join(', ');
+  const bookIds = [...new Set(rows.filter((r) => r.targetType === 'book').map((r) => r.targetId))];
+  const workIds = [...new Set(rows.filter((r) => r.targetType === 'screen_work').map((r) => r.targetId))];
+
+  const [bookRes, workRes] = await Promise.all([
+    bookIds.length > 0
+      ? db
+          .prepare(
+            `SELECT id, title, authors, cover_url, slug FROM books WHERE id IN (${placeholders(bookIds.length)})`,
+          )
+          .bind(...bookIds)
+          .all<{ id: number; title: string; authors: string; cover_url: string | null; slug: string | null }>()
+      : Promise.resolve({ results: [] as { id: number; title: string; authors: string; cover_url: string | null; slug: string | null }[] }),
+    workIds.length > 0
+      ? db
+          .prepare(
+            `SELECT id, title, kind, poster_url, slug FROM screen_works WHERE id IN (${placeholders(workIds.length)})`,
+          )
+          .bind(...workIds)
+          .all<{ id: number; title: string; kind: string; poster_url: string | null; slug: string | null }>()
+      : Promise.resolve({ results: [] as { id: number; title: string; kind: string; poster_url: string | null; slug: string | null }[] }),
+  ]);
+  const booksById = new Map((bookRes.results ?? []).map((b) => [b.id, b]));
+  const worksById = new Map((workRes.results ?? []).map((w) => [w.id, w]));
 
   const items: ListItemView[] = [];
-  for (const r of results ?? []) {
-    const resolved = await resolveListItemTarget(db, r.targetType, r.targetId);
-    if (!resolved) continue; // target was deleted — skip stale rows
-    items.push({ ...r, ...resolved });
+  for (const r of rows) {
+    if (r.targetType === 'book') {
+      const book = booksById.get(r.targetId);
+      if (!book) continue; // target was deleted — skip stale rows
+      items.push({
+        ...r,
+        title: book.title,
+        subtitle: `Book · ${book.authors}`,
+        imageUrl: book.cover_url,
+        href: `/books/${book.slug ?? book.id}`,
+      });
+    } else {
+      const work = worksById.get(r.targetId);
+      if (!work) continue; // target was deleted — skip stale rows
+      items.push({
+        ...r,
+        title: work.title,
+        subtitle: work.kind === 'film' ? 'Film' : 'Series',
+        imageUrl: work.poster_url,
+        href: `/watch/${work.slug ?? work.id}`,
+      });
+    }
   }
   return items;
-}
-
-async function resolveListItemTarget(
-  db: D1Database,
-  targetType: ListTargetType,
-  targetId: number,
-): Promise<Omit<ListItemView, 'id' | 'listId' | 'targetType' | 'targetId' | 'position' | 'note'> | null> {
-  if (targetType === 'book') {
-    const book = await getBook(db, targetId);
-    if (!book) return null;
-    return {
-      title: book.title,
-      subtitle: `Book · ${book.authors}`,
-      imageUrl: book.cover_url,
-      href: `/books/${book.slug ?? book.id}`,
-    };
-  }
-  const work = await getScreenWork(db, targetId);
-  if (!work) return null;
-  return {
-    title: work.title,
-    subtitle: work.kind === 'film' ? 'Film' : 'Series',
-    imageUrl: work.poster_url,
-    href: `/watch/${work.slug ?? work.id}`,
-  };
 }
 
 /** A list the user owns, or why they can't have it. */

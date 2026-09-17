@@ -78,7 +78,8 @@ export const extLink = { target: '_blank', rel: 'noopener noreferrer' } as const
 export type ThemeName = 'light' | 'dark';
 
 /** Cookie name carrying the user's theme choice (1-year Max-Age). */
-export const THEME_COOKIE = 'theme';
+import { THEME_COOKIE } from './theme';
+export { THEME_COOKIE };
 
 /** Read the theme for this request. Anything but 'dark' → 'light'. */
 export function themeOf(c: Context): ThemeName {

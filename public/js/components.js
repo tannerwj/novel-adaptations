@@ -7,7 +7,7 @@ import { esc, safeUrl, statusLabel, kindLabel, shelfLabel, tierLabel, posterArt,
 import { bookUrl, watchUrl, adaptationUrl } from './links.js';
 import { store, toggleTheme } from './store.js';
 import { navigate } from './router.js';
-import { api } from './api.js';
+import { api, errMsg } from './api.js';
 
 const SUN_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`;
 const MOON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>`;
@@ -581,7 +581,7 @@ function wireChrome() {
     const logout = e.target.closest('[data-logout]');
     if (logout) {
       e.preventDefault();
-      doLogout();
+      doLogout(logout);
     }
   });
 
@@ -634,8 +634,26 @@ function wireChrome() {
   });
 }
 
-async function doLogout() {
-  await api('/api/v1/auth/logout', { method: 'POST', loginRedirect: false });
+async function doLogout(sourceEl) {
+  const r = await api('/api/v1/auth/logout', { method: 'POST', loginRedirect: false });
+  if (!r.ok) {
+    // The session may still be valid server-side: keep the local
+    // authenticated state and show a retryable inline error instead of
+    // pretending the logout succeeded.
+    let el = document.querySelector('[data-logout-error]');
+    if (!el) {
+      el = document.createElement('p');
+      el.className = 'form-error visible';
+      el.setAttribute('data-logout-error', '1');
+      el.style.margin = '.5rem .75rem';
+      if (sourceEl && sourceEl.after) sourceEl.after(el);
+      else document.body.prepend(el);
+    }
+    el.textContent = `Couldn’t log out (${errMsg(r)}). Your session is still active — try again.`;
+    return;
+  }
+  const stale = document.querySelector('[data-logout-error]');
+  if (stale) stale.remove();
   store.user = null;
   refreshChrome();
   navigate('/');

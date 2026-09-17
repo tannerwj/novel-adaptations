@@ -228,33 +228,9 @@ export async function getShelf(
   return row?.shelf ?? null;
 }
 
-async function resolveShelfTarget(
-  db: D1Database,
-  targetType: ShelfTargetType,
-  targetId: number,
-): Promise<{ title: string; slug: string | null } | null> {
-  if (targetType === 'book') {
-    const row = await db
-      .prepare('SELECT title, slug FROM books WHERE id = ?1')
-      .bind(targetId)
-      .first<{ title: string; slug: string | null }>();
-    return row ? { title: row.title, slug: row.slug } : null;
-  }
-  // Adaptation: "Book title → Screen title".
-  const row = await db
-    .prepare(
-      `SELECT a.slug, b.title AS book_title, s.title AS screen_title
-         FROM adaptations a
-         JOIN books b ON b.id = a.book_id
-         JOIN screen_works s ON s.id = a.screen_work_id
-        WHERE a.id = ?1`,
-    )
-    .bind(targetId)
-    .first<{ slug: string | null; book_title: string; screen_title: string }>();
-  return row ? { title: `${row.book_title} → ${row.screen_title}`, slug: row.slug } : null;
-}
-
-/** The user's shelf entries with human-readable titles, newest first. */
+/** The user's shelf entries with human-readable titles, newest first.
+ * Targets resolve in two bounded bulk queries (finding 11) instead of one
+ * query per shelf entry. */
 export async function listShelves(db: D1Database, userId: number): Promise<ShelfEntry[]> {
   const { results } = await db
     .prepare(
@@ -265,18 +241,64 @@ export async function listShelves(db: D1Database, userId: number): Promise<Shelf
     )
     .bind(userId)
     .all<{ targetType: ShelfTargetType; targetId: number; shelf: ShelfName }>();
+  const rows = results ?? [];
+  if (rows.length === 0) return [];
+
+  const placeholders = (n: number) =>
+    Array.from({ length: n }, (_, i) => `?${i + 1}`).join(', ');
+  const bookIds = [...new Set(rows.filter((r) => r.targetType === 'book').map((r) => r.targetId))];
+  const adaptationIds = [
+    ...new Set(rows.filter((r) => r.targetType === 'adaptation').map((r) => r.targetId)),
+  ];
+
+  const [bookRes, adapRes] = await Promise.all([
+    bookIds.length > 0
+      ? db
+          .prepare(`SELECT id, title, slug FROM books WHERE id IN (${placeholders(bookIds.length)})`)
+          .bind(...bookIds)
+          .all<{ id: number; title: string; slug: string | null }>()
+      : Promise.resolve({ results: [] as { id: number; title: string; slug: string | null }[] }),
+    adaptationIds.length > 0
+      ? db
+          .prepare(
+            `SELECT a.id, a.slug, b.title AS book_title, s.title AS screen_title
+               FROM adaptations a
+               JOIN books b ON b.id = a.book_id
+               JOIN screen_works s ON s.id = a.screen_work_id
+              WHERE a.id IN (${placeholders(adaptationIds.length)})`,
+          )
+          .bind(...adaptationIds)
+          .all<{ id: number; slug: string | null; book_title: string; screen_title: string }>()
+      : Promise.resolve({
+          results: [] as { id: number; slug: string | null; book_title: string; screen_title: string }[],
+        }),
+  ]);
+  const booksById = new Map((bookRes.results ?? []).map((b) => [b.id, b]));
+  const adapsById = new Map((adapRes.results ?? []).map((a) => [a.id, a]));
 
   const entries: ShelfEntry[] = [];
-  for (const r of results ?? []) {
-    const target = await resolveShelfTarget(db, r.targetType, r.targetId);
-    if (target === null) continue; // target was deleted — skip stale rows
-    entries.push({
-      targetType: r.targetType,
-      targetId: r.targetId,
-      title: target.title,
-      slug: target.slug,
-      shelf: r.shelf,
-    });
+  for (const r of rows) {
+    if (r.targetType === 'book') {
+      const book = booksById.get(r.targetId);
+      if (!book) continue; // target was deleted — skip stale rows
+      entries.push({
+        targetType: r.targetType,
+        targetId: r.targetId,
+        title: book.title,
+        slug: book.slug,
+        shelf: r.shelf,
+      });
+    } else {
+      const adap = adapsById.get(r.targetId);
+      if (!adap) continue; // target was deleted — skip stale rows
+      entries.push({
+        targetType: r.targetType,
+        targetId: r.targetId,
+        title: `${adap.book_title} → ${adap.screen_title}`,
+        slug: adap.slug,
+        shelf: r.shelf,
+      });
+    }
   }
   return entries;
 }

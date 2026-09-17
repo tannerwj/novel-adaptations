@@ -11,6 +11,11 @@
 // SAFETY: only ever touches the e2e-test@example.com user. Refuses to
 // continue if the resolved user id is 1 or 2 (known real accounts) or if
 // the email doesn't match exactly.
+//
+// LIVE OPT-IN: setup writes to the production D1 (wrangler --remote). It
+// refuses to run unless E2E_LIVE=1 is set — pass --live to run.mjs/run.py,
+// which exports it for the whole suite. This keeps a casual
+// `node tests/e2e/run.mjs` from ever writing to production.
 
 import { execFileSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
@@ -40,6 +45,12 @@ function resultRows(d1out, stmtIndex) {
 }
 
 export async function setup() {
+  if (process.env.E2E_LIVE !== '1') {
+    throw new Error(
+      'setup: refusing to write to the production D1 without opt-in — ' +
+        're-run with --live (or E2E_LIVE=1)',
+    );
+  }
   // 1. Find-or-create the test user.
   const out = d1(
     `INSERT INTO users (email) VALUES ('${TEST_EMAIL}') ON CONFLICT(email) DO NOTHING; ` +
@@ -62,13 +73,26 @@ export async function setup() {
   );
 
   // 3. Prove the session works end-to-end through the real auth path.
+  // This is also the base/database consistency check: the session was
+  // minted in the production D1 (wrangler --remote above), so if BASE_URL
+  // points at a worker bound to a different database, /auth/me will not
+  // see the session and setup aborts before any test runs.
   const res = await fetch(`${BASE}/api/v1/auth/me`, {
     headers: { cookie: `na_session=${token}` },
   });
-  if (res.status !== 200) throw new Error(`setup: /auth/me returned ${res.status} with fresh session`);
+  if (res.status !== 200)
+    throw new Error(
+      `setup: /auth/me returned ${res.status} with fresh session — ` +
+        `BASE_URL (${BASE}) is probably bound to a different database than ` +
+        `the production D1 written above; refusing to continue`,
+    );
   const me = await res.json();
   if (me?.user?.email !== TEST_EMAIL || me?.user?.id !== user.id) {
-    throw new Error('setup: /auth/me did not return the test user');
+    throw new Error(
+      'setup: /auth/me did not return the test user — ' +
+        `BASE_URL (${BASE}) is probably bound to a different database than ` +
+        'the production D1 written above; refusing to continue',
+    );
   }
 
   return { userId: user.id, email: TEST_EMAIL, token };

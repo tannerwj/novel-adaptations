@@ -7,7 +7,19 @@
 // global fetch to hit BASE_URL (with the test session cookie), and lets
 // tests assert on the exact HTML strings users see after first paint.
 
-export const BASE = (process.env.BASE_URL || 'https://noveladaptations.com').replace(/\/$/, '');
+const computeBase = () =>
+  (process.env.BASE_URL || 'https://noveladaptations.com').replace(/\/$/, '');
+
+export let BASE = computeBase();
+
+/**
+ * Re-read BASE_URL into the live BASE binding. run.mjs imports this module
+ * before parsing --base, so it calls this after argument parsing; every
+ * importer sees the updated value through the live binding.
+ */
+export function refreshBaseFromEnv() {
+  BASE = computeBase();
+}
 
 // ---------------------------------------------------------------------------
 // HTTP

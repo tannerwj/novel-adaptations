@@ -78,7 +78,9 @@ export async function sendMagicLink(
 ): Promise<{ sent: boolean }> {
   const binding = env.EMAIL;
   if (!binding || typeof binding.send !== 'function') {
-    console.log('[auth] magic link for', email, link);
+    // Never log the link itself: it is a live credential. Development builds
+    // surface it through the API's dev_link response field instead.
+    console.log('[auth] EMAIL binding not configured — magic link not sent');
     return { sent: false };
   }
 

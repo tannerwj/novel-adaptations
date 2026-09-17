@@ -10,6 +10,11 @@ Within each table, collisions get a stable numeric suffix (-2, -3, ...) with
 the lowest id keeping the base slug. Deterministic: same input always yields
 the same slugs.
 
+Permalink safety (finding 16): rows that already have a slug are NEVER
+rewritten — the script only fills NULL slugs, and existing slugs are
+reserved during collision resolution so a new slug can never steal one.
+Re-running after a title/date change leaves published URLs untouched.
+
 Usage:
   python3 scripts/backfill-slugs.py --dry-run   # show samples, write nothing
   python3 scripts/backfill-slugs.py             # apply to production D1
@@ -84,9 +89,14 @@ def cap(base, limit=90):
     return base[:limit].rstrip("-") or "untitled"
 
 
-def dedupe(pairs):
-    """pairs: [(id, base_slug)] in id order → ({id: unique_slug}, suffix_count)."""
-    used = set()
+def dedupe(pairs, reserved=()):
+    """pairs: [(id, base_slug)] in id order → ({id: unique_slug}, suffix_count).
+
+    `reserved` seeds the used-set with slugs that already exist in the table
+    (kept permalinks): new slugs never collide with — and never rewrite —
+    them.
+    """
+    used = set(reserved)
     out = {}
     suffixed = 0
     for row_id, base in pairs:
@@ -103,10 +113,13 @@ def dedupe(pairs):
 
 
 def build_slugs():
-    works = select("SELECT id, title, release_date FROM screen_works ORDER BY id ASC")
-    books = select("SELECT id, title, authors FROM books ORDER BY id ASC")
+    # Never rewrite an existing permalink: only rows with a NULL slug are
+    # candidates, and their current slugs are reserved during de-duping so a
+    # newly derived slug can never collide with (or steal) a kept one.
+    works = select("SELECT id, title, release_date, slug FROM screen_works ORDER BY id ASC")
+    books = select("SELECT id, title, authors, slug FROM books ORDER BY id ASC")
     adaps = select(
-        "SELECT a.id, s.title, s.release_date FROM adaptations a "
+        "SELECT a.id, s.title, s.release_date, a.slug AS slug FROM adaptations a "
         "JOIN screen_works s ON s.id = a.screen_work_id ORDER BY a.id ASC"
     )
 
@@ -115,19 +128,22 @@ def build_slugs():
         year = year_of(release_date)
         return cap(f"{base}-{year}") if year else base
 
-    work_pairs = [(w["id"], screen_base(w["title"], w["release_date"])) for w in works]
+    work_pairs = [(w["id"], screen_base(w["title"], w["release_date"])) for w in works if not w["slug"]]
+    work_reserved = {w["slug"] for w in works if w["slug"]}
 
     def book_base(title, authors):
         base = slugify(title)
         fa = first_author(authors)
         return cap(f"{base}-{slugify(fa)}") if fa else base
 
-    book_pairs = [(b["id"], book_base(b["title"], b["authors"])) for b in books]
-    adap_pairs = [(a["id"], screen_base(a["title"], a["release_date"])) for a in adaps]
+    book_pairs = [(b["id"], book_base(b["title"], b["authors"])) for b in books if not b["slug"]]
+    book_reserved = {b["slug"] for b in books if b["slug"]}
+    adap_pairs = [(a["id"], screen_base(a["title"], a["release_date"])) for a in adaps if not a["slug"]]
+    adap_reserved = {a["slug"] for a in adaps if a["slug"]}
 
-    work_slugs, work_suffixed = dedupe(work_pairs)
-    book_slugs, book_suffixed = dedupe(book_pairs)
-    adap_slugs, adap_suffixed = dedupe(adap_pairs)
+    work_slugs, work_suffixed = dedupe(work_pairs, work_reserved)
+    book_slugs, book_suffixed = dedupe(book_pairs, book_reserved)
+    adap_slugs, adap_suffixed = dedupe(adap_pairs, adap_reserved)
 
     return (
         {
@@ -161,7 +177,8 @@ def main():
         print("\nDry run: no writes.")
         return
 
-    # Only write rows whose slug is NULL or different (idempotent re-runs).
+    # build_slugs() only returns rows with a NULL slug; the comparison below
+    # is a final safety net so re-runs are idempotent no-ops.
     current = {}
     for table in slugs:
         rows = select(f"SELECT id, slug FROM {table}")

@@ -30,38 +30,50 @@ Public lists:
 
 ## Purge SQL
 
-Run against production D1 before launch. Replace the id list only if the
-table above changed; the `email LIKE '%@example.com'` guard is a second
-safety net (it also matches the automated `e2e-test@example.com` suite
-account, which is likewise test-only and safe to purge).
+Run against production D1 before launch. The purge set is derived from
+**emails, never bare ids**: every DELETE below reuses the same
+email-guarded subquery, so if the id list ever goes stale and identifies
+different accounts, their activity is left untouched (their emails won't
+match) instead of being deleted while their accounts survive.
 
 ```sql
--- 1. Snapshot what you're about to delete (sanity check):
-SELECT id, email, is_admin FROM users WHERE id IN (4,5,6,7,8,9);
+-- 0. Snapshot the purge set first (sanity check). Expect exactly the six
+--    seed personas plus the automated e2e-test@example.com suite account
+--    (also @example.com, also test-only). If anything else appears, STOP.
+SELECT id, email, is_admin FROM users
+ WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2);
 
--- 2. Delete dependent rows (order matters only for readability; no FK enforcement):
-DELETE FROM votes        WHERE user_id IN (4,5,6,7,8,9);
-DELETE FROM ratings      WHERE user_id IN (4,5,6,7,8,9);
-DELETE FROM reviews      WHERE user_id IN (4,5,6,7,8,9);
-DELETE FROM poll_votes   WHERE user_id IN (4,5,6,7,8,9);
-DELETE FROM list_items   WHERE list_id IN (SELECT id FROM lists WHERE user_id IN (4,5,6,7,8,9));
-DELETE FROM lists        WHERE user_id IN (4,5,6,7,8,9);
-DELETE FROM shelf_items  WHERE user_id IN (4,5,6,7,8,9);
-DELETE FROM feedback     WHERE user_id IN (4,5,6,7,8,9);
-DELETE FROM sessions     WHERE user_id IN (4,5,6,7,8,9);
-DELETE FROM magic_tokens WHERE user_id IN (4,5,6,7,8,9);
-DELETE FROM vote_rate    WHERE user_id IN (4,5,6,7,8,9);
-DELETE FROM ratings_rate WHERE user_id IN (4,5,6,7,8,9);
-DELETE FROM reviews_rate WHERE user_id IN (4,5,6,7,8,9);
-DELETE FROM polls_rate   WHERE user_id IN (4,5,6,7,8,9);
+-- 1. Delete dependent rows. Each statement re-derives the user set from
+--    the email guard — do NOT replace these subqueries with a bare id list.
+DELETE FROM votes        WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2));
+DELETE FROM ratings      WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2));
+DELETE FROM reviews      WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2));
+DELETE FROM poll_votes   WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2));
+DELETE FROM hype         WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2));
+DELETE FROM list_items   WHERE list_id IN (SELECT id FROM lists WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2)));
+DELETE FROM lists        WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2));
+DELETE FROM shelf_items  WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2));
+DELETE FROM feedback     WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2));
+DELETE FROM sessions     WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2));
+DELETE FROM magic_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2));
+DELETE FROM vote_rate    WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2));
+DELETE FROM ratings_rate WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2));
+DELETE FROM reviews_rate WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2));
+DELETE FROM polls_rate   WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2));
+DELETE FROM hype_rate    WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2));
+DELETE FROM lists_rate   WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2));
 
--- 3. Delete the users themselves (guard: example.com only, never admins):
-DELETE FROM users WHERE id IN (4,5,6,7,8,9)
-  AND email LIKE '%@example.com' AND is_admin = 0;
+-- 2. Delete the users themselves (guard: example.com only, never admins,
+--    never ids 1/2):
+DELETE FROM users WHERE email LIKE '%@example.com' AND is_admin = 0 AND id NOT IN (1, 2);
 
--- 4. Verify zero remain:
-SELECT COUNT(*) FROM users WHERE id IN (4,5,6,7,8,9);
+-- 3. Verify zero remain:
+SELECT COUNT(*) FROM users WHERE email LIKE '%@example.com';
 ```
+
+Run the statements as one D1 batch so the cleanup is atomic (a batch
+rolls back entirely if any statement fails) rather than statement by
+statement.
 
 Do NOT purge: user id 1, user id 2 (owner admin), or any non-`@example.com`
 address.

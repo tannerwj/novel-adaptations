@@ -369,6 +369,20 @@ function cacheKeyFor(url: string): Request {
 }
 
 /**
+ * Drop the cached bot preview for a list after it is edited, privatized, or
+ * deleted. Without this, a previously public list's title and description
+ * stay servable from the edge cache for up to PRERENDER_S_MAXAGE after the
+ * change. Best-effort: the entry expires on its own within the hour anyway.
+ */
+export async function purgeListPreview(origin: string, slug: string): Promise<void> {
+  try {
+    await caches.default.delete(cacheKeyFor(`${origin}/lists/${slug}`));
+  } catch {
+    // ignore — cache purge must never fail the API request
+  }
+}
+
+/**
  * Serve the prerendered document for a crawler request, from the edge cache
  * when available. Returns null when the path isn't prerenderable or anything
  * fails — the caller must fall through to the SPA shell.

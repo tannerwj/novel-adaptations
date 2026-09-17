@@ -7,6 +7,7 @@
 //
 // SAFETY: resolves the user by id, then REFUSES to delete unless the row's
 // email is exactly e2e-test@example.com, is_admin = 0, and id is not 1 or 2.
+// LIVE OPT-IN: refuses to run unless E2E_LIVE=1 is set (see setup.mjs).
 // Usage: node teardown.mjs <userId>   (or E2E_USER_ID env)
 
 import { execFileSync } from 'node:child_process';
@@ -45,6 +46,12 @@ const TABLES = [
 ];
 
 export async function teardown(userId) {
+  if (process.env.E2E_LIVE !== '1') {
+    throw new Error(
+      'teardown: refusing to delete from the production D1 without opt-in — ' +
+        're-run with --live (or E2E_LIVE=1)',
+    );
+  }
   const id = Number(userId);
   if (!Number.isInteger(id) || id < 1) throw new Error(`teardown: bad user id ${userId}`);
 

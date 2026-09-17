@@ -4,10 +4,12 @@
 //   POST /api/feedback            — plain form POST → validation → rate limit → thanks page
 //   GET  /admin/feedback          — admin triage queue (?type=&status= filters)
 //   POST /api/feedback/:id/status — admin triage action (JSON)
+//   POST /api/feedback/:id/intake — admin: fetch metadata for an adaptation_tip
+//                                   and create the catalog records (JSON)
 //
 // AUTH: anonymous submission is allowed on /api/feedback (no login wall);
 // spam protection is the 5/hour/IP rate limit. /admin/feedback and
-// /api/feedback/:id/status are gated behind admin sessions
+// /api/feedback/:id/* are gated behind admin sessions
 // (requireAdminPage → 303/403, requireAdminApi → 403 JSON), fail closed.
 
 import type { Hono } from 'hono';
@@ -27,6 +29,8 @@ import {
   type FeedbackStatus,
   type FeedbackType,
 } from './db';
+import { IntakeError, intakeFromTip } from '../intake';
+import { fetchAndCacheProviders } from '../watch_providers_cache';
 import {
   AdminFeedbackPage,
   FeedbackPage,
@@ -176,5 +180,66 @@ export function mountFeedback<E extends Env>(app: Hono<{ Bindings: E }>): void {
     }
     await setFeedbackStatus(c.env.DB, id, payload.status);
     return c.json({ ok: true, id, status: payload.status });
+  });
+
+  // Admin gate is checked inline (rather than via requireAdminApi) so the
+  // handler keeps the app's full Bindings type (TMDB_API_KEY). Fail closed,
+  // same 403 JSON as requireAdminApi.
+  app.post('/api/feedback/:id/intake', async (c) => {
+    const user = await getUser(c);
+    if (!user || !user.isAdmin) {
+      return c.json({ error: 'Forbidden — admin access required.' }, 403);
+    }
+    const id = Number(c.req.param('id'));
+    if (!Number.isInteger(id) || id <= 0) {
+      return c.json({ error: 'invalid feedback id' }, 400);
+    }
+    const item = await getFeedback(c.env.DB, id);
+    if (!item) {
+      return c.json({ error: `feedback ${id} not found` }, 404);
+    }
+    if (item.type !== 'adaptation_tip') {
+      return c.json({ error: 'metadata intake is only for adaptation tips' }, 400);
+    }
+    if (item.status === 'done') {
+      return c.json({ error: 'this tip is already marked done' }, 400);
+    }
+    try {
+      const result = await intakeFromTip(
+        c.env.DB,
+        {
+          subject: item.subject,
+          proofUrl: item.proof_url,
+          sourceUrl: item.proof_url,
+          tmdbApiKey: c.env.TMDB_API_KEY,
+        },
+      );
+      // Warm the where-to-watch cache in the background; the page works
+      // without it.
+      const tmdbIdRow = await c.env.DB.prepare(
+        'SELECT tmdb_id FROM screen_works WHERE id = ?1',
+      )
+        .bind(result.screenWork.id)
+        .first<{ tmdb_id: number | null }>();
+      if (c.env.TMDB_API_KEY && tmdbIdRow?.tmdb_id) {
+        c.executionCtx.waitUntil(
+          fetchAndCacheProviders(
+            c.env.DB,
+            c.env.TMDB_API_KEY,
+            result.screenWork.id,
+            tmdbIdRow.tmdb_id,
+            result.screenWork.kind as 'film' | 'series',
+          ).catch((e) => console.error('intake provider warm failed:', (e as Error).message)),
+        );
+      }
+      await setFeedbackStatus(c.env.DB, id, 'done');
+      return c.json({ ok: true, id, ...result });
+    } catch (e) {
+      if (e instanceof IntakeError) {
+        return c.json({ error: e.message }, 422);
+      }
+      console.error(`/api/feedback/${id}/intake failed:`, (e as Error).message);
+      return c.json({ error: 'metadata intake failed' }, 500);
+    }
   });
 }

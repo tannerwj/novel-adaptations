@@ -207,7 +207,8 @@ export async function getAdaptationSummaryBySlug(
 
 /**
  * News related to a screen work: items whose book_title matches (case-insensitively)
- * any linked book's title, with status approved or pending, newest first.
+ * any linked book's title, newest first. Only approved items are visible —
+ * pending stories stay behind the admin curation gate.
  */
 export async function getScreenWorkNews(
   db: D1Database,
@@ -221,7 +222,7 @@ export async function getScreenWorkNews(
       `SELECT * FROM news_items
        WHERE book_title IS NOT NULL
          AND LOWER(book_title) IN (${placeholders})
-         AND status IN ('approved', 'pending')
+         AND status = 'approved'
        ORDER BY published_at DESC NULLS LAST, id DESC`,
     )
     .bind(...titles)
@@ -365,6 +366,28 @@ export function assertReleasedStatusAllowed(releaseDate: string | null | undefin
       `Cannot mark 'released': release_date ${releaseDate} is in the future`,
     );
   }
+}
+
+/**
+ * Ids of adaptations linked to a screen work whose 'released' status would
+ * be violated by setting the work's release_date to the given value.
+ * A cleared or future date invalidates every linked 'released' adaptation.
+ * Callers (e.g. the admin release-date endpoint) should reject the edit so
+ * the admin changes those adaptations' statuses first; migration 0022's
+ * trigger is the backstop for direct SQL writes.
+ */
+export async function releasedAdaptationsViolatedByDate(
+  db: D1Database,
+  screenWorkId: number,
+  releaseDate: string | null,
+): Promise<number[]> {
+  const today = new Date().toISOString().slice(0, 10);
+  if (releaseDate != null && releaseDate !== '' && releaseDate <= today) return [];
+  const { results } = await db
+    .prepare('SELECT id FROM adaptations WHERE screen_work_id = ?1 AND status = \'released\'')
+    .bind(screenWorkId)
+    .all<{ id: number }>();
+  return (results ?? []).map((r) => r.id);
 }
 
 /**

@@ -5,6 +5,10 @@ export type ReviewTargetType = 'book' | 'screen_work';
 
 export const REVIEW_TARGET_TYPES: ReviewTargetType[] = ['book', 'screen_work'];
 
+/** Review body/title length caps — shared by the API validator and the client. */
+export const BODY_MAX = 5000;
+export const TITLE_MAX = 120;
+
 /** A review row joined with its author's identity. */
 export interface Review {
   id: number;
@@ -18,6 +22,15 @@ export interface Review {
   updatedAt: string;
   authorId: number;
   authorEmail: string;
+}
+
+/**
+ * Public display name for a reviewer — the email's local part, never the
+ * full address. Every JSON projection and renderer must use this instead
+ * of exposing account emails to other visitors.
+ */
+export function publicDisplayName(email: string): string {
+  return email.split('@')[0] || 'reader';
 }
 
 /** Column aliasing is explicit so D1 returns camelCase keys directly. */
@@ -61,6 +74,34 @@ export async function listReviews(
     .bind(targetType, targetId)
     .all<ReviewRow>();
   return (results ?? []).map(toReview);
+}
+
+/** One page of reviews for a target, newest first, with the total count.
+ * The count and the page run in a single batch (one round trip) so they
+ * are consistent; callers must not fetch all rows and slice in memory
+ * (finding 11). */
+export async function listReviewsPage(
+  db: D1Database,
+  targetType: ReviewTargetType,
+  targetId: number,
+  page: number,
+  perPage: number,
+): Promise<{ reviews: Review[]; total: number }> {
+  const offset = (page - 1) * perPage;
+  const [countResult, pageResult] = await db.batch([
+    db
+      .prepare('SELECT COUNT(*) AS n FROM reviews WHERE target_type = ?1 AND target_id = ?2')
+      .bind(targetType, targetId),
+    db
+      .prepare(
+        `${SELECT_REVIEWS} WHERE r.target_type = ?1 AND r.target_id = ?2 ORDER BY r.id DESC LIMIT ?3 OFFSET ?4`,
+      )
+      .bind(targetType, targetId, perPage, offset),
+  ]);
+  const total =
+    ((((countResult as D1Result).results ?? [])[0] as { n: number } | undefined)?.n ?? 0);
+  const reviews = (((pageResult as D1Result).results ?? []) as ReviewRow[]).map(toReview);
+  return { reviews, total };
 }
 
 /** A single review, or null. */

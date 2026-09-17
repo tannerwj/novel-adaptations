@@ -21,13 +21,15 @@
  *     separate statement).
  *   - Idempotent: re-running enriches only flagged or still-missing rows
  *     (posters, backdrops, tmdb_id, release_date).
- *   - Retry-capped: enrichment_attempts counts search attempts per row and
- *     selection requires attempts < 3, so unmatchable rows stop being
- *     retried and the bulk-backfill loop always converges (migration 0019).
+ *   - Retry-capped: enrichment_attempts counts genuine no-match searches per
+ *     row and selection requires attempts < 3, so unmatchable rows stop
+ *     being retried and the bulk-backfill loop always converges
+ *     (migration 0019). Network/API failures and missing-key runs never
+ *     burn an attempt — they stay eligible for the next run.
  *   - Throttled: ~300 ms between TMDB calls (≈33 req/10 s, under the free
  *     tier's ~40/10 s cap).
- *   - Fail-soft: per-item try/catch — a bad title, API error, or timeout is
- *     counted as `failed` and the batch continues.
+ *   - Fail-soft: a no-match, API error, or timeout is counted as `failed`
+ *     and the batch continues.
  *
  * All lookup logic keeps the injected-fetcher pattern from src/tmdb.ts, and
  * the batching/progress helpers are pure and exported for unit tests.
@@ -37,11 +39,12 @@ import type { Hono } from 'hono';
 import { requireAdminPage } from './auth/session';
 import {
   enrichScreenWorkFromEnv,
+  fetchEnrichmentById,
+  type EnrichOutcome,
   type TmdbEnrichment,
-  type TmdbEnv,
   type TmdbFetcher,
 } from './tmdb';
-import { fetchAndCacheProviders } from './watch_providers';
+import { fetchAndCacheProviders } from './watch_providers_cache';
 
 /** What registerEnrichmentRoutes (and sweepEnrichment's caller) need. */
 export interface EnrichmentDeps {
@@ -314,41 +317,48 @@ export async function enrichRows(
     result.done++;
     let tmdbId: number | null = row.tmdb_id;
     if (row.needsEnrich ?? true) {
-      try {
-        const hit = await enrichScreenWorkFromEnv(
-          { TMDB_API_KEY: apiKey },
-          {
-            title: row.title,
-            kind: kindOf(row),
-            year: extractYear(row.release_date),
-          },
-          fetcher,
-        );
-        if (hit) {
-          await applyEnrichment(db, row.id, hit);
-          tmdbId = hit.tmdbId;
-          result.enriched++;
-        } else {
-          // No key, no match, or network/API failure — counted, not fatal.
-          result.failed++;
-        }
-      } catch (e) {
+      // No API key → nothing is attempted and nothing is counted: the row
+      // stays eligible for a later run once a key exists.
+      let outcome: EnrichOutcome = { status: 'not-attempted' };
+      if (apiKey) {
+        outcome = row.tmdb_id
+          ? // Known TMDB identity: fetch by id so the metadata can never
+            // mix with a different title's search hit.
+            await fetchEnrichmentById(apiKey, kindOf(row), row.tmdb_id, fetcher)
+          : await enrichScreenWorkFromEnv(
+              { TMDB_API_KEY: apiKey },
+              {
+                title: row.title,
+                kind: kindOf(row),
+                year: extractYear(row.release_date),
+              },
+              fetcher,
+            );
+      }
+      if (outcome.status === 'hit') {
+        await applyEnrichment(db, row.id, outcome.hit);
+        tmdbId = outcome.hit.tmdbId;
+        result.enriched++;
+      } else if (outcome.status === 'no-match') {
+        result.failed++;
+        // Genuine miss only: count the attempt so the backfill loop
+        // converges. Failures stay eligible for retry.
+        await db
+          .prepare(
+            `UPDATE screen_works
+                SET enrichment_attempts = enrichment_attempts + 1
+              WHERE id = ?1`,
+          )
+          .bind(row.id)
+          .run();
+      } else if (outcome.status === 'failed') {
+        // Retryable failure: never burns an attempt, stays eligible.
         result.failed++;
         console.error(
           `enrichment failed for screen_work ${row.id} (${row.title}):`,
-          (e as Error).message,
+          outcome.message ?? 'unknown error',
         );
       }
-      // Count the attempt even on a miss: after 3 attempts the row stops
-      // being selected, so the backfill loop always converges.
-      await db
-        .prepare(
-          `UPDATE screen_works
-              SET enrichment_attempts = enrichment_attempts + 1
-            WHERE id = ?1`,
-        )
-        .bind(row.id)
-        .run();
       if (throttleMs > 0) await sleep(throttleMs);
     }
     if (

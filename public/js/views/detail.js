@@ -3,7 +3,7 @@
 import { esc, safeUrl, kindLabel, posterArt, releaseYear, HERO_SIZES } from '../utils.js';
 import { bookUrl, watchUrl, adaptationUrl } from '../links.js';
 import { api, errMsg } from '../api.js';
-import { renderNotFound } from '../router.js';
+import { notFoundHtml } from '../router.js';
 import { isAuthedResolved } from '../store.js';
 import {
   adaptationCard, statusBadge, kindPill, statusTimeline, releaseNotes,
@@ -17,10 +17,10 @@ import { ratingWidget, pollWidget, hypeWidget, reviewsSection, addToListControl,
 
 export async function adaptationView({ params }) {
   const slug = String(params.slug ?? '').trim();
-  if (!slug) { renderNotFound(); return { title: 'Not found', html: '' }; }
+  if (!slug) return { title: 'Not found', html: notFoundHtml() };
   const r = await api(`/api/v1/adaptations/${encodeURIComponent(slug)}`, { loginRedirect: false });
   if (!r.ok) {
-    if (r.status === 404 || r.status === 422) { renderNotFound(); return { title: 'Not found', html: '' }; }
+    if (r.status === 404 || r.status === 422) return { title: 'Not found', html: notFoundHtml() };
     throw new Error(errMsg(r));
   }
   const { adaptation: a, timeline, user_voted, user_shelf, poll } = r.data;
@@ -91,10 +91,10 @@ export async function adaptationView({ params }) {
 
 export async function bookView({ params }) {
   const slug = String(params.slug ?? '').trim();
-  if (!slug) { renderNotFound(); return { title: 'Not found', html: '' }; }
+  if (!slug) return { title: 'Not found', html: notFoundHtml() };
   const r = await api(`/api/v1/books/${encodeURIComponent(slug)}`, { loginRedirect: false });
   if (!r.ok) {
-    if (r.status === 404 || r.status === 422) { renderNotFound(); return { title: 'Not found', html: '' }; }
+    if (r.status === 404 || r.status === 422) return { title: 'Not found', html: notFoundHtml() };
     throw new Error(errMsg(r));
   }
   const b = r.data.book;
@@ -170,10 +170,10 @@ function whereToWatch(data, title) {
 
 export async function watchView({ params }) {
   const slug = String(params.slug ?? '').trim();
-  if (!slug) { renderNotFound(); return { title: 'Not found', html: '' }; }
+  if (!slug) return { title: 'Not found', html: notFoundHtml() };
   const r = await api(`/api/v1/watch/${encodeURIComponent(slug)}`, { loginRedirect: false });
   if (!r.ok) {
-    if (r.status === 404 || r.status === 422) { renderNotFound(); return { title: 'Not found', html: '' }; }
+    if (r.status === 404 || r.status === 422) return { title: 'Not found', html: notFoundHtml() };
     throw new Error(errMsg(r));
   }
   const w = r.data.work;

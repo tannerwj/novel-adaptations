@@ -38,16 +38,25 @@ function loadingHtml() {
   return `<div class="view-loading" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Loading…</span></div>`;
 }
 
-export function renderError(title, heading, message, cta) {
-  const root = app();
-  document.title = `${title} — Novel Adaptations`;
-  root.innerHTML =
+export function errorHtml(title, heading, message, cta) {
+  return (
     `<div class="view-error page-narrow">` +
       `<p class="kicker">Hmm</p>` +
       `<h1 class="display-title">${heading}</h1>` +
       `<p class="lede">${message}</p>` +
       (cta || `<p class="center" style="margin-top:1.75rem"><a class="btn btn-primary" href="/">← Back to all adaptations</a></p>`) +
-    `</div>`;
+    `</div>`
+  );
+}
+
+export function renderError(title, heading, message, cta) {
+  const root = app();
+  document.title = `${title} — Novel Adaptations`;
+  root.innerHTML = errorHtml(title, heading, message, cta);
+}
+
+export function notFoundHtml() {
+  return errorHtml('Not found', 'Page not found', 'That page doesn’t exist. It may have moved, or the link may be wrong.');
 }
 
 export function renderNotFound() {

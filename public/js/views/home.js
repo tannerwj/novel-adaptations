@@ -353,17 +353,6 @@ const STATUS_FILTERS = [
 ];
 const STATUS_LABELS = Object.fromEntries(STATUS_FILTERS.map((o) => [o.value, o.label]));
 
-/**
- * "Upcoming" is a virtual filter (the home page links /search?status=upcoming):
- * everything still in the pipeline, i.e. not yet released or cancelled.
- */
-const UPCOMING_STATUSES = ['rumored', 'optioned', 'in_development', 'filming', 'post_production'];
-function statusMatches(filter, status) {
-  if (!filter) return true;
-  if (filter === 'upcoming') return UPCOMING_STATUSES.includes(status);
-  return status === filter;
-}
-
 function validKind(v) {
   return KIND_FILTERS.some((o) => o.value === v) ? v : '';
 }
@@ -402,16 +391,21 @@ function popularHtml(books, heading) {
   );
 }
 
-/** Split the search API payload into kind/status-filtered groups. Books have
- *  no kind or status, so they always pass through. */
-function filterGroups(data, kind, status) {
+/** Search groups arrive pre-filtered by the server (kind/status in SQL). */
+function filterGroups(data) {
   return {
     books: data.books?.data ?? [],
-    works: (data.screen_works?.data ?? []).filter((w) => !kind || w.kind === kind),
-    stories: (data.adaptations?.data ?? []).filter(
-      (s) => (!kind || s.screen_kind === kind) && statusMatches(status, s.status),
-    ),
+    works: data.screen_works?.data ?? [],
+    stories: data.adaptations?.data ?? [],
   };
+}
+
+/** Query string for /api/v1/search: text plus the active kind/status filters. */
+function searchParams(qq, kind, status) {
+  const p = new URLSearchParams({ q: qq, limit: '12' });
+  if (kind) p.set('kind', kind);
+  if (status) p.set('status', status);
+  return p;
 }
 
 /**
@@ -490,11 +484,8 @@ function browseHeading(kind, status) {
 function browseCountText(state) {
   const b = state.browse;
   const what = state.kind === 'film' ? 'films' : state.kind === 'series' ? 'series' : 'adaptations';
-  // The server total is only exact when every active filter went to the
-  // server; kind and the virtual "upcoming" filter are client-side, so the
-  // honest label there is "so far".
-  const exactTotal = !state.kind && (!state.status || state.status !== 'upcoming');
-  return exactTotal ? `Showing ${b.shown} of ${b.total} ${what}` : `Showing ${b.shown} ${what} so far`;
+  // Every filter goes to the server, so the server total is always exact.
+  return `Showing ${b.shown} of ${b.total} ${what}`;
 }
 
 function filtersHtml(kind, status) {
@@ -538,31 +529,22 @@ export async function searchView({ query }) {
   };
 
   /**
-   * Fetch the next browse page(s) from the SQL-paginated adaptations
-   * endpoint — D1 ships BROWSE_PER_PAGE rows per request, never the whole
-   * catalog. With a kind filter (client-side), keep paging until the page
-   * yields at least one card, so "Load more" never appends an empty page.
+   * Fetch the next browse page from the SQL-paginated adaptations endpoint.
+   * Kind and status (including the virtual 'upcoming') filter server-side,
+   * so every page arrives full and the total is exact — no client-side
+   * discard, no multi-page hunt for a match.
    */
   const loadBrowsePage = async () => {
     const b = state.browse;
-    let added = [];
-    let fetched = 0;
-    while (added.length === 0 && !b.exhausted && fetched < 8) {
-      const params = new URLSearchParams({ page: String(b.page + 1), per_page: String(BROWSE_PER_PAGE) });
-      // 'upcoming' is a virtual filter (pre-release pipeline) — it can't go
-      // to the server's single-status param, so it filters client-side below.
-      if (state.status && state.status !== 'upcoming') params.set('status', state.status);
-      const r = await api(`/api/v1/adaptations?${params}`, { loginRedirect: false });
-      if (!r.ok) throw new Error(errMsg(r));
-      b.page = r.data.page;
-      b.total = r.data.total;
-      const items = (r.data.data ?? []).filter(
-        (a) => (!state.kind || a.screen_kind === state.kind) && statusMatches(state.status, a.status),
-      );
-      added = added.concat(items);
-      fetched += 1;
-      if (b.page * r.data.per_page >= b.total || (r.data.data ?? []).length === 0) b.exhausted = true;
-    }
+    const params = new URLSearchParams({ page: String(b.page + 1), per_page: String(BROWSE_PER_PAGE) });
+    if (state.kind) params.set('kind', state.kind);
+    if (state.status) params.set('status', state.status);
+    const r = await api(`/api/v1/adaptations?${params}`, { loginRedirect: false });
+    if (!r.ok) throw new Error(errMsg(r));
+    b.page = r.data.page;
+    b.total = r.data.total;
+    const added = r.data.data ?? [];
+    if (b.page * r.data.per_page >= b.total || added.length === 0) b.exhausted = true;
     b.shown += added.length;
     return added;
   };
@@ -575,7 +557,7 @@ export async function searchView({ query }) {
           `<a href="/feedback?type=adaptation_tip">suggest an adaptation</a> we’re missing.</p>`
         : `<div class="poster-grid" data-browse-grid>${cardsHtml}</div>`) +
       `<p class="meta" data-browse-count>${esc(browseCountText(state))}</p>` +
-      (!b.exhausted && b.shown > 0
+      (!b.exhausted
         ? `<div class="load-more-wrap"><button type="button" class="btn" data-browse-more>Load more</button></div>`
         : '')
     );
@@ -583,9 +565,9 @@ export async function searchView({ query }) {
 
   let initialHtml;
   if (q) {
-    const r = await api(`/api/v1/search?q=${encodeURIComponent(q)}&limit=12`, { loginRedirect: false });
+    const r = await api(`/api/v1/search?${searchParams(q, state.kind, state.status)}`, { loginRedirect: false });
     if (!r.ok) throw new Error(errMsg(r));
-    const groups = filterGroups(r.data, state.kind, state.status);
+    const groups = filterGroups(r.data);
     const total = groups.books.length + groups.works.length + groups.stories.length;
     initialHtml = total === 0 ? noResultsHtml(q, r.data.popular) : resultsHtml(groups);
   } else {
@@ -644,9 +626,9 @@ export async function searchView({ query }) {
 
       const renderSearchResults = async (qq) => {
         const my = ++state.seq;
-        const res = await api(`/api/v1/search?q=${encodeURIComponent(qq)}&limit=12`, { loginRedirect: false });
+        const res = await api(`/api/v1/search?${searchParams(qq, state.kind, state.status)}`, { loginRedirect: false });
         if (my !== state.seq || !res.ok) return;
-        const groups = filterGroups(res.data, state.kind, state.status);
+        const groups = filterGroups(res.data);
         const total = groups.books.length + groups.works.length + groups.stories.length;
         slot.innerHTML = total === 0 ? noResultsHtml(qq, res.data.popular) : resultsHtml(groups);
         setActive(-1);

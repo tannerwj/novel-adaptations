@@ -12,7 +12,8 @@
  * `white-space: pre-wrap`.
  */
 import type { Review, ReviewTargetType } from './db';
-import { BODY_MAX, TITLE_MAX } from './routes';
+import { BODY_MAX, TITLE_MAX } from './db';
+import { publicDisplayName } from './db';
 
 export type ReviewView = Review;
 
@@ -164,11 +165,6 @@ export const REVIEW_SCRIPT = `
 })();
 `;
 
-/** Public display name for a reviewer — the email's local part, no full address. */
-function displayName(email: string): string {
-  return email.split('@')[0] || 'reader';
-}
-
 function formatDate(createdAt: string): string {
   return createdAt.slice(0, 10);
 }
@@ -187,7 +183,7 @@ function ReviewItem({
     <article class="review-item">
       {review.title && <h3>{review.title}</h3>}
       <div class="meta">
-        by {displayName(review.authorEmail)} · {formatDate(review.createdAt)}
+        by {publicDisplayName(review.authorEmail)} · {formatDate(review.createdAt)}
         {edited && ' · edited'}
         {review.hasSpoilers && <span class="spoiler-badge">spoilers</span>}
       </div>

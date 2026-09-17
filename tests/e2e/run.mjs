@@ -1,6 +1,6 @@
 // tests/e2e/run.mjs — single entry point for the E2E regression suite.
 //
-//   node tests/e2e/run.mjs [--base https://noveladaptations.com] [--skip-auth] [--only <name-substring>]
+//   node tests/e2e/run.mjs [--base https://noveladaptations.com] [--skip-auth] [--only <name-substring>] [--live]
 //
 // Orchestrates: setup (mint test-user session via D1) → logged-out flows →
 // logged-in flows → teardown (delete every test row), with teardown in a
@@ -8,9 +8,13 @@
 //
 // --skip-auth runs only the logged-out flows (no CLOUDFLARE_API_TOKEN needed).
 // Requires CLOUDFLARE_API_TOKEN otherwise (wrangler D1 for setup/teardown).
+//
+// --live is REQUIRED for any run that mints the test session: setup and
+// teardown write to the production D1, and they refuse to run without this
+// explicit opt-in (or E2E_LIVE=1 in the environment).
 
 import { execFileSync } from 'node:child_process';
-import { runTests, loadClientViews, setClientAuthed } from './helpers.mjs';
+import { runTests, loadClientViews, setClientAuthed, refreshBaseFromEnv } from './helpers.mjs';
 import { tests as loggedOutTests } from './flows/logged-out.mjs';
 import { tests as loggedInTests } from './flows/logged-in.mjs';
 
@@ -18,11 +22,12 @@ const E2E_DIR = new URL('./', import.meta.url);
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const opts = { skipAuth: false, only: null };
+  const opts = { skipAuth: false, only: null, live: false };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--base' && args[i + 1]) process.env.BASE_URL = args[++i];
     else if (args[i] === '--skip-auth') opts.skipAuth = true;
     else if (args[i] === '--only' && args[i + 1]) opts.only = args[++i];
+    else if (args[i] === '--live') opts.live = true;
     else {
       console.error(`unknown arg: ${args[i]}`);
       process.exit(2);
@@ -45,6 +50,17 @@ const filter = (tests, only) => (only ? tests.filter((t) => t.name.toLowerCase()
 
 async function main() {
   const opts = parseArgs();
+  refreshBaseFromEnv();
+  // setup/teardown write to the production D1: require the explicit opt-in
+  // before anything runs (setup.mjs enforces it again as defense in depth).
+  if (!opts.skipAuth && !opts.live && process.env.E2E_LIVE !== '1') {
+    console.error(
+      'refusing to run: this suite mints a test session and writes to the production D1.\n' +
+        'Re-run with --live (or E2E_LIVE=1) to confirm, or --skip-auth for logged-out flows only.',
+    );
+    process.exit(2);
+  }
+  if (opts.live) process.env.E2E_LIVE = '1';
   const base = process.env.BASE_URL || 'https://noveladaptations.com';
   console.log(`E2E suite → ${base}${opts.only ? ` (only: "${opts.only}")` : ''}${opts.skipAuth ? ' [logged-out only]' : ''}`);
 

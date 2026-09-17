@@ -242,6 +242,16 @@ export function AdminFeedbackPage({
                     Mark reviewed
                   </button>
                 )}
+                {item.type === 'adaptation_tip' && (
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-primary"
+                    data-act="intake"
+                    data-path={`/api/feedback/${item.id}/intake`}
+                  >
+                    Fetch metadata
+                  </button>
+                )}
                 <button
                   type="button"
                   class="btn btn-sm btn-primary"
@@ -261,18 +271,66 @@ export function AdminFeedbackPage({
   );
 }
 
-/** Posts a new status to /api/feedback/:id/status and reloads the queue. */
+/** Triage actions: status posts reload the queue; intake renders its result
+ *  inline (no alert(), no reload). */
 const FEEDBACK_ADMIN_SCRIPT = `
 document.querySelectorAll('button[data-act]').forEach((btn) => {
   btn.addEventListener('click', async () => {
+    const card = btn.closest('.queue-item');
+    const act = btn.getAttribute('data-act');
+    const showError = (msg) => {
+      let el = card.querySelector('[data-inline-error]');
+      if (!el) {
+        el = document.createElement('p');
+        el.className = 'form-error';
+        el.setAttribute('data-inline-error', '1');
+        btn.closest('.actions').after(el);
+      }
+      el.textContent = msg;
+      el.classList.add('visible');
+    };
+    if (act === 'intake') {
+      btn.disabled = true;
+      const original = btn.textContent;
+      btn.textContent = 'Fetching…';
+      try {
+        const res = await fetch(btn.getAttribute('data-path'), { method: 'POST' });
+        let data = {};
+        try { data = await res.json(); } catch (e) {}
+        if (!res.ok) { showError('Error: ' + (data.error || res.status)); return; }
+        const lines = [
+          (data.book.created ? 'Created book: ' : 'Reused book: ') + data.book.title,
+          (data.screenWork.created ? 'Created ' + data.screenWork.kind + ': ' : 'Reused ' + data.screenWork.kind + ': ') + data.screenWork.title,
+          'Adaptation ' + (data.adaptation.created ? 'created' : 'already existed') + ' (' + data.adaptation.status + ')',
+        ].concat(data.warnings || []);
+        const panel = document.createElement('div');
+        panel.className = 'intake-result';
+        const ul = document.createElement('ul');
+        lines.forEach((line) => {
+          const li = document.createElement('li');
+          li.textContent = line;
+          ul.appendChild(li);
+        });
+        panel.appendChild(ul);
+        btn.closest('.actions').replaceWith(panel);
+        // The server marked the tip done — reflect it in place.
+        // Markup order in this file: type pill first, status pill second.
+        const pills = card.querySelectorAll('.badges .kind-pill');
+        if (pills[1]) pills[1].textContent = 'Done';
+        card.style.opacity = '0.7';
+      } finally {
+        if (btn.isConnected) { btn.disabled = false; btn.textContent = original; }
+      }
+      return;
+    }
     const res = await fetch(btn.getAttribute('data-path'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: btn.getAttribute('data-act') }),
+      body: JSON.stringify({ status: act }),
     });
     let data = {};
     try { data = await res.json(); } catch (e) {}
-    if (!res.ok) { alert('Error: ' + (data.error || res.status)); return; }
+    if (!res.ok) { showError('Error: ' + (data.error || res.status)); return; }
     location.reload();
   });
 });

@@ -60,7 +60,7 @@ const NEWS_STATUS_LABELS = { pending: 'Pending', approved: 'Approved', dismissed
 function newsCardHtml(it) {
   const link = safeUrl(it.url);
   return (
-    `<article class="news-review-card" data-news-id="${it.id}">` +
+    `<article class="news-review-card" data-news-id="${it.id}" data-trust-tier="${esc(it.trust_tier ?? '')}">` +
       `<p class="meta">#${it.id} · ${esc(it.source)} · trust: ${esc(it.trust_tier)}${it.published_at ? ` · published ${esc(it.published_at.slice(0, 10))}` : ''}</p>` +
       `<h2 class="news-title">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer">${esc(it.title)}</a>` : esc(it.title)}</h2>` +
       (it.summary ? `<p>${esc(it.summary)}</p>` : '') +
@@ -76,6 +76,135 @@ function newsCardHtml(it) {
   );
 }
 
+function adaptLabel(a) {
+  const book = a.book_title || 'Unknown book';
+  const screen = a.screen_title || 'unknown title';
+  const kind = a.screen_kind ? ` · ${esc(a.screen_kind)}` : '';
+  const status = a.status ? ` · ${esc(a.status)}` : '';
+  return `${esc(book)} → ${esc(screen)}${kind}${status}`;
+}
+
+/** Inline card error line — replaces alert() for news-queue actions. */
+function flashCardError(card, msg) {
+  const actions = card.querySelector('.actions');
+  if (!actions) return;
+  let el = actions.querySelector('[data-card-error]');
+  if (!el) {
+    el = document.createElement('p');
+    el.className = 'form-error';
+    el.setAttribute('data-card-error', '1');
+    actions.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add('visible');
+}
+
+/**
+ * Inline promote panel: search-as-you-type adaptation picker plus (for
+ * rumor-tier items) a corroborating-URL field. No prompt()/alert().
+ */
+function openPromotePanel(card, newsId) {
+  const actions = card.querySelector('.actions');
+  if (!actions || actions.querySelector('[data-promote-panel]')) return;
+  const isRumor = card.dataset.trustTier === 'rumor';
+
+  const panel = document.createElement('div');
+  panel.className = 'promote-panel';
+  panel.setAttribute('data-promote-panel', '1');
+  panel.innerHTML =
+    `<label class="field"><span>Attach to adaptation</span>` +
+      `<input type="text" class="input" data-promote-q placeholder="Type to search adaptations…" autocomplete="off">` +
+    `</label>` +
+    `<div class="promote-results" data-promote-results hidden></div>` +
+    `<p class="meta" data-promote-selected hidden></p>` +
+    (isRumor
+      ? `<label class="field"><span>Corroborating source URL <em>(required for rumor-tier)</em></span>` +
+        `<input type="url" class="input" data-promote-url placeholder="https://…"></label>`
+      : '') +
+    `<p class="form-error" data-promote-error hidden></p>` +
+    `<div class="actions-row">` +
+      `<button type="button" class="btn btn-primary btn-sm" data-promote-submit disabled>⬆ Promote</button>` +
+      `<button type="button" class="btn btn-sm" data-promote-cancel>Cancel</button>` +
+    `</div>`;
+  actions.appendChild(panel);
+
+  const q = panel.querySelector('[data-promote-q]');
+  const results = panel.querySelector('[data-promote-results]');
+  const selectedLine = panel.querySelector('[data-promote-selected]');
+  const err = panel.querySelector('[data-promote-error]');
+  const submit = panel.querySelector('[data-promote-submit]');
+  let selectedId = null;
+  let selectedStatus = null;
+  let timer = null;
+
+  const showErr = (m) => { err.textContent = m; err.classList.add('visible'); };
+  const clearErr = () => { err.classList.remove('visible'); };
+
+  const renderResults = (items) => {
+    if (!items.length) {
+      results.innerHTML = `<p class="meta">No adaptations match.</p>`;
+    } else {
+      results.innerHTML = items
+        .map((a) => `<button type="button" class="promote-hit" data-adapt-id="${a.id}">${adaptLabel(a)}</button>`)
+        .join('');
+    }
+    results.hidden = false;
+    results.querySelectorAll('[data-adapt-id]').forEach((hit) => {
+      hit.addEventListener('click', () => {
+        selectedId = Number(hit.dataset.adaptId);
+        const a = items.find((x) => x.id === selectedId);
+        selectedStatus = a?.status ?? null;
+        const label = a ? adaptLabel(a) : hit.textContent;
+        selectedLine.innerHTML = '';
+        selectedLine.append(
+          document.createTextNode('Attached to: '),
+          (() => { const s = document.createElement('strong'); s.textContent = a ? `${a.book_title || 'Unknown book'} → ${a.screen_title || 'unknown title'}` : label; return s; })(),
+          document.createTextNode(
+            selectedStatus
+              ? ` (currently “${selectedStatus}” — promoting advances it to the next pipeline stage).`
+              : '.',
+          ),
+        );
+        selectedLine.hidden = false;
+        results.hidden = true;
+        q.value = '';
+        submit.disabled = false;
+        clearErr();
+      });
+    });
+  };
+
+  q.addEventListener('input', () => {
+    clearTimeout(timer);
+    selectedId = null;
+    submit.disabled = true;
+    const term = q.value.trim();
+    if (term.length < 2) { results.hidden = true; return; }
+    timer = setTimeout(async () => {
+      const r = await api(`/api/v1/search?q=${encodeURIComponent(term)}&limit=8`);
+      if (!r.ok) { showErr(errMsg(r)); return; }
+      renderResults(r.data.adaptations?.data ?? []);
+    }, 250);
+  });
+
+  panel.querySelector('[data-promote-cancel]').addEventListener('click', () => panel.remove());
+
+  submit.addEventListener('click', async () => {
+    clearErr();
+    const body = { adaptation_id: selectedId };
+    if (isRumor) {
+      const url = panel.querySelector('[data-promote-url]').value.trim();
+      if (!url) { showErr('A corroborating URL is required to promote a rumor-tier item.'); return; }
+      body.corroborating_url = url;
+    }
+    submit.disabled = true;
+    const r = await api(`/api/v1/admin/news/${newsId}/promote`, { method: 'POST', body });
+    if (!r.ok) { submit.disabled = false; showErr(errMsg(r)); return; }
+    card.style.opacity = '0.4';
+    actions.innerHTML = `<span class="meta">✓ Promoted.</span>`;
+  });
+}
+
 export async function adminNewsView({ query }) {
   const status = NEWS_STATUSES.includes(query.status) ? query.status : 'pending';
   const renderPage = async (page = 1) => {
@@ -89,7 +218,7 @@ export async function adminNewsView({ query }) {
         adminBar('/admin/news') +
         `<p class="kicker">Admin</p>` +
         `<h1 class="display-title">News queue</h1>` +
-        `<p class="lede">AI-drafted stories awaiting review. Approving publishes a story to the site; promoting pushes it to the top; dismissing removes it.</p>` +
+        `<p class="lede">AI-drafted stories awaiting review. Approving publishes a story to the site; promoting advances the linked adaptation to its next pipeline status; dismissing removes it.</p>` +
         `<div class="actions" style="margin-bottom:1.5rem">` +
           NEWS_STATUSES.map((s) =>
             `<a href="/admin/news?status=${s}" class="btn btn-sm${s === status ? ' btn-primary' : ''}">${NEWS_STATUS_LABELS[s]}${counts && counts[s] != null ? ` (${counts[s]})` : ''}</a>`
@@ -108,12 +237,19 @@ export async function adminNewsView({ query }) {
             btn.addEventListener('click', async () => {
               const action = btn.dataset.newsAction;
               if (action === 'dismiss' && !confirm('Dismiss this story? It will be removed from the queue.')) return;
+              // Promote needs a target adaptation (and a corroborating source
+              // for rumor-tier items) — picked in an inline panel below, never
+              // a prompt(). The API rejects a bodyless request.
+              if (action === 'promote') {
+                openPromotePanel(card, id);
+                return;
+              }
               btn.disabled = true;
               const r2 = await api(`/api/v1/admin/news/${id}/${action}`, { method: 'POST' });
-              if (!r2.ok) { btn.disabled = false; alert(errMsg(r2)); return; }
+              if (!r2.ok) { btn.disabled = false; flashCardError(card, errMsg(r2)); return; }
               card.style.opacity = '0.4';
               card.querySelector('.actions').innerHTML =
-                `<span class="meta">✓ ${action === 'approve' ? 'Approved — published.' : action === 'promote' ? 'Promoted.' : 'Dismissed.'}</span>`;
+                `<span class="meta">✓ ${action === 'approve' ? 'Approved — published.' : 'Dismissed.'}</span>`;
             });
           });
         });
@@ -214,7 +350,14 @@ export async function adminRunsView() {
       wireBackfill(mount);
       const refreshRuns = async (page) => {
         const rr = await api(`/api/v1/admin/news/runs?page=${page}&per_page=25`);
-        if (!rr.ok) { alert(errMsg(rr)); return; }
+        if (!rr.ok) {
+          const slot = root.querySelector('[data-runs-table]') || mount;
+          const p = document.createElement('p');
+          p.className = 'form-error';
+          p.textContent = errMsg(rr);
+          slot.replaceWith(p);
+          return;
+        }
         const box = root.querySelector('[data-runs-table]');
         if (box) box.outerHTML = runsTableHtml(rr.data.runs.data);
         const old = root.querySelector('[data-pagination]');
@@ -372,7 +515,19 @@ export async function adminFeedbackView({ query }) {
                 method: 'POST',
                 body: { status: btn.dataset.fbStatus },
               });
-              if (!r2.ok) { btn.disabled = false; alert(errMsg(r2)); return; }
+              if (!r2.ok) {
+                btn.disabled = false;
+                let el = row.querySelector('[data-row-error]');
+                if (!el) {
+                  el = document.createElement('p');
+                  el.className = 'form-error';
+                  el.setAttribute('data-row-error', '1');
+                  row.appendChild(el);
+                }
+                el.textContent = errMsg(r2);
+                el.classList.add('visible');
+                return;
+              }
               row.style.opacity = '0.4';
               btn.remove();
             });

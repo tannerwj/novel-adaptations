@@ -2,7 +2,7 @@
 // book-vs-screen polls, hype meter, spoiler-safe reviews, add-to-list.
 // All mutations go through /api/v1 (snake_case); every API text is escaped.
 
-import { esc, displayName, dateOnly } from './utils.js';
+import { esc, dateOnly } from './utils.js';
 import { api, errMsg } from './api.js';
 import { store } from './store.js';
 
@@ -388,7 +388,7 @@ export function reviewItemHtml(r, currentUserId) {
   return (
     `<article class="review-item" data-review-id="${r.id}">` +
       (r.title ? `<h3>${esc(r.title)}</h3>` : '') +
-      `<div class="meta">by ${esc(displayName(r.author_email))} · ${esc(dateOnly(r.created_at))}` +
+      `<div class="meta">by ${esc(r.author_name)} · ${esc(dateOnly(r.created_at))}` +
       (edited ? ' · edited' : '') +
       (r.has_spoilers ? `<span class="spoiler-badge">spoilers</span>` : '') +
       `</div>` +
@@ -449,20 +449,36 @@ export function wireReviews(root) {
         esc(total === 0 ? 'Nobody has reviewed this yet.' : `${total} ${total === 1 ? 'review' : 'reviews'}`) +
         ' · Spoiler-flagged reviews stay blurred until you reveal them.';
 
-      section.querySelector('[data-reviews-form-slot]').innerHTML = signedIn
-        ? `<div class="review-form"><form data-review-form>` +
-            `<label>Title (optional)<input type="text" name="title" maxlength="${REVIEW_TITLE_MAX}" placeholder="Sum it up in a line"></label>` +
-            `<label>Review<textarea name="body" required maxlength="${REVIEW_BODY_MAX}" placeholder="What did you think? Flag it below if your review has spoilers."></textarea></label>` +
-            `<label class="checkbox-row"><input type="checkbox" name="has_spoilers"> Contains spoilers</label>` +
-            `<div class="form-error" role="alert"></div>` +
-            `<div><button type="submit" class="btn btn-sm btn-primary">Post review</button></div>` +
-          `</form></div>`
-        : `<p class="review-signin"><a class="btn btn-sm" href="/auth/login">Sign in to write a review</a></p>`;
+      // Render the write-review form only once (finding 18): re-rendering it
+      // on every pagination load would discard an in-progress draft.
+      const formSlot = section.querySelector('[data-reviews-form-slot]');
+      if (!formSlot.dataset.rendered) {
+        formSlot.dataset.rendered = '1';
+        formSlot.innerHTML = signedIn
+          ? `<div class="review-form"><form data-review-form>` +
+              `<label>Title (optional)<input type="text" name="title" maxlength="${REVIEW_TITLE_MAX}" placeholder="Sum it up in a line"></label>` +
+              `<label>Review<textarea name="body" required maxlength="${REVIEW_BODY_MAX}" placeholder="What did you think? Flag it below if your review has spoilers."></textarea></label>` +
+              `<label class="checkbox-row"><input type="checkbox" name="has_spoilers"> Contains spoilers</label>` +
+              `<div class="form-error" role="alert"></div>` +
+              `<div><button type="submit" class="btn btn-sm btn-primary">Post review</button></div>` +
+            `</form></div>`
+          : `<p class="review-signin"><a class="btn btn-sm" href="/auth/login">Sign in to write a review</a></p>`;
+      }
 
       const list = section.querySelector('[data-reviews-list]');
       const html = wrap.data.map((rev) => reviewItemHtml(rev, currentUserId)).join('') ||
         `<p class="review-empty">No reviews yet — be the first to write one.</p>`;
-      list.innerHTML = append ? list.innerHTML + html : html;
+      if (append) {
+        // Append DOM nodes without touching the existing ones (finding 18):
+        // re-serializing via innerHTML destroys listeners on earlier
+        // reviews while their data-wired="1" flags survive, leaving them
+        // permanently unwired.
+        const tpl = document.createElement('template');
+        tpl.innerHTML = html;
+        list.append(...tpl.content.childNodes);
+      } else {
+        list.innerHTML = html;
+      }
 
       const moreSlot = section.querySelector('[data-reviews-more]');
       const shown = section.querySelectorAll('[data-review-id]').length;

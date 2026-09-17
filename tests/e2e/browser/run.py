@@ -6,12 +6,14 @@ deployed site: session cookie injection, votes, star ratings, polls, spoiler
 reviews, lists, shelves, logout, mobile tabs/sheet/layout, theme, search.
 
 Usage:
-    /tmp/pw/bin/python tests/e2e/browser/run.py [--base URL] [--skip-auth]
+    /tmp/pw/bin/python tests/e2e/browser/run.py [--base URL] [--skip-auth] [--live]
                                                 [--only <flow>] [--executable-path PATH]
 
 - Full run needs CLOUDFLARE_API_TOKEN (D1 session mint + teardown). The token
   is obtained via dynamic_credentials and never printed.
 - --skip-auth runs only the logged-out/mobile flows (no token needed).
+- --live is REQUIRED for any run that mints the test session: setup and
+  teardown write to the production D1 and refuse without this opt-in.
 - Chromium cannot reach the internet directly in this sandbox; ensure_proxy()
   starts tests/e2e/browser/proxy_fwd.py on 127.0.0.1:18080 when needed and
   every launch goes through it.
@@ -550,6 +552,8 @@ def main():
     ap.add_argument("--executable-path", default=str(DEFAULT_EXECUTABLE))
     ap.add_argument("--skip-auth", action="store_true", help="logged-out flows only (no D1 token)")
     ap.add_argument("--only", default=None, help="run a single flow by name")
+    ap.add_argument("--live", action="store_true",
+                    help="opt in to writing to the production D1 (setup/teardown refuse without it)")
     args = ap.parse_args()
     base = args.base.rstrip("/")
     SHOTS.mkdir(exist_ok=True)
@@ -561,6 +565,15 @@ def main():
     if args.skip_auth:
         selected = [f for f in selected if not f[1]]
     needs_auth = any(f[1] for f in selected)
+
+    # setup/teardown write to the production D1: require the explicit opt-in
+    # before anything runs (setup.mjs enforces it again as defense in depth).
+    if needs_auth and not args.live and os.environ.get("E2E_LIVE") != "1":
+        print("refusing to run: this suite mints a test session and writes to the production D1.\n"
+              "Re-run with --live (or E2E_LIVE=1) to confirm, or --skip-auth for logged-out flows only.")
+        return 2
+    if args.live:
+        os.environ["E2E_LIVE"] = "1"
 
     ensure_proxy()
     exe = args.executable_path

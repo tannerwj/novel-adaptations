@@ -3,7 +3,7 @@
   "info": {
     "title": "Novel Adaptations API",
     "version": "1.0.0",
-    "description": "The versioned JSON API (`/api/v1`) powering the Novel Adaptations\nclient-rendered SPA. This is the canonical contract: it is generated from\nand kept in sync with `src/api/v1.ts`, and served live at\n`/api/openapi.json` (machine-readable JSON) and `/api/docs` (interactive\ndocs).\n\n## Shared conventions\n\n* All request/response bodies are JSON. Send `Content-Type: application/json`\n  on requests with a body.\n* JSON keys are **snake_case** everywhere.\n* **Error envelope** — every error response has the shape\n  `{ \"error\": { \"code\": \"snake_case_string\", \"message\": \"human readable\" } }`\n  with the matching HTTP status. Common codes: `unauthorized` (401),\n  `invalid_token` (401), `forbidden` (403), `not_found` (404),\n  `conflict` (409), `validation_error` (422), `rate_limited` (429),\n  `email_not_configured` (503), `internal_error` (500). Validation\n  failures always answer **422**, never 400.\n* **Pagination envelope** — paginated lists answer\n  `{ \"data\": [...], \"page\": 1, \"per_page\": 24, \"total\": 128 }`.\n  `page` defaults to 1; `per_page` defaults vary per endpoint and are\n  clamped to a maximum of 100.\n* **Auth** — session cookie `na_session` (HttpOnly, 30 days). Endpoints\n  marked with the cookieAuth security requirement return\n  `401 { \"error\": { \"code\": \"unauthorized\", ... } }` when signed out, and\n  `403 { \"error\": { \"code\": \"forbidden\", ... } }` when the caller is\n  signed in but not an admin (admin routes only).\n* Unknown `/api/v1/*` paths answer\n  `404 { \"error\": { \"code\": \"not_found\", \"message\": \"Unknown API endpoint.\" } }`.\n",
+    "description": "The versioned JSON API (`/api/v1`) powering the Novel Adaptations\nclient-rendered SPA. This is the canonical contract: it is generated from\nand kept in sync with `src/api/v1.ts`, and served live at\n`/api/openapi.json` (machine-readable JSON) and `/api/docs` (interactive\ndocs).\n\n## Shared conventions\n\n* All request/response bodies are JSON. Send `Content-Type: application/json`\n  on requests with a body.\n* JSON keys are **snake_case** everywhere.\n* **Error envelope** \u2014 every error response has the shape\n  `{ \"error\": { \"code\": \"snake_case_string\", \"message\": \"human readable\" } }`\n  with the matching HTTP status. Common codes: `unauthorized` (401),\n  `invalid_token` (401), `forbidden` (403), `not_found` (404),\n  `conflict` (409), `validation_error` (422), `rate_limited` (429),\n  `email_not_configured` (503), `internal_error` (500). Validation\n  failures always answer **422**, never 400.\n* **Pagination envelope** \u2014 paginated lists answer\n  `{ \"data\": [...], \"page\": 1, \"per_page\": 24, \"total\": 128 }`.\n  `page` defaults to 1; `per_page` defaults vary per endpoint and are\n  clamped to a maximum of 100.\n* **Auth** \u2014 session cookie `na_session` (HttpOnly, 30 days). Endpoints\n  marked with the cookieAuth security requirement return\n  `401 { \"error\": { \"code\": \"unauthorized\", ... } }` when signed out, and\n  `403 { \"error\": { \"code\": \"forbidden\", ... } }` when the caller is\n  signed in but not an admin (admin routes only).\n* Unknown `/api/v1/*` paths answer\n  `404 { \"error\": { \"code\": \"not_found\", \"message\": \"Unknown API endpoint.\" } }`.\n",
     "contact": {
       "name": "Novel Adaptations",
       "url": "https://noveladaptations.com"
@@ -25,11 +25,11 @@
     },
     {
       "name": "Home",
-      "description": "Landing data — adaptation grid plus site stats."
+      "description": "Landing data \u2014 adaptation grid plus site stats."
     },
     {
       "name": "Adaptations",
-      "description": "Book↔screen-work pairing records."
+      "description": "Book\u2194screen-work pairing records."
     },
     {
       "name": "Books",
@@ -45,7 +45,7 @@
     },
     {
       "name": "Ratings",
-      "description": "1–5 star ratings on books and screen works."
+      "description": "1\u20135 star ratings on books and screen works."
     },
     {
       "name": "Reviews",
@@ -57,7 +57,7 @@
     },
     {
       "name": "Hype",
-      "description": "1–5 hype meter for unreleased screen works."
+      "description": "1\u20135 hype meter for unreleased screen works."
     },
     {
       "name": "Lists",
@@ -122,7 +122,7 @@
     },
     "responses": {
       "Unauthorized": {
-        "description": "Not signed in. `{ \"error\": { \"code\": \"unauthorized\", \"message\": \"…\" } }`.",
+        "description": "Not signed in. `{ \"error\": { \"code\": \"unauthorized\", \"message\": \"\u2026\" } }`.",
         "content": {
           "application/json": {
             "schema": {
@@ -170,7 +170,7 @@
         }
       },
       "Unprocessable": {
-        "description": "Validation failure — always 422 in this API, never 400.",
+        "description": "Validation failure \u2014 always 422 in this API, never 400.",
         "content": {
           "application/json": {
             "schema": {
@@ -195,7 +195,7 @@
             "example": {
               "error": {
                 "code": "rate_limited",
-                "message": "Too many requests — try again later."
+                "message": "Too many requests \u2014 try again later."
               }
             }
           }
@@ -583,7 +583,7 @@
           },
           "body": {
             "type": "string",
-            "example": "Herbert built a universe…",
+            "example": "Herbert built a universe\u2026",
             "maxLength": 5000
           },
           "has_spoilers": {
@@ -942,7 +942,7 @@
           },
           "rank": {
             "type": "integer",
-            "description": "Relevance tier, 0 = exact title match … 7 = substring; lower is better."
+            "description": "Relevance tier, 0 = exact title match \u2026 7 = substring; lower is better."
           }
         }
       },
@@ -983,7 +983,7 @@
           },
           "rank": {
             "type": "integer",
-            "description": "Relevance tier, 0 = exact title match … 5 = substring; lower is better."
+            "description": "Relevance tier, 0 = exact title match \u2026 5 = substring; lower is better."
           }
         }
       },
@@ -1043,7 +1043,7 @@
           },
           "rank": {
             "type": "integer",
-            "description": "Relevance tier, 0 = exact title match … 7 = substring; lower is better."
+            "description": "Relevance tier, 0 = exact title match \u2026 7 = substring; lower is better."
           }
         }
       },
@@ -1817,7 +1817,7 @@
                     },
                     "dev_link": {
                       "type": "string",
-                      "description": "Development/preview only — the sign-in URL."
+                      "description": "Development/preview only \u2014 the sign-in URL."
                     }
                   }
                 }
@@ -1868,7 +1868,7 @@
                 "properties": {
                   "token": {
                     "type": "string",
-                    "example": "9f2c…(64 hex chars)"
+                    "example": "9f2c\u2026(64 hex chars)"
                   }
                 }
               }
@@ -2114,7 +2114,7 @@
           "Home"
         ],
         "summary": "Featured adaptation rail",
-        "description": "A small, fixed-size rail for the home landing page — derived from real data only (no curation): adaptations whose screen work has actual poster art (TMDB enrichment), ordered by the community vote count on the source book, then newest release date, then newest record. `limit` defaults to 12 and is clamped to 24.",
+        "description": "A small, fixed-size rail for the home landing page \u2014 derived from real data only (no curation): adaptations whose screen work has actual poster art (TMDB enrichment), ordered by the community vote count on the source book, then newest release date, then newest record. `limit` defaults to 12 and is clamped to 24.",
         "parameters": [
           {
             "name": "limit",
@@ -2280,7 +2280,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Book with adaptations, rating summary, reviews, and personal state.",
+            "description": "Book with adaptations, rating summary, and personal state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2292,7 +2292,6 @@
                     "user_rating",
                     "user_voted",
                     "user_shelf",
-                    "reviews",
                     "user_lists"
                   ],
                   "properties": {
@@ -2345,9 +2344,6 @@
                         "watched",
                         null
                       ]
-                    },
-                    "reviews": {
-                      "$ref": "#/components/schemas/PagedReviews"
                     },
                     "user_lists": {
                       "type": "array",
@@ -2406,7 +2402,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Screen work with related news, where-to-watch providers, ratings,\nreviews, and — when unreleased — the hype meter. `watch_providers`\nmay be null (7-day D1 cache; the fetch never throws).\n",
+            "description": "Screen work with related news, where-to-watch providers, ratings,\nreviews, and \u2014 when unreleased \u2014 the hype meter. `watch_providers`\nmay be null (7-day D1 cache; the fetch never throws).\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -2417,7 +2413,6 @@
                     "watch_providers",
                     "rating",
                     "user_rating",
-                    "reviews",
                     "hype",
                     "user_lists"
                   ],
@@ -2465,9 +2460,6 @@
                       ],
                       "minimum": 1,
                       "maximum": 5
-                    },
-                    "reviews": {
-                      "$ref": "#/components/schemas/PagedReviews"
                     },
                     "hype": {
                       "oneOf": [
@@ -2690,8 +2682,8 @@
         "tags": [
           "Ratings"
         ],
-        "summary": "Set a 1–5 rating",
-        "description": "Rate limit 60/hour per user. Upserts — re-rating replaces the old value.",
+        "summary": "Set a 1\u20135 rating",
+        "description": "Rate limit 60/hour per user. Upserts \u2014 re-rating replaces the old value.",
         "security": [
           {
             "cookieAuth": []
@@ -2835,7 +2827,7 @@
           "Reviews"
         ],
         "summary": "Write a review",
-        "description": "One review per user per item — a second POST answers 409 `conflict`\nwith `review_id` pointing at the existing review (edit it instead).\nRate limit 20/hour. Body ≤ 5000 chars; title optional, ≤ 120 chars.\n",
+        "description": "One review per user per item \u2014 a second POST answers 409 `conflict`\nwith `review_id` pointing at the existing review (edit it instead).\nRate limit 20/hour. Body \u2264 5000 chars; title optional, \u2264 120 chars.\n",
         "security": [
           {
             "cookieAuth": []
@@ -2874,7 +2866,7 @@
                   "body": {
                     "type": "string",
                     "maxLength": 5000,
-                    "example": "Herbert built a universe…"
+                    "example": "Herbert built a universe\u2026"
                   },
                   "has_spoilers": {
                     "type": "boolean",
@@ -2934,7 +2926,7 @@
                         },
                         "message": {
                           "type": "string",
-                          "example": "You've already reviewed this — edit your existing review instead."
+                          "example": "You've already reviewed this \u2014 edit your existing review instead."
                         }
                       }
                     },
@@ -2962,7 +2954,7 @@
           "Reviews"
         ],
         "summary": "Edit a review",
-        "description": "Authors only — editing someone else's review answers 403.",
+        "description": "Authors only \u2014 editing someone else's review answers 403.",
         "security": [
           {
             "cookieAuth": []
@@ -3141,7 +3133,7 @@
           "Polls"
         ],
         "summary": "Vote in the book-vs-screen poll",
-        "description": "Upserts — re-voting replaces the old choice. Rate limit 30/hour.",
+        "description": "Upserts \u2014 re-voting replaces the old choice. Rate limit 30/hour.",
         "security": [
           {
             "cookieAuth": []
@@ -3249,7 +3241,7 @@
         "tags": [
           "Hype"
         ],
-        "summary": "Set your hype level (1–5)",
+        "summary": "Set your hype level (1\u20135)",
         "description": "Upserts. Rate limit 60/hour.",
         "security": [
           {
@@ -3426,7 +3418,7 @@
           "Lists"
         ],
         "summary": "Public list by slug",
-        "description": "Private lists answer 404 `not_found` for non-owners — the API never\nleaks that a private list exists.\n",
+        "description": "Private lists answer 404 `not_found` for non-owners \u2014 the API never\nleaks that a private list exists.\n",
         "parameters": [
           {
             "name": "slug",
@@ -3926,7 +3918,7 @@
           "Shelves"
         ],
         "summary": "Shelve a book or adaptation",
-        "description": "Upserts — reshelving replaces the old shelf.",
+        "description": "Upserts \u2014 reshelving replaces the old shelf.",
         "security": [
           {
             "cookieAuth": []
@@ -4077,7 +4069,7 @@
           "Search"
         ],
         "summary": "Site-wide search",
-        "description": "Searches books, screen works, and adaptations (each capped at 12 hits;\n`limit` narrows that, never widens it). With an empty query — or no\nhits — the response carries `popular` books instead.\n",
+        "description": "Searches books, screen works, and adaptations (each capped at 12 hits;\n`limit` narrows that, never widens it). With an empty query \u2014 or no\nhits \u2014 the response carries `popular` books instead.\n",
         "parameters": [
           {
             "name": "q",
@@ -4329,7 +4321,7 @@
           "Feedback"
         ],
         "summary": "Submit feedback",
-        "description": "Public — no login required; the session user is attached when present.\nRate-limited by IP. Subject 3–120 chars, body 10–5000 chars.\n",
+        "description": "Public \u2014 no login required; the session user is attached when present.\nRate-limited by IP. Subject 3\u2013120 chars, body 10\u20135000 chars.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -4362,7 +4354,7 @@
                     "type": "string",
                     "minLength": 10,
                     "maxLength": 5000,
-                    "example": "Villeneuve started principal photography in Budapest…"
+                    "example": "Villeneuve started principal photography in Budapest\u2026"
                   },
                   "proof_url": {
                     "type": "string",
@@ -4709,7 +4701,7 @@
           "Admin"
         ],
         "summary": "Promote a news item into an adaptation status change",
-        "description": "Links the news item to an adaptation and advances the adaptation's\nstatus. `corroborating_url` is required when the item is rumor-tier.\nWhen `status` is omitted the adaptation advances one rung on the\npromote ladder (rumored → optioned → … → released); an explicit\n`status` must be a valid adaptation status. Already at the final\nstatus with no explicit `status` → 422. The linked screen work is\nqueued for TMDB poster enrichment when poster-less.\n",
+        "description": "Links the news item to an adaptation and advances the adaptation's\nstatus. `corroborating_url` is required when the item is rumor-tier.\nWhen `status` is omitted the adaptation advances one rung on the\npromote ladder (rumored \u2192 optioned \u2192 \u2026 \u2192 released); an explicit\n`status` must be a valid adaptation status. Already at the final\nstatus with no explicit `status` \u2192 422. The linked screen work is\nqueued for TMDB poster enrichment when poster-less.\n",
         "security": [
           {
             "cookieAuth": []
@@ -4868,7 +4860,7 @@
           "Admin"
         ],
         "summary": "Run one TMDB enrichment batch",
-        "description": "Enriches up to `n` poster-less screen works via TMDB. `n` must be an\ninteger 1–10; default 5. Failures are counted per-row, not fatal.\n",
+        "description": "Enriches up to `n` poster-less screen works via TMDB. `n` must be an\ninteger 1\u201310; default 5. Failures are counted per-row, not fatal.\n",
         "security": [
           {
             "cookieAuth": []
@@ -5188,7 +5180,7 @@
           "Admin"
         ],
         "summary": "Triage a feedback item",
-        "description": "Only forward transitions are allowed — `reviewed` or `done`.",
+        "description": "Only forward transitions are allowed \u2014 `reviewed` or `done`.",
         "security": [
           {
             "cookieAuth": []
