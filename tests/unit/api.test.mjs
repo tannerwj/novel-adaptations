@@ -176,8 +176,14 @@ test('PUT /api/v1/lists/:id purges the bot preview on edit', async () => {
   });
   assert.equal(res.status, 200);
   assert.ok(
-    purged.some((u) => u === 'http://localhost/lists/my-list?na-prerender=1'),
+    purged.some((u) => u === 'http://localhost/lists/my-list?na-prerender=v2'),
     `preview purge expected, got: ${JSON.stringify(purged)}`,
+  );
+  // The Markdown rendering is cached under a separate key — it must be
+  // purged too, or an edit would leave stale Markdown at the edge.
+  assert.ok(
+    purged.some((u) => u === 'http://localhost/lists/my-list?na-markdown=v1'),
+    `markdown purge expected, got: ${JSON.stringify(purged)}`,
   );
 });
 
@@ -195,7 +201,7 @@ test('PUT /api/v1/lists/:id purges the bot preview on public→private', async (
   const row = sqlite.prepare('SELECT is_public FROM lists WHERE id = ' + globalThis.__testIds.listId + '').get();
   assert.equal(row.is_public, 0);
   assert.ok(
-    purged.some((u) => u.includes('/lists/my-list?na-prerender=1')),
+    purged.some((u) => u.includes('/lists/my-list?na-prerender=v2')),
     `preview purge expected after privatizing, got: ${JSON.stringify(purged)}`,
   );
 });
@@ -205,7 +211,7 @@ test('DELETE /api/v1/lists/:id purges the bot preview', async () => {
   const res = await req(`/api/v1/lists/${globalThis.__testIds.listId}`, { method: 'DELETE' });
   assert.equal(res.status, 200);
   assert.ok(
-    purged.some((u) => u.includes('/lists/my-list?na-prerender=1')),
+    purged.some((u) => u.includes('/lists/my-list?na-prerender=v2')),
     `preview purge expected after delete, got: ${JSON.stringify(purged)}`,
   );
 });

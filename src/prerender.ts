@@ -238,9 +238,15 @@ export function parseSubjects(subjects: string | null): string[] {
 // Per-route content
 // ---------------------------------------------------------------------------
 
-interface Prerendered {
+export interface Prerendered {
   status: number;
   html: string;
+  /**
+   * The content model the HTML was rendered from. Markdown negotiation
+   * (src/agent.ts) renders from this instead of re-parsing the HTML, so the
+   * two representations can never drift apart.
+   */
+  meta: PrerenderMeta;
 }
 
 /** Static (non-DB) routes with their prerender copy. */
@@ -315,18 +321,16 @@ const STATIC_ROUTES: Record<string, { title: string; description: string; body: 
 
 function staticRoute(path: string, origin: string): Prerendered {
   const r = STATIC_ROUTES[path]!;
-  return {
-    status: 200,
-    html: prerenderDoc({
-      title: r.title,
-      description: r.description,
-      canonical: origin + path,
-      image: `${origin}/og-card.jpg`,
-      body: r.body,
-      // WebSite entity (with SearchAction) on the home page only.
-      jsonLd: path === '/' ? websiteJsonLd(origin) : undefined,
-    }),
+  const meta: PrerenderMeta = {
+    title: r.title,
+    description: r.description,
+    canonical: origin + path,
+    image: `${origin}/og-card.jpg`,
+    body: r.body,
+    // WebSite entity (with SearchAction) on the home page only.
+    jsonLd: path === '/' ? websiteJsonLd(origin) : undefined,
   };
+  return { status: 200, html: prerenderDoc(meta), meta };
 }
 
 async function watchRoute(db: D1Database, origin: string, slug: string): Promise<Prerendered | null> {
@@ -351,25 +355,23 @@ async function watchRoute(db: D1Database, origin: string, slug: string): Promise
           .map((a) => `<li><a href="/adaptations/${a.slug ?? a.id}">${esc(a.title)}</a> — ${esc(STATUS_LABEL[a.status] ?? a.status)}</li>`)
           .join('')}</ul>`
       : '');
-  return {
-    status: 200,
-    html: prerenderDoc({
-      title,
+  const meta: PrerenderMeta = {
+    title,
+    description,
+    canonical: `${origin}/watch/${w.slug ?? w.id}`,
+    image: artOrFallback(origin, w.poster_url, w.backdrop_url),
+    body,
+    jsonLd: screenWorkJsonLd({
+      title: w.title,
+      kind: w.kind,
+      releaseDate: w.release_date,
       description,
       canonical: `${origin}/watch/${w.slug ?? w.id}`,
       image: artOrFallback(origin, w.poster_url, w.backdrop_url),
-      body,
-      jsonLd: screenWorkJsonLd({
-        title: w.title,
-        kind: w.kind,
-        releaseDate: w.release_date,
-        description,
-        canonical: `${origin}/watch/${w.slug ?? w.id}`,
-        image: artOrFallback(origin, w.poster_url, w.backdrop_url),
-        books: w.books.map((b) => ({ title: b.title, authors: b.authors })),
-      }),
+      books: w.books.map((b) => ({ title: b.title, authors: b.authors })),
     }),
   };
+  return { status: 200, html: prerenderDoc(meta), meta };
 }
 
 async function adaptationRoute(db: D1Database, origin: string, slug: string): Promise<Prerendered | null> {
@@ -389,25 +391,23 @@ async function adaptationRoute(db: D1Database, origin: string, slug: string): Pr
       : '') +
     `<p>Status: ${esc(status)}</p>` +
     `<p><a href="/books/${a.book_slug ?? a.book_id}">${esc(a.book_title)}</a> · <a href="/watch/${a.screen_slug ?? a.screen_work_id}">${esc(a.screen_title)}</a></p>`;
-  return {
-    status: 200,
-    html: prerenderDoc({
-      title,
+  const meta: PrerenderMeta = {
+    title,
+    description,
+    canonical: `${origin}/adaptations/${a.adaptation_slug ?? a.id}`,
+    image: artOrFallback(origin, a.screen_poster_url, a.book_cover_url),
+    body,
+    jsonLd: screenWorkJsonLd({
+      title: a.screen_title,
+      kind: a.screen_kind,
+      releaseDate: a.screen_release_date,
       description,
       canonical: `${origin}/adaptations/${a.adaptation_slug ?? a.id}`,
       image: artOrFallback(origin, a.screen_poster_url, a.book_cover_url),
-      body,
-      jsonLd: screenWorkJsonLd({
-        title: a.screen_title,
-        kind: a.screen_kind,
-        releaseDate: a.screen_release_date,
-        description,
-        canonical: `${origin}/adaptations/${a.adaptation_slug ?? a.id}`,
-        image: artOrFallback(origin, a.screen_poster_url, a.book_cover_url),
-        books: [{ title: a.book_title, authors: a.book_authors }],
-      }),
+      books: [{ title: a.book_title, authors: a.book_authors }],
     }),
   };
+  return { status: 200, html: prerenderDoc(meta), meta };
 }
 
 async function bookRoute(db: D1Database, origin: string, slug: string): Promise<Prerendered | null> {
@@ -422,25 +422,23 @@ async function bookRoute(db: D1Database, origin: string, slug: string): Promise<
     (b.cover_url
       ? `<img src="${esc(b.cover_url)}" alt="${esc(b.title)} book cover" width="500">`
       : '');
-  return {
-    status: 200,
-    html: prerenderDoc({
-      title,
-      description,
+  const meta: PrerenderMeta = {
+    title,
+    description,
+    canonical: `${origin}/books/${b.slug ?? b.id}`,
+    image: artOrFallback(origin, b.cover_url),
+    body,
+    jsonLd: bookJsonLd({
+      title: b.title,
+      authors: b.authors,
+      pubDate: b.pub_date,
+      description: b.description,
       canonical: `${origin}/books/${b.slug ?? b.id}`,
       image: artOrFallback(origin, b.cover_url),
-      body,
-      jsonLd: bookJsonLd({
-        title: b.title,
-        authors: b.authors,
-        pubDate: b.pub_date,
-        description: b.description,
-        canonical: `${origin}/books/${b.slug ?? b.id}`,
-        image: artOrFallback(origin, b.cover_url),
-        subjects: parseSubjects(b.subjects),
-      }),
+      subjects: parseSubjects(b.subjects),
     }),
   };
+  return { status: 200, html: prerenderDoc(meta), meta };
 }
 
 async function listRoute(db: D1Database, origin: string, slug: string): Promise<Prerendered | null> {
@@ -453,16 +451,14 @@ async function listRoute(db: D1Database, origin: string, slug: string): Promise<
   const body =
     `<h1>${esc(l.title)}</h1>` +
     `<p>${esc(description)}</p>`;
-  return {
-    status: 200,
-    html: prerenderDoc({
-      title,
-      description,
-      canonical: `${origin}/lists/${esc(l.slug)}`,
-      image: `${origin}/og-card.jpg`,
-      body,
-    }),
+  const meta: PrerenderMeta = {
+    title,
+    description,
+    canonical: `${origin}/lists/${esc(l.slug)}`,
+    image: `${origin}/og-card.jpg`,
+    body,
   };
+  return { status: 200, html: prerenderDoc(meta), meta };
 }
 
 const ID_RE = /^[1-9]\d{0,9}$/;
@@ -526,14 +522,35 @@ function cacheKeyFor(url: string): Request {
 }
 
 /**
+ * Bump this integer whenever the Markdown document shape changes — it is
+ * part of the Markdown edge cache key (src/agent.ts serves it), so a deploy
+ * never serves stale Markdown from a previous shape. Lives here next to
+ * cacheKeyFor so purgeListPreview can drop both variants of a page.
+ */
+export const MARKDOWN_CACHE_VERSION = 1;
+
+/** Edge cache key for the Markdown rendering of a page (served by src/agent.ts). */
+export function markdownCacheKeyFor(url: string): Request {
+  const sep = url.includes('?') ? '&' : '?';
+  return new Request(`${url}${sep}na-markdown=v${MARKDOWN_CACHE_VERSION}`);
+}
+
+/**
  * Drop the cached bot preview for a list after it is edited, privatized, or
- * deleted. Without this, a previously public list's title and description
- * stay servable from the edge cache for up to PRERENDER_S_MAXAGE after the
- * change. Best-effort: the entry expires on its own within the hour anyway.
+ * deleted — both the HTML and the Markdown variants, since both render from
+ * the same title/description. Without this, a previously public list's title
+ * and description stay servable from the edge cache for up to
+ * PRERENDER_S_MAXAGE after the change. Best-effort: entries expire on their
+ * own within the hour anyway.
  */
 export async function purgeListPreview(origin: string, slug: string): Promise<void> {
   try {
-    await caches.default.delete(cacheKeyFor(`${origin}/lists/${slug}`));
+    const cache = caches.default;
+    const pageUrl = `${origin}/lists/${slug}`;
+    await Promise.all([
+      cache.delete(cacheKeyFor(pageUrl)),
+      cache.delete(markdownCacheKeyFor(pageUrl)),
+    ]);
   } catch {
     // ignore — cache purge must never fail the API request
   }
@@ -564,6 +581,9 @@ export async function servePrerendered(
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': `public, s-maxage=${PRERENDER_S_MAXAGE}`,
+          // The same URL can serve HTML or Markdown depending on the Accept
+          // header (src/agent.ts) — caches must key on it.
+          Vary: 'Accept',
           'X-NA-Prerender': 'bot',
         },
       });

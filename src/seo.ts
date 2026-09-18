@@ -130,6 +130,20 @@ export async function collectSitemapEntries(
 }
 
 /**
+ * robots.txt body. The Content-Signal line declares AI usage preferences per
+ * contentsignals.org (IETF draft-romm-aipref-contentsignals): this is a
+ * discovery catalog and we want AI training, search, and agentic use.
+ */
+export function robotsTxt(origin: string): string {
+  return (
+    `User-agent: *\n` +
+    `Allow: /\n` +
+    `Content-Signal: ai-train=yes, search=yes, ai-input=yes\n` +
+    `Sitemap: ${origin}/sitemap.xml\n`
+  );
+}
+
+/**
  * llms.txt — the emerging convention for guiding AI agents/crawlers.
  * Counts are passed in (queried by the route) so no numbers are hardcoded.
  */
@@ -163,7 +177,10 @@ export function llmsTxt(origin: string, adaptationCount: number): string {
     `\n` +
     `- Sitemap (every public page): ${origin}/sitemap.xml\n` +
     `- Read-only JSON API: ${origin}/api/v1 (no auth required for reads; see /api/docs)\n` +
+    `- API catalog (RFC 9727): ${origin}/.well-known/api-catalog\n` +
+    `- Agent skill: ${origin}/.well-known/agent-skills/novel-adaptations/SKILL.md\n` +
     `- Detail pages embed schema.org JSON-LD (Movie / TVSeries / Book / WebSite)\n` +
+    `- Any page can be fetched as Markdown: send \`Accept: text/markdown\`\n` +
     `\n` +
     `## Notes for agents\n` +
     `\n` +
@@ -195,8 +212,7 @@ export function registerSeoRoutes<
 
   app.get('/robots.txt', (c) => {
     const origin = new URL(c.req.url).origin;
-    const body = `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`;
-    return c.text(body, 200, { 'Content-Type': 'text/plain' });
+    return c.text(robotsTxt(origin), 200, { 'Content-Type': 'text/plain' });
   });
 
   app.get('/llms.txt', async (c) => {

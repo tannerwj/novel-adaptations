@@ -22,6 +22,12 @@ import { spaShell, type ThemeName } from './spa/shell';
 import { serverHeaderHtml, serverFooterHtml, type ChromeUser } from './spa/chrome';
 import { getUser, type SessionUser } from './auth/session';
 import { isCrawler, servePrerendered } from './prerender';
+import {
+  acceptsMarkdown,
+  agentLinkHeader,
+  registerAgentRoutes,
+  serveMarkdown,
+} from './agent';
 import { slugForId } from './db';
 
 export interface Env {
@@ -71,7 +77,7 @@ const serveShell = async (c: Context) => {
     : null;
   const url = new URL(c.req.url);
   const pathname = url.pathname;
-  return c.html(
+  const res = c.html(
     spaShell(
       theme,
       serverHeaderHtml(pathname, theme, user, url.search),
@@ -80,6 +86,10 @@ const serveShell = async (c: Context) => {
       url.origin,
     ),
   );
+  // Advertise the machine-readable resources (RFC 8288) on every page —
+  // agents fetching the homepage discover the API catalog this way.
+  res.headers.set('Link', agentLinkHeader(url.origin));
+  return res;
 };
 
 // Bookmarkable SPA routes. GET /auth/verify?token=… serves the shell and the
@@ -90,7 +100,20 @@ const serveShell = async (c: Context) => {
 // HTML document (per-route title/meta/OG tags from D1, cached at the edge)
 // instead of the SPA shell; real browsers always get the shell. Auth/admin
 // routes and unknown IDs fall through to the shell (prerender returns null).
+//
+// Agent-first: before the bot/browser split, an explicit `Accept:
+// text/markdown` request gets the Markdown rendering of the page (same content
+// model as the bot HTML prerender, src/agent.ts). Non-renderable paths fall
+// through to the normal dispatch below.
 const servePage = async (c: Context) => {
+  if (c.req.method === 'GET' && acceptsMarkdown(c.req.header('accept'))) {
+    const md = await serveMarkdown(
+      c.env.DB,
+      c.req.url,
+      (p) => c.executionCtx.waitUntil(p),
+    );
+    if (md) return md;
+  }
   if (c.req.method === 'GET' && isCrawler(c.req.header('user-agent'))) {
     const prerendered = await servePrerendered(
       c.env.DB,
@@ -176,6 +199,10 @@ app.get('/api/docs', (c) => c.html(apiDocsShell()));
 
 // SEO: /sitemap.xml + /robots.txt.
 registerSeoRoutes(app);
+
+// Agent readiness: Markdown negotiation (in servePage), RFC 9727 API catalog,
+// and Agent Skills discovery.
+registerAgentRoutes(app);
 
 app.notFound(async (c) => {
   if (c.req.path.startsWith('/api/')) {
