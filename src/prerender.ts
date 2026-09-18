@@ -12,7 +12,7 @@
 // Prerendered documents are cached at the edge via the Cache API with
 // s-maxage ~1h. Fail-soft: any error falls through to the shell.
 
-import { getAdaptationSummaryBySlug, getBookBySlug, getScreenWorkBySlug } from './db';
+import { getAdaptationSummaryBySlug, getBookBySlug, getScreenWorkBySlug, parseCastJson } from './db';
 import { getListBySlug } from './lists/db';
 import { getMostWanted } from './votes/db';
 import { DEFAULT_DESCRIPTION } from './seo';
@@ -181,6 +181,10 @@ export interface ScreenWorkJsonLdInput {
   rating?: { average: number; count: number };
   /** TMDB id → sameAs link so search engines disambiguate the title. */
   tmdbId?: number | null;
+  /** Cast names (top-billed), emitted as actor Person nodes. */
+  cast?: string[];
+  /** Film director name, emitted as a director Person node. */
+  director?: string | null;
 }
 
 /** Add an AggregateRating node to an entity when the crowd has actually rated it. */
@@ -217,6 +221,12 @@ export function screenWorkJsonLd(input: ScreenWorkJsonLdInput): Record<string, u
   withAggregateRating(entity, input.rating);
   if (input.tmdbId) {
     entity.sameAs = `https://www.themoviedb.org/${input.kind === 'series' ? 'tv' : 'movie'}/${input.tmdbId}`;
+  }
+  if (input.cast && input.cast.length > 0) {
+    entity.actor = input.cast.map((name) => ({ '@type': 'Person', name }));
+  }
+  if (input.director) {
+    entity.director = { '@type': 'Person', name: input.director };
   }
   return entity;
 }
@@ -495,6 +505,8 @@ async function watchRoute(db: D1Database, origin: string, slug: string): Promise
         books: w.books.map((b) => ({ title: b.title, authors: b.authors })),
         rating: await ratingAggregate(db, 'screen_work', w.id),
         tmdbId: w.tmdb_id,
+        cast: parseCastJson(w.cast_json).map((m) => m.name),
+        director: w.director,
       }),
       // Trailer is cached in D1 (screen_works.trailer_youtube_key) — when
       // present the page is eligible for video rich results.
@@ -784,7 +796,7 @@ export const PRERENDER_S_MAXAGE = 3600;
  * (JSON-LD schema, body content, meta tags) — it is part of the edge cache
  * key, so a deploy never serves stale bot previews from a previous shape.
  */
-export const PRERENDER_CACHE_VERSION = 4;
+export const PRERENDER_CACHE_VERSION = 5;
 
 function cacheKeyFor(url: string): Request {
   // A synthetic keyed request so prerendered HTML can never collide with a

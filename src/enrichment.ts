@@ -39,6 +39,7 @@ import type { Hono } from 'hono';
 import { requireAdminPage } from './auth/session';
 import {
   enrichScreenWorkFromEnv,
+  fetchCreditsById,
   fetchEnrichmentById,
   type EnrichOutcome,
   type TmdbEnrichment,
@@ -443,4 +444,118 @@ export function registerEnrichmentRoutes<E extends EnrichmentBindings>(
       return c.json({ error: 'enrichment batch failed' }, 500);
     }
   });
+}
+
+/* ------------------------------------------------------------------ */
+/* Credits backfill (migration 0026): cast + director/creators + TMDB   */
+/* audience score, one TMDB call per title via append_to_response=      */
+/* credits. Identity-safe: only rows that already carry a tmdb_id are  */
+/* selected, so the payload can only describe the stored identity.     */
+/* ------------------------------------------------------------------ */
+
+/** A screen work row awaiting credits enrichment. */
+export interface CreditsCandidate {
+  id: number;
+  title: string;
+  kind: string;
+  tmdb_id: number;
+}
+
+/** Rows with a known TMDB identity but no cast data yet, oldest first. */
+export async function selectCreditsBatch(
+  db: D1Database,
+  n: number,
+): Promise<CreditsCandidate[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT id, title, kind, tmdb_id FROM screen_works
+        WHERE tmdb_id IS NOT NULL AND cast_json IS NULL
+        ORDER BY id ASC LIMIT ?1`,
+    )
+    .bind(n)
+    .all<CreditsCandidate>();
+  return results ?? [];
+}
+
+export async function countRemainingCredits(db: D1Database): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS c FROM screen_works
+        WHERE tmdb_id IS NOT NULL AND cast_json IS NULL`,
+    )
+    .first<{ c: number }>();
+  return row?.c ?? 0;
+}
+
+export interface CreditsBatchResult {
+  done: number;
+  enriched: number;
+  failed: number;
+}
+
+/**
+ * Enrich one batch of credits. Writes are NULL-guarded (cast_json IS NULL)
+ * so a row enriched between SELECT and UPDATE keeps the first write; the
+ * loop converges because every outcome either writes cast_json or leaves
+ * the row eligible only on retryable failure. Missing-key runs attempt
+ * nothing and count nothing.
+ */
+export async function runCreditsBatch(
+  deps: EnrichmentDeps,
+  n: number,
+  fetcher: TmdbFetcher = fetch,
+  throttleMs: number = ENRICH_THROTTLE_MS,
+): Promise<CreditsBatchResult> {
+  const result: CreditsBatchResult = { done: 0, enriched: 0, failed: 0 };
+  const rows = await selectCreditsBatch(deps.DB, n);
+  for (const row of rows) {
+    result.done++;
+    const kind = row.kind === 'series' ? 'series' : 'film';
+    // No API key -> nothing is attempted and nothing is counted: the row
+    // stays eligible for a later run once a key exists.
+    const outcome = deps.TMDB_API_KEY
+      ? await fetchCreditsById(deps.TMDB_API_KEY, kind, row.tmdb_id, fetcher)
+      : { status: 'not-attempted' } as const;
+    if (outcome.status === 'hit') {
+      const c = outcome.credits;
+      await deps.DB.prepare(
+        `UPDATE screen_works
+            SET cast_json = ?1,
+                director = ?2,
+                creators = ?3,
+                tmdb_vote_average = ?4,
+                tmdb_vote_count = ?5
+          WHERE id = ?6 AND cast_json IS NULL`,
+      )
+        .bind(
+          JSON.stringify(c.cast),
+          c.director,
+          c.creators,
+          c.vote_average,
+          c.vote_count,
+          row.id,
+        )
+        .run();
+      result.enriched++;
+    } else if (outcome.status === 'no-match') {
+      // Stale tmdb_id (TMDB 404): record empty cast so the credits loop
+      // converges. The metadata backfill (keyed on posters/attempts, not
+      // cast_json) can still repair the identity later.
+      await deps.DB.prepare(
+        `UPDATE screen_works SET cast_json = ?1 WHERE id = ?2 AND cast_json IS NULL`,
+      )
+        .bind(JSON.stringify([]), row.id)
+        .run();
+      result.failed++;
+    } else if (outcome.status === 'failed') {
+      // Retryable: never burns eligibility, stays in the queue.
+      result.failed++;
+      console.error(
+        `credits enrichment failed for screen_work ${row.id} (${row.title}):`,
+        outcome.message ?? 'unknown error',
+      );
+    }
+    if (throttleMs > 0) await sleep(throttleMs);
+  }
+  return result;
 }

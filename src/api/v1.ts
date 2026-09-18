@@ -153,7 +153,7 @@ import {
   listScreenWorksForAdmin,
   validateReleaseDate,
 } from '../news/curation_db';
-import { countRemaining, countRemainingFull, parseBatchSize, runEnrichmentBatch, runFullBatch } from '../enrichment';
+import { countRemaining, countRemainingCredits, countRemainingFull, parseBatchSize, runCreditsBatch, runEnrichmentBatch, runFullBatch } from '../enrichment';
 import {
   getPopularBooks,
   RESULT_LIMIT,
@@ -1980,6 +1980,29 @@ v1.post('/admin/backfill/tmdb-full', async (c) => {
       (e as Error).message,
     );
     return apiError(c, 500, 'internal_error', 'Full backfill batch failed.');
+  }
+});
+
+// Credits backfill: cast + director/creators + TMDB audience score, one TMDB
+// call per title (append_to_response=credits), identity-safe via the stored
+// tmdb_id. POST /admin/backfill/credits?n=30 → { done, enriched, failed,
+// remaining }. Same admin gate as the routes above.
+v1.post('/admin/backfill/credits', async (c) => {
+  const parsed = parseBatchSize(c.req.query('n'));
+  if (!parsed.ok) return validationError(c, parsed.error);
+  try {
+    const batch = await runCreditsBatch(
+      { DB: c.env.DB, TMDB_API_KEY: c.env.TMDB_API_KEY },
+      parsed.n,
+    );
+    const remaining = await countRemainingCredits(c.env.DB);
+    return c.json({ ...batch, remaining });
+  } catch (e) {
+    console.error(
+      '/api/v1/admin/backfill/credits failed:',
+      (e as Error).message,
+    );
+    return apiError(c, 500, 'internal_error', 'Credits backfill batch failed.');
   }
 });
 

@@ -363,3 +363,122 @@ export async function fetchEnrichmentById(
     return { status: 'failed', message: (e as Error).message };
   }
 }
+
+/** One top-billed cast member extracted from TMDB credits. */
+export interface TmdbCastMember {
+  name: string;
+  character: string;
+  /** TMDB profile image path (prepend https://image.tmdb.org/t/p/w185), or null. */
+  profile_path: string | null;
+}
+
+/** Credits + audience score for a screen work, from a single details call. */
+export interface TmdbCredits {
+  cast: TmdbCastMember[];
+  /** Film only: first crew member with job 'Director'. */
+  director: string | null;
+  /** Series only: created_by names, comma-joined. */
+  creators: string | null;
+  vote_average: number | null;
+  vote_count: number | null;
+}
+
+export type CreditsOutcome =
+  | { status: 'hit'; credits: TmdbCredits }
+  | { status: 'no-match' }
+  | { status: 'not-attempted' }
+  | { status: 'failed'; message?: string };
+
+const MAX_CAST = 8;
+
+type JsonRecord = Record<string, unknown>;
+
+const asRecord = (v: unknown): JsonRecord | null =>
+  v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as JsonRecord) : null;
+
+/**
+ * Pure extraction of credits + ratings from a TMDB details payload fetched
+ * with `append_to_response=credits`. Unit-tested; the fetcher below is thin.
+ */
+export function extractCredits(
+  kind: 'film' | 'series',
+  payload: unknown,
+): TmdbCredits {
+  const p = asRecord(payload) ?? {};
+  const num = (v: unknown): number | null =>
+    typeof v === 'number' && Number.isFinite(v) ? v : null;
+  const credits = asRecord(p.credits) ?? {};
+  const castRaw = Array.isArray(credits.cast) ? credits.cast : [];
+  const crewRaw = Array.isArray(credits.crew) ? credits.crew : [];
+  const castOrder = (m: JsonRecord): number =>
+    typeof m.order === 'number' ? m.order : Number.MAX_SAFE_INTEGER;
+  const cast: TmdbCastMember[] = castRaw
+    .map(asRecord)
+    .filter((m): m is JsonRecord => m !== null)
+    .sort((a, b) => castOrder(a) - castOrder(b))
+    .slice(0, MAX_CAST)
+    .map((m) => ({
+      name: typeof m.name === 'string' ? m.name : '',
+      character: typeof m.character === 'string' ? m.character : '',
+      profile_path: typeof m.profile_path === 'string' ? m.profile_path : null,
+    }))
+    .filter((m) => m.name !== '');
+  let director: string | null = null;
+  if (kind === 'film') {
+    for (const m of crewRaw) {
+      const r = asRecord(m);
+      if (r && r.job === 'Director' && typeof r.name === 'string') {
+        director = r.name;
+        break;
+      }
+    }
+  }
+  let creators: string | null = null;
+  if (kind === 'series' && Array.isArray(p.created_by)) {
+    const names = p.created_by
+      .map(asRecord)
+      .filter((c): c is JsonRecord => c !== null && typeof c.name === 'string')
+      .map((c) => c.name as string);
+    creators = names.length > 0 ? names.join(', ') : null;
+  }
+  return {
+    cast,
+    director,
+    creators,
+    vote_average: num(p.vote_average),
+    vote_count: num(p.vote_count),
+  };
+}
+
+/**
+ * Fetch credits + audience score by known TMDB id with
+ * `append_to_response=credits` — one request per title. Identity-safe: the
+ * row already carries the tmdb_id, so the payload can only describe the
+ * stored identity. A 404 (stale id) is a no-match; anything else non-OK or a
+ * transport failure is retryable.
+ */
+export async function fetchCreditsById(
+apiKey: string,
+  kind: 'film' | 'series',
+  tmdbId: number,
+  fetcher: TmdbFetcher = fetch,
+): Promise<CreditsOutcome> {
+  if (!apiKey || !Number.isInteger(tmdbId) || tmdbId < 1) {
+    return { status: 'not-attempted' };
+  }
+  const params = new URLSearchParams({ language: 'en-US', append_to_response: 'credits' });
+  params.set('api_key', apiKey);
+  const endpoint = kind === 'series' ? 'tv' : 'movie';
+  try {
+    const { status, json } = await tmdbGetJson(
+      `${TMDB_API}/${endpoint}/${tmdbId}?${params}`,
+      fetcher,
+    );
+    if (status === 404) return { status: 'no-match' };
+    if (status !== 200) return { status: 'failed', message: `TMDB HTTP ${status}` };
+    if (!json || typeof json !== 'object') return { status: 'no-match' };
+    return { status: 'hit', credits: extractCredits(kind, json) };
+  } catch (e) {
+    return { status: 'failed', message: (e as Error).message };
+  }
+}

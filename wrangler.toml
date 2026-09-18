@@ -36,8 +36,10 @@ name = "EMAIL"
 allowed_sender_addresses = ["noreply@noveladaptations.com"]
 
 # News pipeline: daily ingestion run at 06:00 UTC (docs/NEWS_PIPELINE.md §1).
+# Credits drain: every 2 minutes, one cast+ratings batch while work remains
+# (migration 0026; self-draining, no-ops when the queue is empty).
 [triggers]
-crons = ["0 6 * * *"]
+crons = ["0 6 * * *", "*/2 * * * *"]
 
 # Workers AI, called through the "novel-adaptations" AI Gateway
 # (see src/news/ingest.ts). Heuristic fallback if unavailable.

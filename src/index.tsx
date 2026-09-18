@@ -13,6 +13,7 @@ import { Hono, type Context } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { serveFavicon } from './favicon';
 import { scheduledNewsRun } from './news/ingest';
+import { runCreditsBatch } from './enrichment';
 import { registerSeoRoutes } from './seo';
 import { registerIndexNowKeyRoute } from './indexnow';
 // Versioned JSON API at /api/v1 — the SPA contract (docs/openapi.yaml).
@@ -242,6 +243,19 @@ export default {
   // Hono's fetch is an arrow-function property, so it can be re-homed safely.
   fetch: app.fetch,
   async scheduled(event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
+    // Credits drain (migration 0026): every 2 minutes, one batch of cast +
+    // ratings enrichment while work remains; no-ops otherwise. Self-draining,
+    // so future titles that gain a tmdb_id get credits automatically.
+    if (event.cron === '*/2 * * * *') {
+      if (env.TMDB_API_KEY) {
+        try {
+          await runCreditsBatch({ DB: env.DB, TMDB_API_KEY: env.TMDB_API_KEY }, 40);
+        } catch (e) {
+          console.error('scheduled credits drain failed:', (e as Error).message);
+        }
+      }
+      return;
+    }
     await scheduledNewsRun(env);
   },
 };

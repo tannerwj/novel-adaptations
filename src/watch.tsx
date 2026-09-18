@@ -8,8 +8,8 @@
  *   /watch/:slug       = "the screen work" — the film or series itself:
  *                      poster, synopsis, linked books/adaptations, news.
  *
- * Stubbed on purpose: synopsis/cast/crew arrive via future TMDB enrichment
- * (migration 0009 added screen_works.synopsis). Empty states say so —
+ * Stubbed on purpose: synopsis/cast/crew arrive via TMDB enrichment
+ * (migrations 0009 and 0026). Empty states say so —
  * nothing is faked. Affiliate/purchase links (purchase_url_screen) are stored
  * in the schema but NOT rendered yet (needs disclosure compliance first).
  */
@@ -24,6 +24,7 @@ import { HypeWidget } from './hype/ui';
 import { ReviewsSection, type ReviewView } from './reviews/ui';
 import { AddToListControl } from './lists/ui';
 import type { NewsItem, ScreenWorkDetail } from './db';
+import { parseCastJson } from './db';
 
 function kindLabel(kind: string): string {
   return kind === 'film' ? 'Film' : 'Series';
@@ -68,6 +69,13 @@ export function ScreenWorkPage({
 }) {
   const year = releaseYear(work.release_date);
   const authed = !!user?.email;
+  const cast = parseCastJson(work.cast_json);
+  const tmdbScore =
+    work.tmdb_vote_count != null &&
+    work.tmdb_vote_count > 0 &&
+    work.tmdb_vote_average != null
+      ? work.tmdb_vote_average
+      : null;
   return (
     <Layout
       title={work.title}
@@ -96,6 +104,14 @@ export function ScreenWorkPage({
             <span class="kind-pill">{kindLabel(work.kind)}</span>
             {work.release_date && (
               <span class="kind-pill">📅 {work.release_date}</span>
+            )}
+            {tmdbScore !== null && (
+              <span
+                class="kind-pill"
+                title={`TMDB audience score from ${work.tmdb_vote_count!.toLocaleString()} votes`}
+              >
+                ★ {tmdbScore.toFixed(1)} <span class="meta">TMDB</span>
+              </span>
             )}
           </div>
           <p class="meta" style="margin-top:0.75rem">
@@ -161,13 +177,51 @@ export function ScreenWorkPage({
             <dd>{kindLabel(work.kind)}</dd>
             <dt>Release</dt>
             <dd>{work.release_date ?? 'TBA'}</dd>
+            {work.director && (
+              <>
+                <dt>Director</dt>
+                <dd>{work.director}</dd>
+              </>
+            )}
+            {work.creators && (
+              <>
+                <dt>Created by</dt>
+                <dd>{work.creators}</dd>
+              </>
+            )}
           </dl>
         </section>
         <section class="panel">
           <h2>Cast &amp; crew</h2>
-          <p class="empty" style="margin:0">
-            Cast and crew appear here once TMDB has them listed.
-          </p>
+          {cast.length > 0 ? (
+            <ul class="cast-strip">
+              {cast.map((m) => (
+                <li key={m.name}>
+                  {m.profile_path ? (
+                    <img
+                      src={`https://image.tmdb.org/t/p/w185${m.profile_path}`}
+                      alt={m.name}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span class="cast-fallback" aria-hidden="true">
+                      {m.name
+                        .split(' ')
+                        .map((w) => w[0])
+                        .slice(0, 2)
+                        .join('')}
+                    </span>
+                  )}
+                  <span class="cast-name">{m.name}</span>
+                  {m.character && <span class="cast-char">{m.character}</span>}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p class="empty" style="margin:0">
+              Cast and crew appear here once TMDB has them listed.
+            </p>
+          )}
         </section>
       </div>
 

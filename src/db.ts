@@ -37,6 +37,48 @@ export interface ScreenWork {
    * '' = TMDB has no trailer, otherwise the YouTube video key.
    */
   trailer_youtube_key: string | null;
+  /**
+   * Top-billed cast as a JSON array (migration 0026), each
+   * { name, character, profile_path }. profile_path is a TMDB image path or
+   * null. Null until the credits backfill runs.
+   */
+  cast_json: string | null;
+  /** Film director (migration 0026). */
+  director: string | null;
+  /** Series creators, comma-joined (migration 0026). */
+  creators: string | null;
+  /** TMDB audience score at enrichment time (migration 0026). */
+  tmdb_vote_average: number | null;
+  /** TMDB vote count at enrichment time (migration 0026). */
+  tmdb_vote_count: number | null;
+}
+
+/** One cast member from screen_works.cast_json. */
+export interface ScreenCastMember {
+  name: string;
+  character: string;
+  profile_path: string | null;
+}
+
+/** Parse screen_works.cast_json defensively — corrupt JSON becomes []. */
+export function parseCastJson(raw: string | null): ScreenCastMember[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (m): m is ScreenCastMember =>
+          !!m && typeof m === 'object' && typeof (m as { name?: unknown }).name === 'string',
+      )
+      .map((m) => ({
+        name: m.name,
+        character: typeof m.character === 'string' ? m.character : '',
+        profile_path: typeof m.profile_path === 'string' ? m.profile_path : null,
+      }));
+  } catch {
+    return [];
+  }
 }
 
 export interface Adaptation {
