@@ -430,6 +430,30 @@ function filmYearOk(releaseDate: string | null, filmYear: number | null): boolea
   return m != null && Math.abs(Number(m[1]) - filmYear) <= 1;
 }
 
+/** Transient failures stay retryable: keep the row pending until attempts run out. */
+const MAX_ATTEMPTS = 3;
+
+async function markRetryable(
+  db: D1Database,
+  id: number,
+  attempts: number,
+  reason: string,
+): Promise<'failed' | 'pending'> {
+  if (attempts + 1 >= MAX_ATTEMPTS) {
+    await markCandidate(db, id, 'failed', reason);
+    return 'failed';
+  }
+  await db
+    .prepare(
+      `UPDATE wiki_expansion_candidates
+       SET reason = ?1, attempts = attempts + 1
+       WHERE id = ?2`,
+    )
+    .bind(reason, id)
+    .run();
+  return 'pending';
+}
+
 async function markCandidate(
   db: D1Database,
   id: number,
@@ -531,8 +555,13 @@ export async function processExpansionBatch(
         fetcher,
       );
       if (outcome.status === 'failed' || outcome.status === 'not-attempted') {
-        await markCandidate(deps.DB, row.id, 'failed', `TMDB error: ${outcome.status}`);
-        result.failed++;
+        const disposition = await markRetryable(
+          deps.DB,
+          row.id,
+          row.attempts,
+          `TMDB error: ${outcome.status}`,
+        );
+        if (disposition === 'failed') result.failed++;
         continue;
       }
       if (outcome.status !== 'hit') {
@@ -564,8 +593,13 @@ export async function processExpansionBatch(
       await markCandidate(deps.DB, row.id, 'created', null, book.openlibraryId, outcome.hit.tmdbId);
       result.created++;
     } catch (e) {
-      await markCandidate(deps.DB, row.id, 'failed', `error: ${(e as Error).message}`);
-      result.failed++;
+      const disposition = await markRetryable(
+        deps.DB,
+        row.id,
+        row.attempts,
+        `error: ${(e as Error).message}`,
+      );
+      if (disposition === 'failed') result.failed++;
     }
     await sleep(EXPANSION_THROTTLE_MS);
   }

@@ -155,10 +155,17 @@ function fakeDb() {
             return { meta: {} };
           }
           if (q.startsWith('UPDATE wiki_expansion_candidates')) {
-            const c = state.candidates.find((x) => x.id === args[4]);
+            // Two shapes: markCandidate (status, reason, ol_key, tmdb_id, id)
+            // and markRetryable (reason, id).
+            const id = args.length === 2 ? args[1] : args[4];
+            const c = state.candidates.find((x) => x.id === id);
             if (c) {
-              c.status = args[0]; c.reason = args[1];
-              c.ol_work_key = args[2]; c.tmdb_id = args[3];
+              if (args.length === 2) {
+                c.reason = args[0];
+              } else {
+                c.status = args[0]; c.reason = args[1];
+                c.ol_work_key = args[2]; c.tmdb_id = args[3];
+              }
               c.attempts++;
             }
             return { meta: {} };
@@ -314,8 +321,7 @@ test('processExpansionBatch no-ops without a TMDB key', async () => {
   assert.equal(await countPendingExpansion(db), 0);
 });
 
-test('processExpansionBatch skips already-cataloged adaptations without API calls', async () => {
-  const db = fakeDb();
+test('processExpansionBatch skips already-cataloged adaptations without API calls', async () => {  const db = fakeDb();
   db.state.candidates.push(
     { id: 1, book_title: 'Dune', book_year: 1965, authors: 'Frank Herbert', film_title: 'Dune: Part Two', film_year: 2024, source_list: 'novels-d-j', status: 'pending', attempts: 0 },
   );
@@ -326,4 +332,41 @@ test('processExpansionBatch skips already-cataloged adaptations without API call
   assert.equal(batch.skipped, 1);
   assert.equal(calls, 0); // no provider calls burned
   assert.match(db.state.candidates[0].reason, /already in catalog/);
+});
+
+test('processExpansionBatch retries transient TMDB failures, then gives up', async () => {
+  const db = fakeDb();
+  db.state.candidates.push(
+    { id: 1, book_title: 'The 25th Hour', book_year: 2001, authors: 'David Benioff', film_title: '25th Hour', film_year: 2002, source_list: 'novels-0-9-a-c', status: 'pending', attempts: 0 },
+  );
+  const fetcher = async (url) => {
+    const ok = (json) => ({ ok: true, status: 200, json: async () => json });
+    if (url.includes('openlibrary.org/search.json')) {
+      return ok({ docs: [{ key: '/works/OL1W', title: 'The 25th Hour', author_name: ['David Benioff'], first_publish_year: 2001 }] });
+    }
+    if (url.includes('openlibrary.org/works/')) return ok({ description: 'x', subjects: [] });
+    if (url.includes('api.themoviedb.org')) throw new Error('boom'); // transport failure
+    return { ok: false, status: 404, json: async () => null };
+  };
+
+  // Attempt 1: stays pending, attempts bumped, not counted as failed.
+  let batch = await processExpansionBatch({ DB: db, TMDB_API_KEY: 'KEY' }, 10, fetcher);
+  assert.equal(batch.processed, 1);
+  assert.equal(batch.failed, 0);
+  let c = db.state.candidates[0];
+  assert.equal(c.status, 'pending');
+  assert.equal(c.attempts, 1);
+
+  // Attempt 2: still pending.
+  batch = await processExpansionBatch({ DB: db, TMDB_API_KEY: 'KEY' }, 10, fetcher);
+  c = db.state.candidates[0];
+  assert.equal(c.status, 'pending');
+  assert.equal(c.attempts, 2);
+
+  // Attempt 3: exhausted → failed.
+  batch = await processExpansionBatch({ DB: db, TMDB_API_KEY: 'KEY' }, 10, fetcher);
+  assert.equal(batch.failed, 1);
+  c = db.state.candidates[0];
+  assert.equal(c.status, 'failed');
+  assert.match(c.reason, /TMDB error: failed/);
 });
