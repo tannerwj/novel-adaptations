@@ -14,6 +14,12 @@ import { getCookie } from 'hono/cookie';
 import { serveFavicon } from './favicon';
 import { scheduledNewsRun } from './news/ingest';
 import { runCreditsBatch } from './enrichment';
+import {
+  countTotalExpansion,
+  hoursSinceLastScrape,
+  processExpansionBatch,
+  scrapeAndStoreExpansionCandidates,
+} from './expansion';
 import { registerSeoRoutes } from './seo';
 import { registerIndexNowKeyRoute } from './indexnow';
 // Versioned JSON API at /api/v1 — the SPA contract (docs/openapi.yaml).
@@ -252,6 +258,39 @@ export default {
           await runCreditsBatch({ DB: env.DB, TMDB_API_KEY: env.TMDB_API_KEY }, 40);
         } catch (e) {
           console.error('scheduled credits drain failed:', (e as Error).message);
+        }
+      }
+      return;
+    }
+    // Wikipedia expansion drain (migration 0027): every 5 minutes, resolve +
+    // create up to 40 candidates. Bootstraps itself: the first tick scrapes
+    // the lists when the queue is empty (retried after 24h if a scrape ever
+    // yields nothing).
+    if (event.cron === '*/5 * * * *') {
+      if (env.TMDB_API_KEY) {
+        try {
+          const total = await countTotalExpansion(env.DB);
+          if (total === 0) {
+            const since = await hoursSinceLastScrape(env.DB);
+            if (since == null || since > 24) {
+              const scrape = await scrapeAndStoreExpansionCandidates(env.DB);
+              console.log(
+                `expansion scrape: ${scrape.pages} pages, ${scrape.candidates} candidates (${scrape.dropped} dropped)`,
+              );
+            }
+          }
+          const batch = await processExpansionBatch(
+            { DB: env.DB, TMDB_API_KEY: env.TMDB_API_KEY },
+            40,
+          );
+          if (batch.processed > 0) {
+            console.log(
+              `expansion batch: ${batch.created} created, ${batch.skipped} skipped, ` +
+                `${batch.failed} failed, ${batch.remaining} remaining`,
+            );
+          }
+        } catch (e) {
+          console.error('scheduled expansion drain failed:', (e as Error).message);
         }
       }
       return;

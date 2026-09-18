@@ -239,6 +239,24 @@ export function imdbIdFromUrl(url: string | null): string | null {
   return /imdb\.com\/title\/(tt\d+)/i.exec(url)?.[1] ?? null;
 }
 
+/** A fully-resolved adaptation: the metadata lookups all succeeded. */
+export interface ResolvedScreenWork {
+  tmdbId: number;
+  kind: 'film' | 'series';
+  title: string;
+  posterUrl: string;
+  backdropUrl: string | null;
+  releaseDate: string | null;
+  synopsis: string | null;
+}
+
+export interface ResolvedIntakeInput {
+  book: OpenLibraryBook;
+  screenWork: ResolvedScreenWork;
+  /** Source URL stored on the adaptation row. */
+  sourceUrl: string | null;
+}
+
 /**
  * Resolve a tip to catalog records. Throws IntakeError (plain English) when
  * a lookup fails; the database is only written after every lookup succeeds.
@@ -312,17 +330,40 @@ export async function intakeFromTip(
     );
   }
 
-  // 3. Write — reusing existing rows so re-runs never duplicate.
-  //
-  // All inserts go through ONE db.batch(), which D1 executes as a single
-  // all-or-nothing transaction: a later insert can never leave partial
-  // records behind. Existence was resolved above; the adaptation row links
-  // via COALESCE(known id, subselect of the row this batch just inserted).
+  // 3. Write — the lookups above all succeeded; delegate to the shared writer.
+  return writeIntakeRecords(db, {
+    book,
+    screenWork: {
+      tmdbId,
+      kind,
+      title: workTitle,
+      posterUrl,
+      backdropUrl,
+      releaseDate,
+      synopsis,
+    },
+    sourceUrl: input.sourceUrl,
+  });
+}
+
+/**
+ * Write the book + screen work + adaptation rows for a fully-resolved
+ * adaptation. Reuses existing rows by tmdb_id / openlibrary_id /
+ * (book_id, screen_work_id), so re-running can never duplicate the catalog.
+ * All inserts go through ONE db.batch(), which D1 executes as a single
+ * all-or-nothing transaction.
+ */
+export async function writeIntakeRecords(
+  db: D1Database,
+  input: ResolvedIntakeInput,
+): Promise<IntakeResult> {
+  const { book, screenWork } = input;
+  let workTitle = screenWork.title;
   const warnings: string[] = [];
 
   const existingWork = await db
     .prepare('SELECT id, title FROM screen_works WHERE tmdb_id = ?1')
-    .bind(tmdbId)
+    .bind(screenWork.tmdbId)
     .first<{ id: number; title: string }>();
   if (existingWork) workTitle = existingWork.title;
 
@@ -348,7 +389,7 @@ export async function intakeFromTip(
   // Slugs are resolved up front (reads) so the batch is fully formed.
   const workSlug = existingWork
     ? null
-    : await uniqueSlug(db, 'screen_works', workSlugBase(workTitle, releaseDate));
+    : await uniqueSlug(db, 'screen_works', workSlugBase(workTitle, screenWork.releaseDate));
   const bookSlug = existingBook
     ? null
     : await uniqueSlug(db, 'books', bookSlugBase(book.title, book.authors));
@@ -356,14 +397,14 @@ export async function intakeFromTip(
   const today = new Date().toISOString().slice(0, 10);
   const adaptationStatus = existingAdaptation
     ? existingAdaptation.status
-    : !releaseDate
+    : !screenWork.releaseDate
       ? 'rumored'
-      : releaseDate > today
+      : screenWork.releaseDate > today
         ? 'post_production'
         : 'released';
   const adaptSlug = existingAdaptation
     ? null
-    : await uniqueSlug(db, 'adaptations', workSlugBase(workTitle, releaseDate));
+    : await uniqueSlug(db, 'adaptations', workSlugBase(workTitle, screenWork.releaseDate));
 
   const stmts: D1PreparedStatement[] = [];
   let workIdx = -1;
@@ -379,7 +420,16 @@ export async function intakeFromTip(
               synopsis, needs_enrichment, slug)
            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8)`,
         )
-        .bind(tmdbId, workTitle, kind, posterUrl, backdropUrl, releaseDate, synopsis, workSlug),
+        .bind(
+          screenWork.tmdbId,
+          workTitle,
+          screenWork.kind,
+          screenWork.posterUrl,
+          screenWork.backdropUrl,
+          screenWork.releaseDate,
+          screenWork.synopsis,
+          workSlug,
+        ),
     );
   }
   if (!existingBook) {
@@ -408,7 +458,7 @@ export async function intakeFromTip(
           existingBook?.id ?? null,
           book.openlibraryId,
           existingWork?.id ?? null,
-          tmdbId,
+          screenWork.tmdbId,
           adaptationStatus,
           input.sourceUrl,
           adaptSlug,
@@ -427,7 +477,7 @@ export async function intakeFromTip(
 
   return {
     book: { id: bookId, title: book.title, created: !existingBook },
-    screenWork: { id: screenWorkId, title: workTitle, kind, created: !existingWork },
+    screenWork: { id: screenWorkId, title: workTitle, kind: screenWork.kind, created: !existingWork },
     adaptation: { id: adaptationId, status: adaptationStatus, created: !existingAdaptation },
     warnings,
   };

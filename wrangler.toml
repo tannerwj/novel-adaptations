@@ -39,7 +39,7 @@ allowed_sender_addresses = ["noreply@noveladaptations.com"]
 # Credits drain: every 2 minutes, one cast+ratings batch while work remains
 # (migration 0026; self-draining, no-ops when the queue is empty).
 [triggers]
-crons = ["0 6 * * *", "*/2 * * * *"]
+crons = ["0 6 * * *", "*/2 * * * *", "*/5 * * * *"]
 
 # Workers AI, called through the "novel-adaptations" AI Gateway
 # (see src/news/ingest.ts). Heuristic fallback if unavailable.

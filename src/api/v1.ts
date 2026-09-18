@@ -170,6 +170,11 @@ import {
 import { getWatchProviders } from '../watch_providers_cache';
 import { fetchAndCacheProviders } from '../watch_providers_cache';
 import { IntakeError, intakeFromTip } from '../intake';
+import {
+  expansionStats,
+  processExpansionBatch,
+  scrapeAndStoreExpansionCandidates,
+} from '../expansion';
 import { submitIndexNow } from '../indexnow';
 import { fetchTrailerKey } from '../trailers';
 
@@ -2010,6 +2015,46 @@ v1.get('/admin/screen-works', async (c) => {
   const { page, per_page } = pagination(c, 100);
   const works = await listScreenWorksForAdmin(c.env.DB);
   return c.json({ screen_works: paginate(works, page, per_page) });
+});
+
+// Wikipedia expansion: stage 1 scrapes the fiction-film lists into the
+// candidates table (idempotent — re-scrapes add nothing new).
+// POST /admin/expansion/scrape → { pages, candidates, alreadyKnown, dropped }
+v1.post('/admin/expansion/scrape', async (c) => {
+  try {
+    const result = await scrapeAndStoreExpansionCandidates(c.env.DB);
+    return c.json(result);
+  } catch (e) {
+    console.error('/api/v1/admin/expansion/scrape failed:', (e as Error).message);
+    return apiError(c, 500, 'internal_error', 'Expansion scrape failed.');
+  }
+});
+
+// Stage 2: resolve + create, n candidates per call.
+// POST /admin/expansion/process?n=10 → { processed, created, skipped, failed, remaining }
+v1.post('/admin/expansion/process', async (c) => {
+  const parsed = parseBatchSize(c.req.query('n'));
+  if (!parsed.ok) return validationError(c, parsed.error);
+  try {
+    const batch = await processExpansionBatch(
+      { DB: c.env.DB, TMDB_API_KEY: c.env.TMDB_API_KEY },
+      parsed.n,
+    );
+    return c.json(batch);
+  } catch (e) {
+    console.error('/api/v1/admin/expansion/process failed:', (e as Error).message);
+    return apiError(c, 500, 'internal_error', 'Expansion batch failed.');
+  }
+});
+
+// GET /admin/expansion/stats → { pending, created, skipped, failed }
+v1.get('/admin/expansion/stats', async (c) => {
+  try {
+    return c.json(await expansionStats(c.env.DB));
+  } catch (e) {
+    console.error('/api/v1/admin/expansion/stats failed:', (e as Error).message);
+    return apiError(c, 500, 'internal_error', 'Expansion stats failed.');
+  }
 });
 
 v1.post('/admin/screen-works/:id/release-date', async (c) => {
