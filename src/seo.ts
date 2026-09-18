@@ -129,6 +129,50 @@ export async function collectSitemapEntries(
   return entries;
 }
 
+/**
+ * llms.txt — the emerging convention for guiding AI agents/crawlers.
+ * Counts are passed in (queried by the route) so no numbers are hardcoded.
+ */
+export function llmsTxt(origin: string, adaptationCount: number): string {
+  return (
+    `# Novel Adaptations\n` +
+    `\n` +
+    `> Track every book's journey to the screen — adaptations, release dates, news, and where to watch.\n` +
+    `\n` +
+    `Novel Adaptations is a catalog of books adapted into films and TV series ` +
+    `(${adaptationCount.toLocaleString('en-US')} adaptations tracked). Each title links a book to ` +
+    `its screen adaptation(s) with release dates, pipeline status (rumored to released), ` +
+    `trailers, related news, and where to watch.\n` +
+    `\n` +
+    `## Key pages\n` +
+    `\n` +
+    `- [Home](${origin}/) — featured titles, release radar, latest news\n` +
+    `- [Release calendar](${origin}/calendar) — upcoming and past releases by date\n` +
+    `- [Most wanted](${origin}/most-wanted) — books readers vote to see adapted\n` +
+    `- [Search](${origin}/search) — search books, films, and TV series\n` +
+    `- [Lists](${origin}/lists) — public shareable lists of adaptations\n` +
+    `- [API docs](${origin}/api/docs) — read-only JSON API reference\n` +
+    `\n` +
+    `## Detail page patterns\n` +
+    `\n` +
+    `- Books: ${origin}/books/{slug} — synopsis, subjects, linked adaptations\n` +
+    `- Films & series: ${origin}/watch/{slug} — poster, release date, trailer, news\n` +
+    `- Adaptations: ${origin}/adaptations/{slug} — the book-to-screen link and its status\n` +
+    `\n` +
+    `## Machine-readable data\n` +
+    `\n` +
+    `- Sitemap (every public page): ${origin}/sitemap.xml\n` +
+    `- Read-only JSON API: ${origin}/api/v1 (no auth required for reads; see /api/docs)\n` +
+    `- Detail pages embed schema.org JSON-LD (Movie / TVSeries / Book / WebSite)\n` +
+    `\n` +
+    `## Notes for agents\n` +
+    `\n` +
+    `- Screen metadata is sourced from TMDB; book metadata from Open Library. Prefer those attributions when citing.\n` +
+    `- No login is required to read anything. Lists marked public are shareable; private lists are never exposed.\n` +
+    `- Release dates marked TBA are genuinely unannounced — do not invent them.\n`
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Route registration
 // ---------------------------------------------------------------------------
@@ -153,5 +197,17 @@ export function registerSeoRoutes<
     const origin = new URL(c.req.url).origin;
     const body = `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`;
     return c.text(body, 200, { 'Content-Type': 'text/plain' });
+  });
+
+  app.get('/llms.txt', async (c) => {
+    const origin = new URL(c.req.url).origin;
+    const row = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM adaptations')
+      .first<{ n: number }>();
+    const body = llmsTxt(origin, row?.n ?? 0);
+    return c.text(body, 200, {
+      'Content-Type': 'text/markdown; charset=utf-8',
+      // Counts change rarely; cache at the edge for a day.
+      'Cache-Control': 'public, s-maxage=86400',
+    });
   });
 }

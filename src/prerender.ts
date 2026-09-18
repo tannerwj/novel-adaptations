@@ -22,12 +22,14 @@ import { DEFAULT_DESCRIPTION } from './seo';
 
 /**
  * Standard crawler/bot/unfurler User-Agent list: search indexers, social
- * preview fetchers, and messaging-app unfurlers. Case-insensitive substring
- * match — deliberately broad; a false positive only costs the bot a static
- * page (never user data), while a false negative just serves the shell.
+ * preview fetchers, messaging-app unfurlers, and AI training/inference
+ * crawlers (GPTBot, ClaudeBot, Google-Extended, PerplexityBot, ...).
+ * Case-insensitive substring match — deliberately broad; a false positive
+ * only costs the bot a static page (never user data), while a false negative
+ * just serves the shell.
  */
 const BOT_UA_RE =
-  /bot|crawler|spider|crawling|slurp|mediapartners-google|baidu|yandex|duckduck|sogou|exabot|facebot|ia_archiver|googlebot|google-inspectiontool|googleother|bingbot|bingpreview|twitterbot|facebookexternalhit|slackbot|linkedinbot|discordbot|whatsapp|telegrambot|telegram|pinterestbot|applebot|embedly|quora|tumblr|redditbot|vkshare|skypeuripreview|nuzzel|bitlybot|iframely|developers\.google\.com\/web\/snippet/i;
+  /bot|crawler|spider|crawling|slurp|mediapartners-google|baidu|yandex|duckduck|sogou|exabot|facebot|ia_archiver|googlebot|google-inspectiontool|googleother|google-extended|bingbot|bingpreview|twitterbot|facebookexternalhit|slackbot|linkedinbot|discordbot|whatsapp|telegrambot|telegram|pinterestbot|applebot|embedly|quora|tumblr|redditbot|vkshare|skypeuripreview|nuzzel|bitlybot|iframely|anthropic-ai|claude-web|cohere-ai|developers\.google\.com\/web\/snippet/i;
 
 /** True when the User-Agent header belongs to a crawler/unfurler. */
 export function isCrawler(userAgent: string | null | undefined): boolean {
@@ -58,6 +60,18 @@ export interface PrerenderMeta {
   image: string;
   /** Small HTML body: h1 + summary + links. Keep it light. */
   body: string;
+  /**
+   * Optional schema.org entity for a JSON-LD script tag — lets search and AI
+   * engines parse the page as typed data (Movie/TVSeries/Book/WebSite).
+   * Must be JSON-serializable; `<` is escaped on render so a hostile title
+   * can't break out of the script tag.
+   */
+  jsonLd?: unknown;
+}
+
+/** Serialize JSON-LD for inline <script>: escape `<` to block `</script>` breakout. */
+export function serializeJsonLd(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
 const SITE_NAME = 'Novel Adaptations';
@@ -67,7 +81,7 @@ const SITE_NAME = 'Novel Adaptations';
  * session data, no secrets — safe to cache at the edge and serve to bots.
  */
 export function prerenderDoc(meta: PrerenderMeta): string {
-  const { title, description, canonical, image, body } = meta;
+  const { title, description, canonical, image, body, jsonLd } = meta;
   const t = esc(title);
   const d = esc(description);
   return (
@@ -89,6 +103,9 @@ export function prerenderDoc(meta: PrerenderMeta): string {
     `<meta name="twitter:title" content="${t}">` +
     `<meta name="twitter:description" content="${d}">` +
     `<meta name="twitter:image" content="${esc(image)}">` +
+    (jsonLd !== undefined
+      ? `<script type="application/ld+json">${serializeJsonLd(jsonLd)}</script>`
+      : '') +
     `</head>` +
     `<body>${body}</body>` +
     `</html>`
@@ -115,6 +132,106 @@ function artOrFallback(origin: string, ...urls: (string | null)[]): string {
     if (u && /^https?:\/\//.test(u)) return u;
   }
   return `${origin}/og-card.jpg`;
+}
+
+// ---------------------------------------------------------------------------
+// JSON-LD (schema.org) — GEO: typed entities for search + AI engines
+// ---------------------------------------------------------------------------
+
+const SCHEMA_CONTEXT = 'https://schema.org';
+
+export interface JsonLdBookRef {
+  title: string;
+  authors: string;
+}
+
+function bookRefJsonLd(b: JsonLdBookRef): Record<string, unknown> {
+  return { '@type': 'Book', name: b.title, author: b.authors };
+}
+
+export interface ScreenWorkJsonLdInput {
+  title: string;
+  kind: string;
+  releaseDate: string | null;
+  description: string;
+  canonical: string;
+  image: string;
+  books: JsonLdBookRef[];
+}
+
+/** Movie/TVSeries entity with isBasedOn → Book links. */
+export function screenWorkJsonLd(input: ScreenWorkJsonLdInput): Record<string, unknown> {
+  const entity: Record<string, unknown> = {
+    '@context': SCHEMA_CONTEXT,
+    '@type': input.kind === 'series' ? 'TVSeries' : 'Movie',
+    name: input.title,
+    url: input.canonical,
+    image: input.image,
+    description: input.description,
+  };
+  if (input.releaseDate && /^\d{4}-\d{2}-\d{2}/.test(input.releaseDate)) {
+    entity.datePublished = input.releaseDate.slice(0, 10);
+  }
+  if (input.books.length > 0) {
+    entity.isBasedOn = input.books.map(bookRefJsonLd);
+  }
+  return entity;
+}
+
+export interface BookJsonLdInput {
+  title: string;
+  authors: string;
+  pubDate: string | null;
+  description: string | null;
+  canonical: string;
+  image: string;
+  /** Open Library subjects, e.g. ["Science fiction", "Dystopias"]. */
+  subjects: string[];
+}
+
+/** Book entity; genre comes from Open Library subjects when available. */
+export function bookJsonLd(input: BookJsonLdInput): Record<string, unknown> {
+  const entity: Record<string, unknown> = {
+    '@context': SCHEMA_CONTEXT,
+    '@type': 'Book',
+    name: input.title,
+    author: input.authors,
+    url: input.canonical,
+    image: input.image,
+  };
+  if (input.description) entity.description = input.description;
+  if (input.pubDate && /^\d{4}/.test(input.pubDate)) {
+    entity.datePublished = input.pubDate.slice(0, 10);
+  }
+  if (input.subjects.length > 0) entity.genre = input.subjects;
+  return entity;
+}
+
+/** WebSite entity for the home page, with a SearchAction AI engines can use. */
+export function websiteJsonLd(origin: string): Record<string, unknown> {
+  return {
+    '@context': SCHEMA_CONTEXT,
+    '@type': 'WebSite',
+    name: SITE_NAME,
+    url: `${origin}/`,
+    description: DEFAULT_DESCRIPTION,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: `${origin}/search?q={query}`,
+      'query-input': 'required name=query',
+    },
+  };
+}
+
+/** Parse the books.subjects JSON column into a string array; [] on any failure. */
+export function parseSubjects(subjects: string | null): string[] {
+  if (!subjects) return [];
+  try {
+    const parsed: unknown = JSON.parse(subjects);
+    return Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === 'string') : [];
+  } catch {
+    return [];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -206,6 +323,8 @@ function staticRoute(path: string, origin: string): Prerendered {
       canonical: origin + path,
       image: `${origin}/og-card.jpg`,
       body: r.body,
+      // WebSite entity (with SearchAction) on the home page only.
+      jsonLd: path === '/' ? websiteJsonLd(origin) : undefined,
     }),
   };
 }
@@ -223,6 +342,7 @@ async function watchRoute(db: D1Database, origin: string, slug: string): Promise
   const body =
     `<h1>${esc(w.title)}</h1>` +
     `<p>${esc(description)}</p>` +
+    (w.synopsis ? `<p>${esc(w.synopsis)}</p>` : '') +
     (w.poster_url
       ? `<img src="${esc(w.poster_url)}" alt="${esc(w.title)} poster artwork" width="500">`
       : '') +
@@ -239,6 +359,15 @@ async function watchRoute(db: D1Database, origin: string, slug: string): Promise
       canonical: `${origin}/watch/${w.slug ?? w.id}`,
       image: artOrFallback(origin, w.poster_url, w.backdrop_url),
       body,
+      jsonLd: screenWorkJsonLd({
+        title: w.title,
+        kind: w.kind,
+        releaseDate: w.release_date,
+        description,
+        canonical: `${origin}/watch/${w.slug ?? w.id}`,
+        image: artOrFallback(origin, w.poster_url, w.backdrop_url),
+        books: w.books.map((b) => ({ title: b.title, authors: b.authors })),
+      }),
     }),
   };
 }
@@ -268,6 +397,15 @@ async function adaptationRoute(db: D1Database, origin: string, slug: string): Pr
       canonical: `${origin}/adaptations/${a.adaptation_slug ?? a.id}`,
       image: artOrFallback(origin, a.screen_poster_url, a.book_cover_url),
       body,
+      jsonLd: screenWorkJsonLd({
+        title: a.screen_title,
+        kind: a.screen_kind,
+        releaseDate: a.screen_release_date,
+        description,
+        canonical: `${origin}/adaptations/${a.adaptation_slug ?? a.id}`,
+        image: artOrFallback(origin, a.screen_poster_url, a.book_cover_url),
+        books: [{ title: a.book_title, authors: a.book_authors }],
+      }),
     }),
   };
 }
@@ -280,6 +418,7 @@ async function bookRoute(db: D1Database, origin: string, slug: string): Promise<
   const body =
     `<h1>${esc(b.title)}</h1>` +
     `<p>${esc(description)}</p>` +
+    (b.description ? `<p>${esc(b.description)}</p>` : '') +
     (b.cover_url
       ? `<img src="${esc(b.cover_url)}" alt="${esc(b.title)} book cover" width="500">`
       : '');
@@ -291,6 +430,15 @@ async function bookRoute(db: D1Database, origin: string, slug: string): Promise<
       canonical: `${origin}/books/${b.slug ?? b.id}`,
       image: artOrFallback(origin, b.cover_url),
       body,
+      jsonLd: bookJsonLd({
+        title: b.title,
+        authors: b.authors,
+        pubDate: b.pub_date,
+        description: b.description,
+        canonical: `${origin}/books/${b.slug ?? b.id}`,
+        image: artOrFallback(origin, b.cover_url),
+        subjects: parseSubjects(b.subjects),
+      }),
     }),
   };
 }
