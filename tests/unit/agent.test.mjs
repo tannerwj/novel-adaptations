@@ -158,3 +158,9 @@ test('robotsTxt declares Content Signals and the sitemap', () => {
   assert.ok(body.includes(`Sitemap: ${ORIGIN}/sitemap.xml`));
   assert.ok(body.includes('User-agent: *\nAllow: /'));
 });
+
+test('agentSkillMarkdown points agents at the full catalog dump and the RSS feed', () => {
+  const skill = agentSkillMarkdown(ORIGIN);
+  assert.ok(skill.includes(`${ORIGIN}/llms-full.txt`), 'skill mentions llms-full.txt');
+  assert.ok(skill.includes(`${ORIGIN}/feed.xml`), 'skill mentions the RSS feed');
+});

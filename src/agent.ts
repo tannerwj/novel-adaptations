@@ -236,6 +236,8 @@ trailers, news, and where to watch.
 ## Read the catalog
 
 - Start at {origin}/llms.txt for an overview, URL patterns, and data-source notes.
+- Need the whole catalog at once? {origin}/llms-full.txt lists every adaptation on one line.
+- Adaptation news as RSS: {origin}/feed.xml.
 - Every public page is listed in {origin}/sitemap.xml.
 - Any page can be fetched as Markdown: send \`Accept: text/markdown\`. The
   Markdown carries YAML frontmatter (title, description) and the page's

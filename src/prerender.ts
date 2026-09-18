@@ -14,6 +14,7 @@
 
 import { getAdaptationSummaryBySlug, getBookBySlug, getScreenWorkBySlug } from './db';
 import { getListBySlug } from './lists/db';
+import { getMostWanted } from './votes/db';
 import { DEFAULT_DESCRIPTION } from './seo';
 
 // ---------------------------------------------------------------------------
@@ -157,6 +158,27 @@ export interface ScreenWorkJsonLdInput {
   canonical: string;
   image: string;
   books: JsonLdBookRef[];
+  /**
+   * Crowd rating from the site's own 1–5 ratings. Emitted as AggregateRating
+   * only when count > 0 — Google renders star snippets for Movie/TVSeries.
+   * The ratings are visible on the page (the rating widget), per guidelines.
+   */
+  rating?: { average: number; count: number };
+}
+
+/** Add an AggregateRating node to an entity when the crowd has actually rated it. */
+function withAggregateRating(
+  entity: Record<string, unknown>,
+  rating: { average: number; count: number } | undefined,
+): void {
+  if (!rating || rating.count <= 0) return;
+  entity.aggregateRating = {
+    '@type': 'AggregateRating',
+    ratingValue: rating.average,
+    ratingCount: rating.count,
+    bestRating: 5,
+    worstRating: 1,
+  };
 }
 
 /** Movie/TVSeries entity with isBasedOn → Book links. */
@@ -175,6 +197,7 @@ export function screenWorkJsonLd(input: ScreenWorkJsonLdInput): Record<string, u
   if (input.books.length > 0) {
     entity.isBasedOn = input.books.map(bookRefJsonLd);
   }
+  withAggregateRating(entity, input.rating);
   return entity;
 }
 
@@ -187,6 +210,8 @@ export interface BookJsonLdInput {
   image: string;
   /** Open Library subjects, e.g. ["Science fiction", "Dystopias"]. */
   subjects: string[];
+  /** Crowd rating from the site's own 1–5 ratings; see ScreenWorkJsonLdInput. */
+  rating?: { average: number; count: number };
 }
 
 /** Book entity; genre comes from Open Library subjects when available. */
@@ -204,6 +229,7 @@ export function bookJsonLd(input: BookJsonLdInput): Record<string, unknown> {
     entity.datePublished = input.pubDate.slice(0, 10);
   }
   if (input.subjects.length > 0) entity.genre = input.subjects;
+  withAggregateRating(entity, input.rating);
   return entity;
 }
 
@@ -221,6 +247,96 @@ export function websiteJsonLd(origin: string): Record<string, unknown> {
       'query-input': 'required name=query',
     },
   };
+}
+
+/**
+ * BreadcrumbList for a detail page, e.g. Home → Films & TV → Dune: Part Two.
+ * Google renders these as breadcrumbs in the SERP listing.
+ */
+export function breadcrumbListJsonLd(
+  origin: string,
+  trail: { name: string; path: string }[],
+): Record<string, unknown> {
+  return {
+    '@type': 'BreadcrumbList',
+    itemListElement: trail.map((t, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: t.name,
+      item: `${origin}${t.path}`,
+    })),
+  };
+}
+
+export interface VideoObjectJsonLdInput {
+  title: string;
+  description: string;
+  youtubeKey: string;
+  uploadDate: string | null;
+}
+
+/**
+ * VideoObject for a cached YouTube trailer — makes watch pages eligible for
+ * video rich results. Thumbnail/embed URLs are derived from the key; no
+ * network call needed.
+ */
+export function videoObjectJsonLd(input: VideoObjectJsonLdInput): Record<string, unknown> {
+  const entity: Record<string, unknown> = {
+    '@type': 'VideoObject',
+    name: `${input.title} — Official Trailer`,
+    description: input.description,
+    thumbnailUrl: `https://i.ytimg.com/vi/${input.youtubeKey}/hqdefault.jpg`,
+    embedUrl: `https://www.youtube.com/embed/${input.youtubeKey}`,
+    contentUrl: `https://www.youtube.com/watch?v=${input.youtubeKey}`,
+  };
+  if (input.uploadDate && /^\d{4}-\d{2}-\d{2}/.test(input.uploadDate)) {
+    entity.uploadDate = input.uploadDate.slice(0, 10);
+  }
+  return entity;
+}
+
+/**
+ * Combine schema.org nodes for a page's JSON-LD script tag. A single node is
+ * returned unchanged (existing shape preserved); multiple nodes are wrapped
+ * in a @graph with the shared @context hoisted. Undefined nodes are dropped.
+ */
+export function jsonLdGraph(
+  ...nodes: (Record<string, unknown> | undefined)[]
+): Record<string, unknown> | undefined {
+  const present = nodes.filter((n): n is Record<string, unknown> => n !== undefined);
+  if (present.length === 0) return undefined;
+  if (present.length === 1) return present[0];
+  return {
+    '@context': SCHEMA_CONTEXT,
+    '@graph': present.map((n) => {
+      const { '@context': _dropped, ...rest } = n;
+      return rest;
+    }),
+  };
+}
+
+/**
+ * Crowd rating aggregate for a target, or {count: 0} when nobody rated it.
+ * Kept as raw SQL here (not via src/ratings/db.ts) so this module stays
+ * dependency-light; the query mirrors getRatingSummary exactly.
+ */
+async function ratingAggregate(
+  db: D1Database,
+  targetType: 'book' | 'screen_work',
+  targetId: number,
+): Promise<{ average: number; count: number }> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS count, AVG(rating) AS average
+         FROM ratings
+        WHERE target_type = ?1 AND target_id = ?2`,
+    )
+    .bind(targetType, targetId)
+    .first<{ count: number; average: number | null }>();
+  const count = row?.count ?? 0;
+  // Round to one decimal, matching the API's rating summary.
+  const average = count === 0 ? 0 : Math.round((row?.average ?? 0) * 10) / 10;
+  return { average, count };
 }
 
 /** Parse the books.subjects JSON column into a string array; [] on any failure. */
@@ -259,22 +375,8 @@ const STATIC_ROUTES: Record<string, { title: string; description: string; body: 
       `<p>${esc(DEFAULT_DESCRIPTION)}</p>` +
       `<p><a href="/calendar">Release calendar</a> · <a href="/most-wanted">Most wanted</a> · <a href="/lists">Lists</a></p>`,
   },
-  '/calendar': {
-    title: 'Release calendar — Novel Adaptations',
-    description:
-      'Upcoming book-to-screen releases: films and TV series adapted from novels, with release dates.',
-    body:
-      `<h1>Release calendar</h1>` +
-      `<p>Upcoming book-to-screen releases: films and TV series adapted from novels, with release dates.</p>`,
-  },
-  '/most-wanted': {
-    title: 'Most wanted adaptations — Novel Adaptations',
-    description:
-      'The book adaptations readers want most — vote for the stories you want to see on screen.',
-    body:
-      `<h1>Most wanted</h1>` +
-      `<p>The book adaptations readers want most — vote for the stories you want to see on screen.</p>`,
-  },
+  // NOTE: /calendar and /most-wanted are DB-backed (calendarRoute /
+  // mostWantedRoute below) so their prerenders carry a real ItemList.
   '/search': {
     title: 'Search — Novel Adaptations',
     description: 'Search books, films, and TV series adapted from novels.',
@@ -361,15 +463,32 @@ async function watchRoute(db: D1Database, origin: string, slug: string): Promise
     canonical: `${origin}/watch/${w.slug ?? w.id}`,
     image: artOrFallback(origin, w.poster_url, w.backdrop_url),
     body,
-    jsonLd: screenWorkJsonLd({
-      title: w.title,
-      kind: w.kind,
-      releaseDate: w.release_date,
-      description,
-      canonical: `${origin}/watch/${w.slug ?? w.id}`,
-      image: artOrFallback(origin, w.poster_url, w.backdrop_url),
-      books: w.books.map((b) => ({ title: b.title, authors: b.authors })),
-    }),
+    jsonLd: jsonLdGraph(
+      screenWorkJsonLd({
+        title: w.title,
+        kind: w.kind,
+        releaseDate: w.release_date,
+        description,
+        canonical: `${origin}/watch/${w.slug ?? w.id}`,
+        image: artOrFallback(origin, w.poster_url, w.backdrop_url),
+        books: w.books.map((b) => ({ title: b.title, authors: b.authors })),
+        rating: await ratingAggregate(db, 'screen_work', w.id),
+      }),
+      // Trailer is cached in D1 (screen_works.trailer_youtube_key) — when
+      // present the page is eligible for video rich results.
+      w.trailer_youtube_key
+        ? videoObjectJsonLd({
+            title: w.title,
+            description,
+            youtubeKey: w.trailer_youtube_key,
+            uploadDate: w.release_date,
+          })
+        : undefined,
+      breadcrumbListJsonLd(origin, [
+        { name: 'Home', path: '/' },
+        { name: w.title, path: `/watch/${w.slug ?? w.id}` },
+      ]),
+    ),
   };
   return { status: 200, html: prerenderDoc(meta), meta };
 }
@@ -397,15 +516,21 @@ async function adaptationRoute(db: D1Database, origin: string, slug: string): Pr
     canonical: `${origin}/adaptations/${a.adaptation_slug ?? a.id}`,
     image: artOrFallback(origin, a.screen_poster_url, a.book_cover_url),
     body,
-    jsonLd: screenWorkJsonLd({
-      title: a.screen_title,
-      kind: a.screen_kind,
-      releaseDate: a.screen_release_date,
-      description,
-      canonical: `${origin}/adaptations/${a.adaptation_slug ?? a.id}`,
-      image: artOrFallback(origin, a.screen_poster_url, a.book_cover_url),
-      books: [{ title: a.book_title, authors: a.book_authors }],
-    }),
+    jsonLd: jsonLdGraph(
+      screenWorkJsonLd({
+        title: a.screen_title,
+        kind: a.screen_kind,
+        releaseDate: a.screen_release_date,
+        description,
+        canonical: `${origin}/adaptations/${a.adaptation_slug ?? a.id}`,
+        image: artOrFallback(origin, a.screen_poster_url, a.book_cover_url),
+        books: [{ title: a.book_title, authors: a.book_authors }],
+      }),
+      breadcrumbListJsonLd(origin, [
+        { name: 'Home', path: '/' },
+        { name: a.screen_title, path: `/adaptations/${a.adaptation_slug ?? a.id}` },
+      ]),
+    ),
   };
   return { status: 200, html: prerenderDoc(meta), meta };
 }
@@ -428,15 +553,22 @@ async function bookRoute(db: D1Database, origin: string, slug: string): Promise<
     canonical: `${origin}/books/${b.slug ?? b.id}`,
     image: artOrFallback(origin, b.cover_url),
     body,
-    jsonLd: bookJsonLd({
-      title: b.title,
-      authors: b.authors,
-      pubDate: b.pub_date,
-      description: b.description,
-      canonical: `${origin}/books/${b.slug ?? b.id}`,
-      image: artOrFallback(origin, b.cover_url),
-      subjects: parseSubjects(b.subjects),
-    }),
+    jsonLd: jsonLdGraph(
+      bookJsonLd({
+        title: b.title,
+        authors: b.authors,
+        pubDate: b.pub_date,
+        description: b.description,
+        canonical: `${origin}/books/${b.slug ?? b.id}`,
+        image: artOrFallback(origin, b.cover_url),
+        subjects: parseSubjects(b.subjects),
+        rating: await ratingAggregate(db, 'book', b.id),
+      }),
+      breadcrumbListJsonLd(origin, [
+        { name: 'Home', path: '/' },
+        { name: b.title, path: `/books/${b.slug ?? b.id}` },
+      ]),
+    ),
   };
   return { status: 200, html: prerenderDoc(meta), meta };
 }
@@ -461,6 +593,122 @@ async function listRoute(db: D1Database, origin: string, slug: string): Promise<
   return { status: 200, html: prerenderDoc(meta), meta };
 }
 
+/**
+ * Most Wanted as a real ranked list: the top-voted books with their vote
+ * counts, exposed as an ItemList so search engines parse the ranking.
+ * Fail-soft like everything else here — an empty/erroring query still
+ * returns the static copy rather than null.
+ */
+async function mostWantedRoute(db: D1Database, origin: string): Promise<Prerendered> {
+  const title = 'Most wanted adaptations — Novel Adaptations';
+  const description =
+    'The book adaptations readers want most — vote for the stories you want to see on screen.';
+  let rows: { slug: string | null; bookId: number; title: string; authors: string; votes: number }[] = [];
+  try {
+    rows = (await getMostWanted(db, null, 10)).map((r) => ({
+      slug: r.slug,
+      bookId: r.bookId,
+      title: r.title,
+      authors: r.authors,
+      votes: r.votes,
+    }));
+  } catch {
+    rows = [];
+  }
+  const body =
+    `<h1>Most wanted</h1>` +
+    `<p>${esc(description)}</p>` +
+    (rows.length
+      ? `<ol>${rows
+          .map(
+            (r) =>
+              `<li><a href="/books/${r.slug ?? r.bookId}">${esc(r.title)}</a> by ${esc(r.authors)} — ${r.votes} vote${r.votes === 1 ? '' : 's'}</li>`,
+          )
+          .join('')}</ol>`
+      : '');
+  const meta: PrerenderMeta = {
+    title,
+    description,
+    canonical: `${origin}/most-wanted`,
+    image: `${origin}/og-card.jpg`,
+    body,
+    jsonLd:
+      rows.length > 0
+        ? {
+            '@context': SCHEMA_CONTEXT,
+            '@type': 'ItemList',
+            name: 'Most wanted book adaptations',
+            itemListElement: rows.map((r, i) => ({
+              '@type': 'ListItem',
+              position: i + 1,
+              name: `${r.title} by ${r.authors}`,
+              url: `${origin}/books/${r.slug ?? r.bookId}`,
+            })),
+          }
+        : undefined,
+  };
+  return { status: 200, html: prerenderDoc(meta), meta };
+}
+
+/**
+ * Release calendar as a real dated list: the next upcoming screen releases,
+ * exposed as an ItemList. Undated (TBA) works are excluded — they aren't
+ * calendar entries.
+ */
+async function calendarRoute(db: D1Database, origin: string): Promise<Prerendered> {
+  const title = 'Release calendar — Novel Adaptations';
+  const description =
+    'Upcoming book-to-screen releases: films and TV series adapted from novels, with release dates.';
+  let rows: { slug: string | null; id: number; title: string; kind: string; release_date: string }[] = [];
+  try {
+    const res = await db
+      .prepare(
+        `SELECT id, slug, title, kind, release_date
+           FROM screen_works
+          WHERE release_date >= date('now')
+          ORDER BY release_date ASC
+          LIMIT 10`,
+      )
+      .all<{ id: number; slug: string | null; title: string; kind: string; release_date: string }>();
+    rows = res.results ?? [];
+  } catch {
+    rows = [];
+  }
+  const body =
+    `<h1>Release calendar</h1>` +
+    `<p>${esc(description)}</p>` +
+    (rows.length
+      ? `<ul>${rows
+          .map(
+            (r) =>
+              `<li><a href="/watch/${r.slug ?? r.id}">${esc(r.title)}</a> (${kindLabel(r.kind)}) — ${esc(r.release_date.slice(0, 10))}</li>`,
+          )
+          .join('')}</ul>`
+      : '');
+  const meta: PrerenderMeta = {
+    title,
+    description,
+    canonical: `${origin}/calendar`,
+    image: `${origin}/og-card.jpg`,
+    body,
+    jsonLd:
+      rows.length > 0
+        ? {
+            '@context': SCHEMA_CONTEXT,
+            '@type': 'ItemList',
+            name: 'Upcoming book-to-screen releases',
+            itemListElement: rows.map((r, i) => ({
+              '@type': 'ListItem',
+              position: i + 1,
+              name: `${r.title} (${kindLabel(r.kind)}, ${r.release_date.slice(0, 10)})`,
+              url: `${origin}/watch/${r.slug ?? r.id}`,
+            })),
+          }
+        : undefined,
+  };
+  return { status: 200, html: prerenderDoc(meta), meta };
+}
+
 const ID_RE = /^[1-9]\d{0,9}$/;
 
 /**
@@ -474,6 +722,10 @@ export async function prerender(
   path: string,
 ): Promise<Prerendered | null> {
   if (Object.hasOwn(STATIC_ROUTES, path)) return staticRoute(path, origin);
+
+  // DB-backed collection pages with real ItemList structured data.
+  if (path === '/calendar') return calendarRoute(db, origin);
+  if (path === '/most-wanted') return mostWantedRoute(db, origin);
 
   let m: RegExpMatchArray | null;
   if ((m = /^\/watch\/([^/]+)$/.exec(path))) {
@@ -510,7 +762,7 @@ export const PRERENDER_S_MAXAGE = 3600;
  * (JSON-LD schema, body content, meta tags) — it is part of the edge cache
  * key, so a deploy never serves stale bot previews from a previous shape.
  */
-export const PRERENDER_CACHE_VERSION = 2;
+export const PRERENDER_CACHE_VERSION = 3;
 
 function cacheKeyFor(url: string): Request {
   // A synthetic keyed request so prerendered HTML can never collide with a
@@ -527,7 +779,7 @@ function cacheKeyFor(url: string): Request {
  * never serves stale Markdown from a previous shape. Lives here next to
  * cacheKeyFor so purgeListPreview can drop both variants of a page.
  */
-export const MARKDOWN_CACHE_VERSION = 1;
+export const MARKDOWN_CACHE_VERSION = 2;
 
 /** Edge cache key for the Markdown rendering of a page (served by src/agent.ts). */
 export function markdownCacheKeyFor(url: string): Request {

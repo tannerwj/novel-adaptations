@@ -57,6 +57,8 @@ export interface SitemapEntry {
   loc: string;
   /** YYYY-MM-DD (or fuller ISO). Omitted when the row has no usable timestamp. */
   lastmod?: string;
+  /** Absolute image URLs for Google's image extension (poster art, covers). */
+  images?: string[];
 }
 
 /** Static pages that always exist. Ordered for a stable, readable sitemap. */
@@ -71,17 +73,30 @@ export function escapeXml(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/** Render sitemap entries to a sitemaps.org 0.9 urlset document. */
+/** Render sitemap entries to a sitemaps.org 0.9 urlset document, with Google's
+ *  image extension for entries that carry poster/cover art. */
 export function buildSitemap(entries: SitemapEntry[]): string {
+  const hasImages = entries.some((e) => e.images && e.images.length > 0);
   const urls = entries
     .map((e) => {
       const lastmod = e.lastmod
         ? `\n    <lastmod>${escapeXml(e.lastmod)}</lastmod>`
         : '';
-      return `  <url>\n    <loc>${escapeXml(e.loc)}</loc>${lastmod}\n  </url>`;
+      const images = (e.images ?? [])
+        .map((src) => `\n    <image:image>\n      <image:loc>${escapeXml(src)}</image:loc>\n    </image:image>`)
+        .join('');
+      return `  <url>\n    <loc>${escapeXml(e.loc)}</loc>${lastmod}${images}\n  </url>`;
     })
     .join('\n');
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>`;
+  const imageNs = hasImages
+    ? ` xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"`
+    : '';
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${imageNs}>\n${urls}\n</urlset>`;
+}
+
+/** Google's image extension requires absolute URLs — relative art is dropped. */
+function absImage(url: string | null): string[] {
+  return url && /^https?:\/\//i.test(url) ? [url] : [];
 }
 
 /**
@@ -102,20 +117,24 @@ export async function collectSitemapEntries(
   const entries: SitemapEntry[] = STATIC_PATHS.map((p) => ({ loc: origin + p }));
 
   const { results: books } = await db
-    .prepare('SELECT id, slug FROM books ORDER BY id ASC')
-    .all<{ id: number; slug: string | null }>();
+    .prepare('SELECT id, slug, cover_url FROM books ORDER BY id ASC')
+    .all<{ id: number; slug: string | null; cover_url: string | null }>();
   for (const b of books ?? []) {
-    entries.push({ loc: `${origin}/books/${b.slug ?? b.id}` });
+    entries.push({
+      loc: `${origin}/books/${b.slug ?? b.id}`,
+      images: absImage(b.cover_url),
+    });
   }
 
   const { results: works } = await db
-    .prepare('SELECT id, slug, release_date FROM screen_works ORDER BY id ASC')
-    .all<{ id: number; slug: string | null; release_date: string | null }>();
+    .prepare('SELECT id, slug, release_date, poster_url FROM screen_works ORDER BY id ASC')
+    .all<{ id: number; slug: string | null; release_date: string | null; poster_url: string | null }>();
   for (const w of works ?? []) {
     entries.push({
       loc: `${origin}/watch/${w.slug ?? w.id}`,
       // Keep the date-only form Google prefers; release_date is YYYY-MM-DD.
       lastmod: w.release_date ? w.release_date.slice(0, 10) : undefined,
+      images: absImage(w.poster_url),
     });
   }
 
@@ -186,7 +205,103 @@ export function llmsTxt(origin: string, adaptationCount: number): string {
     `\n` +
     `- Screen metadata is sourced from TMDB; book metadata from Open Library. Prefer those attributions when citing.\n` +
     `- No login is required to read anything. Lists marked public are shareable; private lists are never exposed.\n` +
-    `- Release dates marked TBA are genuinely unannounced — do not invent them.\n`
+    `- Release dates marked TBA are genuinely unannounced — do not invent them.\n` +
+    `\n` +
+    `## Feeds\n` +
+    `\n` +
+    `- Full catalog dump (every adaptation, one line each): ${origin}/llms-full.txt\n` +
+    `- Adaptation news as RSS: ${origin}/feed.xml\n`
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RSS feed — curated adaptation news, approved-only
+// ---------------------------------------------------------------------------
+
+export interface RssItem {
+  title: string;
+  link: string;
+  description: string | null;
+  /** ISO-ish timestamp from news_items.published_at; null → created_at fallback. */
+  pubDate: string | null;
+  source: string;
+}
+
+/** Normalize a D1 timestamp to an RFC 822 date string; '' when unusable. */
+function rssPubDate(value: string | null): string {
+  if (!value) return '';
+  const d = new Date(value.includes('T') ? value : value.replace(' ', 'T') + 'Z');
+  return Number.isNaN(d.getTime()) ? '' : d.toUTCString();
+}
+
+/** RSS 2.0 for the approved news queue — feed readers and agents alike. */
+export function buildRssFeed(origin: string, items: RssItem[]): string {
+  const xmlItems = items
+    .map((it) => {
+      const pubDate = rssPubDate(it.pubDate);
+      return (
+        `    <item>\n` +
+        `      <title>${escapeXml(it.title)}</title>\n` +
+        `      <link>${escapeXml(it.link)}</link>\n` +
+        (it.description ? `      <description>${escapeXml(it.description)}</description>\n` : '') +
+        (pubDate ? `      <pubDate>${pubDate}</pubDate>\n` : '') +
+        `      <source>${escapeXml(it.source)}</source>\n` +
+        `    </item>`
+      );
+    })
+    .join('\n');
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<rss version="2.0">\n` +
+    `  <channel>\n` +
+    `    <title>Novel Adaptations — adaptation news</title>\n` +
+    `    <link>${escapeXml(origin)}/</link>\n` +
+    `    <description>Curated news about books becoming films and TV series.</description>\n` +
+    `    <language>en-us</language>\n` +
+    (xmlItems ? `\n${xmlItems}\n` : '') +
+    `  </channel>\n` +
+    `</rss>`
+  );
+}
+
+// ---------------------------------------------------------------------------
+// /llms-full.txt — the entire catalog in one agent-readable page
+// ---------------------------------------------------------------------------
+
+export interface FullCatalogRow {
+  a_slug: string | null;
+  a_id: number;
+  status: string;
+  book_title: string;
+  authors: string;
+  b_slug: string | null;
+  b_id: number;
+  screen_title: string;
+  kind: string;
+  release_date: string | null;
+  s_slug: string | null;
+  s_id: number;
+}
+
+/** One markdown line per adaptation — the whole catalog for agents that
+ *  want everything without crawling thousands of pages. */
+export function llmsFullTxt(origin: string, rows: FullCatalogRow[]): string {
+  const lines = rows.map((r) => {
+    const year = r.release_date && /^\d{4}/.test(r.release_date) ? r.release_date.slice(0, 4) : 'TBA';
+    const kind = r.kind === 'series' ? 'TV series' : 'film';
+    return (
+      `- ${r.book_title} by ${r.authors} → ${r.screen_title} (${kind}, ${year}) — ${r.status}\n` +
+      `  book: ${origin}/books/${r.b_slug ?? r.b_id} · screen: ${origin}/watch/${r.s_slug ?? r.s_id} · adaptation: ${origin}/adaptations/${r.a_slug ?? r.a_id}`
+    );
+  });
+  return (
+    `# Novel Adaptations — full catalog\n` +
+    `\n` +
+    `${rows.length.toLocaleString('en-US')} book-to-screen adaptations. ` +
+    `For a guided overview see ${origin}/llms.txt.\n` +
+    `\n` +
+    lines.join('\n') +
+    `\n`
   );
 }
 
@@ -195,9 +310,9 @@ export function llmsTxt(origin: string, adaptationCount: number): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Register /sitemap.xml and /robots.txt on the app. Absolute URLs are built
- * from the request origin so the same code works on preview and production
- * deployments.
+ * Register /sitemap.xml, /robots.txt, /llms.txt, /llms-full.txt, and /feed.xml
+ * on the app. Absolute URLs are built from the request origin so the same
+ * code works on preview and production deployments.
  */
 export function registerSeoRoutes<
   E extends { Bindings: { DB: D1Database } },
@@ -224,6 +339,59 @@ export function registerSeoRoutes<
       'Content-Type': 'text/markdown; charset=utf-8',
       // Counts change rarely; cache at the edge for a day.
       'Cache-Control': 'public, s-maxage=86400',
+    });
+  });
+
+  app.get('/llms-full.txt', async (c) => {
+    const origin = new URL(c.req.url).origin;
+    const { results } = await c.env.DB
+      .prepare(
+        `SELECT a.slug AS a_slug, a.id AS a_id, a.status,
+                b.title AS book_title, b.authors, b.slug AS b_slug, b.id AS b_id,
+                s.title AS screen_title, s.kind, s.release_date,
+                s.slug AS s_slug, s.id AS s_id
+           FROM adaptations a
+           JOIN books b ON b.id = a.book_id
+           JOIN screen_works s ON s.id = a.screen_work_id
+          ORDER BY a.id ASC`,
+      )
+      .all<FullCatalogRow>();
+    return c.text(llmsFullTxt(origin, results ?? []), 200, {
+      'Content-Type': 'text/markdown; charset=utf-8',
+      // Catalog-wide dump; counts change rarely — edge-cache for a day.
+      'Cache-Control': 'public, s-maxage=86400',
+    });
+  });
+
+  app.get('/feed.xml', async (c) => {
+    const origin = new URL(c.req.url).origin;
+    const { results } = await c.env.DB
+      .prepare(
+        `SELECT title, url, summary, source, published_at, created_at
+           FROM news_items
+          WHERE status = 'approved'
+          ORDER BY published_at DESC NULLS LAST, id DESC
+          LIMIT 50`,
+      )
+      .all<{
+        title: string;
+        url: string;
+        summary: string | null;
+        source: string;
+        published_at: string | null;
+        created_at: string | null;
+      }>();
+    const items: RssItem[] = (results ?? []).map((r) => ({
+      title: r.title,
+      link: r.url,
+      description: r.summary,
+      pubDate: r.published_at ?? r.created_at,
+      source: r.source,
+    }));
+    return c.text(buildRssFeed(origin, items), 200, {
+      'Content-Type': 'application/rss+xml; charset=utf-8',
+      // News turnover is slow; an hour of edge cache is plenty.
+      'Cache-Control': 'public, s-maxage=3600',
     });
   });
 }

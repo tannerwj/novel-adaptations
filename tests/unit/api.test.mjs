@@ -21,6 +21,11 @@ import { register } from 'node:module';
 register(new URL('./hooks/extensionless.mjs', import.meta.url));
 
 const { mountV1 } = await import('../../src/api/v1.ts');
+// Purge-key versions are derived from the source constants so a cache-shape
+// bump doesn't silently stale these assertions again.
+const { PRERENDER_CACHE_VERSION, MARKDOWN_CACHE_VERSION } = await import(
+  '../../src/prerender.ts'
+);
 
 /** D1-shaped adapter over node:sqlite. */
 function d1(sqlite) {
@@ -176,13 +181,13 @@ test('PUT /api/v1/lists/:id purges the bot preview on edit', async () => {
   });
   assert.equal(res.status, 200);
   assert.ok(
-    purged.some((u) => u === 'http://localhost/lists/my-list?na-prerender=v2'),
+    purged.some((u) => u === `http://localhost/lists/my-list?na-prerender=v${PRERENDER_CACHE_VERSION}`),
     `preview purge expected, got: ${JSON.stringify(purged)}`,
   );
   // The Markdown rendering is cached under a separate key — it must be
   // purged too, or an edit would leave stale Markdown at the edge.
   assert.ok(
-    purged.some((u) => u === 'http://localhost/lists/my-list?na-markdown=v1'),
+    purged.some((u) => u === `http://localhost/lists/my-list?na-markdown=v${MARKDOWN_CACHE_VERSION}`),
     `markdown purge expected, got: ${JSON.stringify(purged)}`,
   );
 });
@@ -201,7 +206,7 @@ test('PUT /api/v1/lists/:id purges the bot preview on public→private', async (
   const row = sqlite.prepare('SELECT is_public FROM lists WHERE id = ' + globalThis.__testIds.listId + '').get();
   assert.equal(row.is_public, 0);
   assert.ok(
-    purged.some((u) => u.includes('/lists/my-list?na-prerender=v2')),
+    purged.some((u) => u.includes(`/lists/my-list?na-prerender=v${PRERENDER_CACHE_VERSION}`)),
     `preview purge expected after privatizing, got: ${JSON.stringify(purged)}`,
   );
 });
@@ -211,7 +216,7 @@ test('DELETE /api/v1/lists/:id purges the bot preview', async () => {
   const res = await req(`/api/v1/lists/${globalThis.__testIds.listId}`, { method: 'DELETE' });
   assert.equal(res.status, 200);
   assert.ok(
-    purged.some((u) => u.includes('/lists/my-list?na-prerender=v2')),
+    purged.some((u) => u.includes(`/lists/my-list?na-prerender=v${PRERENDER_CACHE_VERSION}`)),
     `preview purge expected after delete, got: ${JSON.stringify(purged)}`,
   );
 });
