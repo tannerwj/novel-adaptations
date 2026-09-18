@@ -475,10 +475,19 @@ async function watchRoute(db: D1Database, origin: string, slug: string): Promise
     `${w.title} (${kindLabel(w.kind)})` +
     (year ? `, released ${year}` : w.release_date ? '' : ', release date TBA') +
     (bookBits.length ? ` — adapted from ${bookBits.slice(0, 3).join('; ')}.` : '.');
+  const castNames = parseCastJson(w.cast_json).map((m) => m.name);
   const body =
     `<h1>${esc(w.title)}</h1>` +
     `<p>${esc(description)}</p>` +
     (w.synopsis ? `<p>${esc(w.synopsis)}</p>` : '') +
+    (castNames.length
+      ? `<p>Starring ${esc(castNames.slice(0, 5).join(', '))}.</p>`
+      : '') +
+    (w.director
+      ? `<p>Directed by ${esc(w.director)}.</p>`
+      : w.creators
+        ? `<p>Created by ${esc(w.creators)}.</p>`
+        : '') +
     (w.poster_url
       ? `<img src="${esc(w.poster_url)}" alt="${esc(w.title)} poster artwork" width="500">`
       : '') +
