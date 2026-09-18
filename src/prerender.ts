@@ -509,11 +509,20 @@ export async function prerender(
  */
 export const PRERENDER_S_MAXAGE = 3600;
 
+/**
+ * Bump this integer whenever the prerendered document shape changes
+ * (JSON-LD schema, body content, meta tags) — it is part of the edge cache
+ * key, so a deploy never serves stale bot previews from a previous shape.
+ */
+export const PRERENDER_CACHE_VERSION = 2;
+
 function cacheKeyFor(url: string): Request {
   // A synthetic keyed request so prerendered HTML can never collide with a
-  // real user's cached response for the same URL.
+  // real user's cached response for the same URL. The version segment is
+  // bumped whenever the prerendered document shape changes (new JSON-LD,
+  // new body content, ...) so a deploy never serves stale bot previews.
   const sep = url.includes('?') ? '&' : '?';
-  return new Request(`${url}${sep}na-prerender=1`);
+  return new Request(`${url}${sep}na-prerender=v${PRERENDER_CACHE_VERSION}`);
 }
 
 /**

@@ -156,3 +156,8 @@ test('llmsTxt references origin-based sitemap, API docs, and page patterns', () 
   assert.ok(txt.includes('/watch/{slug}'));
   assert.ok(txt.includes('application/ld+json') || txt.includes('JSON-LD'));
 });
+
+test('PRERENDER_CACHE_VERSION is a positive integer (bump on shape changes)', async () => {
+  const { PRERENDER_CACHE_VERSION } = prerender;
+  assert.ok(Number.isInteger(PRERENDER_CACHE_VERSION) && PRERENDER_CACHE_VERSION > 0);
+});
