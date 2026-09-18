@@ -68,6 +68,13 @@ export interface PrerenderMeta {
    * can't break out of the script tag.
    */
   jsonLd?: unknown;
+  /** Cached YouTube trailer key → og:video tags for richer social unfurls. */
+  video?: { embedUrl: string };
+}
+
+/** YouTube embed URL for a cached trailer key. */
+export function youtubeEmbedUrl(youtubeKey: string): string {
+  return `https://www.youtube.com/embed/${youtubeKey}`;
 }
 
 /** Serialize JSON-LD for inline <script>: escape `<` to block `</script>` breakout. */
@@ -82,24 +89,32 @@ const SITE_NAME = 'Novel Adaptations';
  * session data, no secrets — safe to cache at the edge and serve to bots.
  */
 export function prerenderDoc(meta: PrerenderMeta): string {
-  const { title, description, canonical, image, body, jsonLd } = meta;
+  const { title, description, canonical, image, body, jsonLd, video } = meta;
   const t = esc(title);
   const d = esc(description);
+  const origin = new URL(canonical).origin;
   return (
     `<!DOCTYPE html>` +
     `<html lang="en">` +
     `<head>` +
     `<meta charset="utf-8">` +
     `<meta name="viewport" content="width=device-width, initial-scale=1">` +
+    // Large image previews in search results — this is a visual catalog.
+    `<meta name="robots" content="max-image-preview:large">` +
     `<title>${t}</title>` +
     `<meta name="description" content="${d}">` +
     `<link rel="canonical" href="${esc(canonical)}">` +
+    `<link rel="alternate" type="application/rss+xml" title="Novel Adaptations — adaptation news" href="${esc(origin)}/feed.xml">` +
     `<meta property="og:site_name" content="${SITE_NAME}">` +
     `<meta property="og:type" content="website">` +
     `<meta property="og:title" content="${t}">` +
     `<meta property="og:description" content="${d}">` +
     `<meta property="og:url" content="${esc(canonical)}">` +
     `<meta property="og:image" content="${esc(image)}">` +
+    (video
+      ? `<meta property="og:video" content="${esc(video.embedUrl)}">` +
+        `<meta property="og:video:type" content="text/html">`
+      : '') +
     `<meta name="twitter:card" content="summary_large_image">` +
     `<meta name="twitter:title" content="${t}">` +
     `<meta name="twitter:description" content="${d}">` +
@@ -164,6 +179,8 @@ export interface ScreenWorkJsonLdInput {
    * The ratings are visible on the page (the rating widget), per guidelines.
    */
   rating?: { average: number; count: number };
+  /** TMDB id → sameAs link so search engines disambiguate the title. */
+  tmdbId?: number | null;
 }
 
 /** Add an AggregateRating node to an entity when the crowd has actually rated it. */
@@ -198,6 +215,9 @@ export function screenWorkJsonLd(input: ScreenWorkJsonLdInput): Record<string, u
     entity.isBasedOn = input.books.map(bookRefJsonLd);
   }
   withAggregateRating(entity, input.rating);
+  if (input.tmdbId) {
+    entity.sameAs = `https://www.themoviedb.org/${input.kind === 'series' ? 'tv' : 'movie'}/${input.tmdbId}`;
+  }
   return entity;
 }
 
@@ -286,7 +306,7 @@ export function videoObjectJsonLd(input: VideoObjectJsonLdInput): Record<string,
     name: `${input.title} — Official Trailer`,
     description: input.description,
     thumbnailUrl: `https://i.ytimg.com/vi/${input.youtubeKey}/hqdefault.jpg`,
-    embedUrl: `https://www.youtube.com/embed/${input.youtubeKey}`,
+    embedUrl: youtubeEmbedUrl(input.youtubeKey),
     contentUrl: `https://www.youtube.com/watch?v=${input.youtubeKey}`,
   };
   if (input.uploadDate && /^\d{4}-\d{2}-\d{2}/.test(input.uploadDate)) {
@@ -463,6 +483,7 @@ async function watchRoute(db: D1Database, origin: string, slug: string): Promise
     canonical: `${origin}/watch/${w.slug ?? w.id}`,
     image: artOrFallback(origin, w.poster_url, w.backdrop_url),
     body,
+    video: w.trailer_youtube_key ? { embedUrl: youtubeEmbedUrl(w.trailer_youtube_key) } : undefined,
     jsonLd: jsonLdGraph(
       screenWorkJsonLd({
         title: w.title,
@@ -473,6 +494,7 @@ async function watchRoute(db: D1Database, origin: string, slug: string): Promise
         image: artOrFallback(origin, w.poster_url, w.backdrop_url),
         books: w.books.map((b) => ({ title: b.title, authors: b.authors })),
         rating: await ratingAggregate(db, 'screen_work', w.id),
+        tmdbId: w.tmdb_id,
       }),
       // Trailer is cached in D1 (screen_works.trailer_youtube_key) — when
       // present the page is eligible for video rich results.
@@ -762,7 +784,7 @@ export const PRERENDER_S_MAXAGE = 3600;
  * (JSON-LD schema, body content, meta tags) — it is part of the edge cache
  * key, so a deploy never serves stale bot previews from a previous shape.
  */
-export const PRERENDER_CACHE_VERSION = 3;
+export const PRERENDER_CACHE_VERSION = 4;
 
 function cacheKeyFor(url: string): Request {
   // A synthetic keyed request so prerendered HTML can never collide with a
@@ -779,7 +801,7 @@ function cacheKeyFor(url: string): Request {
  * never serves stale Markdown from a previous shape. Lives here next to
  * cacheKeyFor so purgeListPreview can drop both variants of a page.
  */
-export const MARKDOWN_CACHE_VERSION = 2;
+export const MARKDOWN_CACHE_VERSION = 3;
 
 /** Edge cache key for the Markdown rendering of a page (served by src/agent.ts). */
 export function markdownCacheKeyFor(url: string): Request {

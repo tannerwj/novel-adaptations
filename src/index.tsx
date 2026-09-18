@@ -14,6 +14,7 @@ import { getCookie } from 'hono/cookie';
 import { serveFavicon } from './favicon';
 import { scheduledNewsRun } from './news/ingest';
 import { registerSeoRoutes } from './seo';
+import { registerIndexNowKeyRoute } from './indexnow';
 // Versioned JSON API at /api/v1 — the SPA contract (docs/openapi.yaml).
 import { mountV1 } from './api/v1';
 import openapiSpec from '../public/openapi.json';
@@ -48,6 +49,10 @@ export interface Env {
   ENVIRONMENT?: string;
   /** TMDB API key for future poster enrichment (`wrangler secret put TMDB_API_KEY`). Absent → stub no-ops. */
   TMDB_API_KEY?: string;
+  /** IndexNow instant-indexing key (`wrangler secret put INDEXNOW_KEY` with a
+   *  random hex string). Served at /{key}.txt and used to notify Bing/Yandex
+   *  of new/changed catalog URLs. Absent → IndexNow disabled. */
+  INDEXNOW_KEY?: string;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -199,6 +204,10 @@ app.get('/api/docs', (c) => c.html(apiDocsShell()));
 
 // SEO: /sitemap.xml + /robots.txt.
 registerSeoRoutes(app);
+
+// IndexNow key file (/{key}.txt) — after the static routes; non-matching
+// paths fall through to the page routes below.
+registerIndexNowKeyRoute(app);
 
 // Agent readiness: Markdown negotiation (in servePage), RFC 9727 API catalog,
 // and Agent Skills discovery.

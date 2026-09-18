@@ -305,3 +305,52 @@ test('llmsTxt advertises the full catalog dump and the RSS feed', () => {
   assert.ok(txt.includes('https://noveladaptations.com/llms-full.txt'));
   assert.ok(txt.includes('https://noveladaptations.com/feed.xml'));
 });
+
+test('screenWorkJsonLd adds a TMDB sameAs link when the TMDB id is known', () => {
+  const film = screenWorkJsonLd({
+    title: 'Dune: Part Two', kind: 'film', releaseDate: '2024-03-01', description: 'd',
+    canonical: 'https://noveladaptations.com/watch/dune-part-two-2024',
+    image: 'https://noveladaptations.com/og-card.jpg', books: [], tmdbId: 693134,
+  });
+  assert.equal(film.sameAs, 'https://www.themoviedb.org/movie/693134');
+  const series = screenWorkJsonLd({
+    title: 'The Last of Us', kind: 'series', releaseDate: null, description: 'd',
+    canonical: 'https://noveladaptations.com/watch/x', image: 'https://noveladaptations.com/og-card.jpg',
+    books: [], tmdbId: 100088,
+  });
+  assert.equal(series.sameAs, 'https://www.themoviedb.org/tv/100088');
+  const unknown = screenWorkJsonLd({
+    title: 'X', kind: 'film', releaseDate: null, description: 'd',
+    canonical: 'https://noveladaptations.com/watch/x', image: 'https://noveladaptations.com/og-card.jpg', books: [],
+  });
+  assert.ok(!('sameAs' in unknown), 'no sameAs without a TMDB id — never guess the URL');
+});
+
+test('prerenderDoc emits robots max-image-preview, RSS autodiscovery, and og:video', () => {
+  const html = prerenderDoc({
+    title: 'Dune: Part Two — Novel Adaptations',
+    description: 'd',
+    canonical: 'https://noveladaptations.com/watch/dune-part-two-2024',
+    image: 'https://noveladaptations.com/og-card.jpg',
+    body: '<h1>Dune: Part Two</h1>',
+    video: { embedUrl: 'https://www.youtube.com/embed/Way9Dexny3w' },
+  });
+  assert.ok(html.includes('<meta name="robots" content="max-image-preview:large">'));
+  assert.ok(
+    html.includes('<link rel="alternate" type="application/rss+xml"') &&
+      html.includes('href="https://noveladaptations.com/feed.xml"'),
+    'RSS autodiscovery with absolute feed URL',
+  );
+  assert.ok(html.includes('<meta property="og:video" content="https://www.youtube.com/embed/Way9Dexny3w">'));
+  assert.ok(html.includes('<meta property="og:video:type" content="text/html">'));
+  const noVideo = prerenderDoc({
+    title: 't', description: 'd', canonical: 'https://noveladaptations.com/',
+    image: 'https://noveladaptations.com/og-card.jpg', body: '<h1>x</h1>',
+  });
+  assert.ok(!noVideo.includes('og:video'), 'no og:video tags without a trailer');
+});
+
+test('youtubeEmbedUrl builds the embed URL from the key', () => {
+  const { youtubeEmbedUrl } = prerender;
+  assert.equal(youtubeEmbedUrl('Way9Dexny3w'), 'https://www.youtube.com/embed/Way9Dexny3w');
+});

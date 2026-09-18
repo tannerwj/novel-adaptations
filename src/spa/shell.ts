@@ -104,6 +104,7 @@ export function spaShell(
     `<meta name="twitter:image" content="${origin}/og-card.jpg">` +
     `<link rel="icon" type="image/png" href="/favicon.png">` +
     `<link rel="apple-touch-icon" href="/apple-touch-icon.png">` +
+    `<link rel="alternate" type="application/rss+xml" title="Novel Adaptations — adaptation news" href="${origin}/feed.xml">` +
     `<script>${THEME_SCRIPT}</script>` +
     `<style>${CRITICAL_CSS}</style>` +
     // Preconnect to the poster/cover image hosts: the LCP element on every

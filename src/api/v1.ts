@@ -170,6 +170,7 @@ import {
 import { getWatchProviders } from '../watch_providers_cache';
 import { fetchAndCacheProviders } from '../watch_providers_cache';
 import { IntakeError, intakeFromTip } from '../intake';
+import { submitIndexNow } from '../indexnow';
 import { fetchTrailerKey } from '../trailers';
 
 const v1 = new Hono<{ Bindings: Env }>();
@@ -2101,6 +2102,28 @@ v1.post('/admin/feedback/:id/intake', async (c) => {
       );
     }
     await setFeedbackStatus(c.env.DB, id, 'done');
+    // Tell IndexNow about the new/changed catalog pages — fire-and-forget;
+    // indexing must never fail the intake response.
+    c.executionCtx.waitUntil(
+      (async () => {
+        const origin = new URL(c.req.url).origin;
+        const slugs = await c.env.DB.batch([
+          c.env.DB.prepare('SELECT slug, id FROM books WHERE id = ?1').bind(result.book.id),
+          c.env.DB.prepare('SELECT slug, id FROM screen_works WHERE id = ?1').bind(result.screenWork.id),
+          c.env.DB.prepare('SELECT slug, id FROM adaptations WHERE id = ?1').bind(result.adaptation.id),
+        ]);
+        const pick = (i: number, base: string): string | null => {
+          const row = slugs[i]?.results?.[0] as { slug: string | null; id: number } | undefined;
+          return row ? `${origin}${base}/${row.slug ?? row.id}` : null;
+        };
+        const urls = [
+          pick(0, '/books'),
+          pick(1, '/watch'),
+          pick(2, '/adaptations'),
+        ].filter((u): u is string => u !== null);
+        await submitIndexNow(c.env, origin, urls);
+      })().catch((e) => console.error('indexnow intake hook failed:', (e as Error).message)),
+    );
     return c.json({ ok: true, id, ...result });
   } catch (e) {
     if (e instanceof IntakeError) {
