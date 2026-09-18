@@ -214,7 +214,21 @@ function fakeDb() {
       // Real D1 allows .first()/.all()/.run() with no bind() when the query
       // has no parameters.
       return {
-        bind: (...args) => exec(args),
+        bind: (...args) => {
+          // D1 sizes the bind array by the largest ?NNN used (a repeated
+          // placeholder does not consume an extra bind). Enforce that here
+          // so a "Wrong number of parameter bindings" production failure is
+          // caught by tests instead of the cron.
+          const nums = [...q.matchAll(/\?(\d+)/g)].map((m) => Number(m[1]));
+          const maxN = nums.length ? Math.max(...nums) : 0;
+          const positional = (q.match(/\?[,)\s]/g) || []).length;
+          const expected = Math.max(maxN, positional);
+          assert.equal(
+            args.length, expected,
+            `bind count mismatch for query: ${q.slice(0, 80)} (got ${args.length}, want ${expected})`,
+          );
+          return exec(args);
+        },
         run: () => exec([]).run(),
         first: () => exec([]).first(),
         all: () => exec([]).all(),

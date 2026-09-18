@@ -484,16 +484,21 @@ async function alreadyCataloged(
   filmTitle: string,
   filmYear: number | null,
 ): Promise<boolean> {
+  // NOTE: D1 sizes the bind array by the largest ?NNN used, so the year
+  // placeholder must not repeat — build the clause conditionally.
+  const yearClause = filmYear != null ? 'AND substr(s.release_date, 1, 4) = ?3' : '';
+  const binds: Array<string | number> =
+    filmYear != null ? [bookTitle, filmTitle, String(filmYear)] : [bookTitle, filmTitle];
   const row = await db
     .prepare(
       `SELECT a.id FROM adaptations a
        JOIN books b ON b.id = a.book_id
        JOIN screen_works s ON s.id = a.screen_work_id
        WHERE lower(b.title) = lower(?1) AND lower(s.title) = lower(?2)
-         AND (?3 IS NULL OR substr(s.release_date, 1, 4) = CAST(?3 AS TEXT))
+         ${yearClause}
        LIMIT 1`,
     )
-    .bind(bookTitle, filmTitle, filmYear, filmYear)
+    .bind(...binds)
     .first<{ id: number }>();
   return row != null;
 }
