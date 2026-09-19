@@ -48,12 +48,26 @@ export function registerIndexNowBulkRetryRoute<
       return c.json({ status: res.status, body: body.slice(0, 2000) });
     }
 
+    // ?batch=N submits only the Nth 1-indexed batch (after ?delayMs, default 0),
+    // so the caller can pace submissions to respect IndexNow rate limits.
+    const batchParam = new URL(c.req.url).searchParams.get('batch');
+    const delayMs = Math.min(
+      120000,
+      Math.max(0, parseInt(new URL(c.req.url).searchParams.get('delayMs') ?? '0', 10) || 0),
+    );
+
     const entries = await collectSitemapEntries(c.env.DB, origin);
     const urls = [...new Set(entries.map((e) => e.loc))];
 
     const batches: Array<{ batch: number; count: number; status: number | string }> = [];
-    for (let i = 0; i < urls.length; i += BATCH_SIZE) {
-      const chunk = urls.slice(i, i + BATCH_SIZE);
+    const totalBatches = Math.ceil(urls.length / BATCH_SIZE);
+    const wanted = batchParam ? [parseInt(batchParam, 10)] : Array.from({ length: totalBatches }, (_, i) => i + 1);
+    for (const n of wanted) {
+      if (!Number.isInteger(n) || n < 1 || n > totalBatches) {
+        return c.json({ error: 'bad_batch', totalBatches }, 400);
+      }
+      if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
+      const chunk = urls.slice((n - 1) * BATCH_SIZE, n * BATCH_SIZE);
       let status: number | string;
       try {
         const res = await fetch('https://api.indexnow.org/indexnow', {
@@ -65,10 +79,10 @@ export function registerIndexNowBulkRetryRoute<
       } catch (e) {
         status = `error: ${(e as Error).message}`;
       }
-      batches.push({ batch: batches.length + 1, count: chunk.length, status });
+      batches.push({ batch: n, count: chunk.length, status });
     }
 
     const ok = batches.every((b) => b.status === 200 || b.status === 202);
-    return c.json({ ok, total_urls: urls.length, batches });
+    return c.json({ ok, total_urls: urls.length, totalBatches, batches });
   });
 }
