@@ -39,7 +39,7 @@ export function registerIndexNowBulkRetryRoute<
     // ?debug=1 submits a single URL and returns IndexNow's raw response body,
     // so we can see exactly what a 4xx means.
     if (new URL(c.req.url).searchParams.get('debug') === '1') {
-      const res = await fetch('https://api.indexnow.org/indexnow.json', {
+      const res = await fetch('https://api.indexnow.org/indexnow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(indexNowPayload(host, key, [`${origin}/`])),
@@ -56,7 +56,7 @@ export function registerIndexNowBulkRetryRoute<
       const chunk = urls.slice(i, i + BATCH_SIZE);
       let status: number | string;
       try {
-        const res = await fetch('https://api.indexnow.org/indexnow.json', {
+        const res = await fetch('https://api.indexnow.org/indexnow', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(indexNowPayload(host, key, chunk)),

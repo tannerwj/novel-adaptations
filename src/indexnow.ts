@@ -43,7 +43,10 @@ export async function submitIndexNow(
   if (!key || urls.length === 0) return;
   const host = new URL(origin).host;
   try {
-    const res = await fetch('https://api.indexnow.org/indexnow.json', {
+    // NOTE: api.indexnow.org/indexnow.json is NOT a valid endpoint — Azure
+    // Front Door answers it with a 400 "services aren't available" page.
+    // The documented endpoint is https://api.indexnow.org/indexnow.
+    const res = await fetch('https://api.indexnow.org/indexnow', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(indexNowPayload(host, key, urls)),

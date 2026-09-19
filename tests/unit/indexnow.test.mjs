@@ -25,3 +25,23 @@ test('submitIndexNow no-ops without a key or URLs (never throws)', async () => {
   await submitIndexNow({}, 'https://noveladaptations.com', ['https://noveladaptations.com/']);
   await submitIndexNow({ INDEXNOW_KEY: 'abc123' }, 'https://noveladaptations.com', []);
 });
+
+test('submitIndexNow posts to https://api.indexnow.org/indexnow (the .json variant 400s)', async () => {
+  // Regression guard: 2026-09-19 the bulk retry revealed api.indexnow.org/indexnow.json
+  // is not a real endpoint — Azure answers 400 "services aren't available". The
+  // documented endpoint is https://api.indexnow.org/indexnow.
+  const calls = [];
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    calls.push(String(url));
+    return { status: 200 };
+  };
+  try {
+    await submitIndexNow({ INDEXNOW_KEY: 'abc12345' }, 'https://noveladaptations.com', [
+      'https://noveladaptations.com/',
+    ]);
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+  assert.deepEqual(calls, ['https://api.indexnow.org/indexnow']);
+});
