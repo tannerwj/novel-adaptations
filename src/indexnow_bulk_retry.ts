@@ -61,13 +61,24 @@ export function registerIndexNowBulkRetryRoute<
 
     const batches: Array<{ batch: number; count: number; status: number | string }> = [];
     const totalBatches = Math.ceil(urls.length / BATCH_SIZE);
-    const wanted = batchParam ? [parseInt(batchParam, 10)] : Array.from({ length: totalBatches }, (_, i) => i + 1);
-    for (const n of wanted) {
-      if (!Number.isInteger(n) || n < 1 || n > totalBatches) {
-        return c.json({ error: 'bad_batch', totalBatches }, 400);
+    // No ?batch param → single request with ALL urls (up to the 10,000/request
+    // IndexNow limit). One request can't trip the per-request rate limiter.
+    const wanted = batchParam
+      ? [parseInt(batchParam, 10)]
+      : null;
+    let chunks: Array<{ n: number; urls: string[] }>;
+    if (wanted) {
+      for (const n of wanted) {
+        if (!Number.isInteger(n) || n < 1 || n > totalBatches) {
+          return c.json({ error: 'bad_batch', totalBatches }, 400);
+        }
       }
+      chunks = wanted.map((n) => ({ n, urls: urls.slice((n - 1) * BATCH_SIZE, n * BATCH_SIZE) }));
+    } else {
+      chunks = [{ n: 1, urls }];
+    }
+    for (const { n, urls: chunk } of chunks) {
       if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
-      const chunk = urls.slice((n - 1) * BATCH_SIZE, n * BATCH_SIZE);
       let status: number | string;
       try {
         const res = await fetch('https://api.indexnow.org/indexnow', {
