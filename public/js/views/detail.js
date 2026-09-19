@@ -207,7 +207,7 @@ export async function watchView({ params }) {
     html:
       `<a class="back-link" href="/">← All adaptations</a>` +
       `<div class="hero">` +
-        posterArt(w.backdrop_url ?? w.poster_url, w.title, `${kindLabel(w.kind)}${year ? ` · ${year}` : ''}`, { eager: true, fetchpriority: 'high', sizes: HERO_SIZES }) +
+        posterArt(w.poster_url, w.title, `${kindLabel(w.kind)}${year ? ` · ${year}` : ''}`, { eager: true, fetchpriority: 'high', sizes: HERO_SIZES }) +
         `<div>` +
           `<p class="kicker">The screen work — ${esc(kindLabel(w.kind).toLowerCase())}</p>` +
           `<h1>${esc(w.title)}</h1>` +

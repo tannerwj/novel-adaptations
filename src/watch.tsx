@@ -88,8 +88,12 @@ export function ScreenWorkPage({
     >
       <a class="back-link" href="/">← All adaptations</a>
       <div class="hero">
+        {/* ARTWORK POLICY: the hero slot is 2:3 — always the poster (natively
+            2:3). A 16:9 backdrop object-fit into this frame shows a meaningless
+            vertical slice (see: Where the Wild Things Are). Backdrops are for
+            16:9 surfaces only (og:image). */}
         <PosterArt
-          src={work.backdrop_url ?? work.poster_url}
+          src={work.poster_url}
           title={work.title}
           subtitle={`${kindLabel(work.kind)}${year ? ` · ${year}` : ''}`}
         />

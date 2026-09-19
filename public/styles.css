@@ -428,7 +428,10 @@ body.sheet-open { overflow: hidden; }
  * aspect ratio with object-fit: cover cropping (.poster, .hero .poster,
  * .rank-thumb, .duel-art) so cards, heroes, and search results all treat
  * artwork identically. posterArt() in public/js/utils.js always emits
- * the .poster wrapper; never bypass it for title artwork. */
+ * the .poster wrapper; never bypass it for title artwork.
+ * 16:9 TMDB backdrops NEVER go in these slots — a landscape still cropped
+ * to 2:3 shows a meaningless vertical slice. Backdrops are for 16:9
+ * surfaces only (og:image social cards). */
 .poster-grid {
   display: grid; gap: 1.75rem 1.5rem;
   grid-template-columns: repeat(2, 1fr);
