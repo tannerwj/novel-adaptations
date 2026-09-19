@@ -22,6 +22,7 @@ import {
 } from './expansion';
 import { registerSeoRoutes } from './seo';
 import { registerIndexNowKeyRoute } from './indexnow';
+import { registerIndexNowBulkRetryRoute } from './indexnow_bulk_retry';
 // Versioned JSON API at /api/v1 — the SPA contract (docs/openapi.yaml).
 import { mountV1 } from './api/v1';
 import openapiSpec from '../public/openapi.json';
@@ -60,6 +61,9 @@ export interface Env {
    *  random hex string). Served at /{key}.txt and used to notify Bing/Yandex
    *  of new/changed catalog URLs. Absent → IndexNow disabled. */
   INDEXNOW_KEY?: string;
+  /** TEMPORARY bearer token for the one-shot IndexNow bulk retry
+   *  (`wrangler secret put BULK_RETRY_TOKEN`). Delete with the route. */
+  BULK_RETRY_TOKEN?: string;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -215,6 +219,10 @@ registerSeoRoutes(app);
 // IndexNow key file (/{key}.txt) — after the static routes; non-matching
 // paths fall through to the page routes below.
 registerIndexNowKeyRoute(app);
+
+// TEMPORARY one-shot IndexNow bulk retry (token-gated). Remove after the
+// 2026-09-19 retry succeeds, along with src/indexnow_bulk_retry.ts.
+registerIndexNowBulkRetryRoute(app);
 
 // Agent readiness: Markdown negotiation (in servePage), RFC 9727 API catalog,
 // and Agent Skills discovery.
